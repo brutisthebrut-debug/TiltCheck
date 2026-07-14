@@ -114,32 +114,38 @@ router.post("/parlays", requireProfile, async (req, res): Promise<void> => {
   const combinedDecimal = legOddsArr.reduce((acc, o) => acc * americanToDecimal(o), 1);
   const payout = calcParlayPayout(combinedDecimal, Number(d.stake));
 
-  const [parlay] = await db
-    .insert(parlaysTable)
-    .values({
-      userId: req.currentUser!.id,
-      name: d.name,
-      stake: String(d.stake),
-      odds: combinedOdds,
-      potentialPayout: String(payout.toFixed(2)),
-      confidenceScore: d.confidenceScore,
-      rationale: d.rationale ?? null,
-      sportsbook: d.sportsbook ?? null,
-      promoNote: d.promoNote ?? null,
-    })
-    .returning();
+  // Insert the parlay and its legs atomically so an interrupted request
+  // can't leave a parlay row with zero legs.
+  const parlay = await db.transaction(async (tx) => {
+    const [createdParlay] = await tx
+      .insert(parlaysTable)
+      .values({
+        userId: req.currentUser!.id,
+        name: d.name,
+        stake: String(d.stake),
+        odds: combinedOdds,
+        potentialPayout: String(payout.toFixed(2)),
+        confidenceScore: d.confidenceScore,
+        rationale: d.rationale ?? null,
+        sportsbook: d.sportsbook ?? null,
+        promoNote: d.promoNote ?? null,
+      })
+      .returning();
 
-  await db.insert(parlayLegsTable).values(
-    d.legs.map((leg) => ({
-      parlayId: parlay.id,
-      sport: leg.sport,
-      event: leg.event,
-      betType: leg.betType,
-      pick: leg.pick,
-      odds: leg.odds,
-      gameDate: leg.gameDate,
-    }))
-  );
+    await tx.insert(parlayLegsTable).values(
+      d.legs.map((leg) => ({
+        parlayId: createdParlay.id,
+        sport: leg.sport,
+        event: leg.event,
+        betType: leg.betType,
+        pick: leg.pick,
+        odds: leg.odds,
+        gameDate: leg.gameDate,
+      }))
+    );
+
+    return createdParlay;
+  });
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, parlay.userId));
   res.status(201).json(await formatParlay(parlay, user?.displayName ?? "Unknown"));
