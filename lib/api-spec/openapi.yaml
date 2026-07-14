@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: EdgeBoard - Sports bet tracking API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: bets
+    description: Straight bet operations
+  - name: parlays
+    description: Parlay operations
+  - name: bankroll
+    description: Bankroll and transaction operations
+  - name: stats
+    description: Analytics and statistics
+  - name: workspace
+    description: Shared workspace operations
+  - name: users
+    description: User operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,482 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Users ──────────────────────────────────────────────────────────────────
+  /users/me:
+    get:
+      operationId: getCurrentUser
+      tags: [users]
+      summary: Get current user (or create on first visit)
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all workspace users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ── Bets ──────────────────────────────────────────────────────────────────
+  /bets:
+    get:
+      operationId: listBets
+      tags: [bets]
+      summary: List straight bets
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [pending, won, lost, push, void, null]
+        - name: sport
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of bets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bet"
+    post:
+      operationId: createBet
+      tags: [bets]
+      summary: Create a new straight bet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BetInput"
+      responses:
+        "201":
+          description: Created bet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bet"
+
+  /bets/{id}:
+    get:
+      operationId: getBet
+      tags: [bets]
+      summary: Get a single bet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bet detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bet"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateBet
+      tags: [bets]
+      summary: Update a bet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BetUpdate"
+      responses:
+        "200":
+          description: Updated bet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bet"
+    delete:
+      operationId: deleteBet
+      tags: [bets]
+      summary: Delete a bet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /bets/{id}/settle:
+    patch:
+      operationId: settleBet
+      tags: [bets]
+      summary: Record result and post-game review for a bet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BetSettlement"
+      responses:
+        "200":
+          description: Settled bet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bet"
+
+  # ── Parlays ───────────────────────────────────────────────────────────────
+  /parlays:
+    get:
+      operationId: listParlays
+      tags: [parlays]
+      summary: List parlays
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [pending, won, lost, push, void, null]
+      responses:
+        "200":
+          description: List of parlays
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Parlay"
+    post:
+      operationId: createParlay
+      tags: [parlays]
+      summary: Create a parlay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParlayInput"
+      responses:
+        "201":
+          description: Created parlay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parlay"
+
+  /parlays/{id}:
+    get:
+      operationId: getParlay
+      tags: [parlays]
+      summary: Get a parlay with its legs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Parlay detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parlay"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateParlay
+      tags: [parlays]
+      summary: Update a parlay
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParlayUpdate"
+      responses:
+        "200":
+          description: Updated parlay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parlay"
+    delete:
+      operationId: deleteParlay
+      tags: [parlays]
+      summary: Delete a parlay
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /parlays/{id}/settle:
+    patch:
+      operationId: settleParlay
+      tags: [parlays]
+      summary: Settle a parlay result and add review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParlaySettlement"
+      responses:
+        "200":
+          description: Settled parlay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parlay"
+
+  # ── Bankroll ──────────────────────────────────────────────────────────────
+  /bankroll:
+    get:
+      operationId: getBankroll
+      tags: [bankroll]
+      summary: Get current bankroll state for a user
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Bankroll state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bankroll"
+
+  /bankroll/transactions:
+    get:
+      operationId: listTransactions
+      tags: [bankroll]
+      summary: List bankroll transactions
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+    post:
+      operationId: createTransaction
+      tags: [bankroll]
+      summary: Add a bankroll transaction (deposit, withdraw, adjustment)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionInput"
+      responses:
+        "201":
+          description: Created transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  # ── Stats (wow endpoints) ─────────────────────────────────────────────────
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      tags: [stats]
+      summary: Overall performance summary for a user
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Performance summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummary"
+
+  /stats/by-sport:
+    get:
+      operationId: getStatsBySport
+      tags: [stats]
+      summary: Win/loss and ROI broken down by sport
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Stats by sport
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SportStats"
+
+  /stats/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [stats]
+      summary: Recent bets and parlays activity feed across the workspace
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Activity feed items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /stats/confidence-analysis:
+    get:
+      operationId: getConfidenceAnalysis
+      tags: [stats]
+      summary: How well confidence scores predict outcomes
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Confidence analysis buckets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConfidenceBucket"
+
+  # ── Workspace ─────────────────────────────────────────────────────────────
+  /workspace:
+    get:
+      operationId: getWorkspace
+      tags: [workspace]
+      summary: Get workspace info and members
+      responses:
+        "200":
+          description: Workspace with members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+
+  /workspace/compare:
+    get:
+      operationId: compareWorkspaceMembers
+      tags: [workspace]
+      summary: Compare bets and stats between workspace members
+      responses:
+        "200":
+          description: Member comparison data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MemberComparison"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +519,538 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        displayName:
+          type: string
+        avatarColor:
+          type: string
+        startingBankroll:
+          type: number
+        createdAt:
+          type: string
+      required: [id, username, displayName, avatarColor, startingBankroll, createdAt]
+
+    UserInput:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 2
+        displayName:
+          type: string
+        avatarColor:
+          type: string
+        startingBankroll:
+          type: number
+      required: [username, displayName, startingBankroll]
+
+    Bet:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        sport:
+          type: string
+        event:
+          type: string
+        betType:
+          type: string
+          enum: [moneyline, spread, total, prop, futures]
+        pick:
+          type: string
+        odds:
+          type: integer
+          description: American odds (e.g. -110, +150)
+        stake:
+          type: number
+        potentialPayout:
+          type: number
+        actualPayout:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [pending, won, lost, push, void]
+        gameDate:
+          type: string
+        confidenceScore:
+          type: integer
+          description: 1-10 confidence rating
+        rationale:
+          type: ["string", "null"]
+          description: Pre-game reasoning
+        postGameReview:
+          type: ["string", "null"]
+          description: Post-game reflection
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+        settledAt:
+          type: ["string", "null"]
+      required: [id, userId, sport, event, betType, pick, odds, stake, potentialPayout, status, gameDate, confidenceScore, createdAt]
+
+    BetInput:
+      type: object
+      properties:
+        userId:
+          type: integer
+        sport:
+          type: string
+          minLength: 1
+        event:
+          type: string
+          minLength: 1
+        betType:
+          type: string
+          enum: [moneyline, spread, total, prop, futures]
+        pick:
+          type: string
+          minLength: 1
+        odds:
+          type: integer
+        stake:
+          type: number
+        gameDate:
+          type: string
+        confidenceScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+        rationale:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+      required: [userId, sport, event, betType, pick, odds, stake, gameDate, confidenceScore]
+
+    BetUpdate:
+      type: object
+      properties:
+        sport:
+          type: string
+        event:
+          type: string
+        betType:
+          type: string
+          enum: [moneyline, spread, total, prop, futures]
+        pick:
+          type: string
+        odds:
+          type: integer
+        stake:
+          type: number
+        gameDate:
+          type: string
+        confidenceScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+        rationale:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    BetSettlement:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [won, lost, push, void]
+        postGameReview:
+          type: string
+      required: [status]
+
+    Parlay:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        name:
+          type: string
+        stake:
+          type: number
+        odds:
+          type: integer
+          description: Combined American odds
+        potentialPayout:
+          type: number
+        actualPayout:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [pending, won, lost, push, void]
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParlayLeg"
+        confidenceScore:
+          type: integer
+          description: 1-10 confidence rating
+        rationale:
+          type: ["string", "null"]
+        postGameReview:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        settledAt:
+          type: ["string", "null"]
+      required: [id, userId, name, stake, odds, potentialPayout, status, legs, confidenceScore, createdAt]
+
+    ParlayLeg:
+      type: object
+      properties:
+        id:
+          type: integer
+        parlayId:
+          type: integer
+        sport:
+          type: string
+        event:
+          type: string
+        betType:
+          type: string
+          enum: [moneyline, spread, total, prop]
+        pick:
+          type: string
+        odds:
+          type: integer
+        gameDate:
+          type: string
+        status:
+          type: string
+          enum: [pending, won, lost, push, void]
+      required: [id, parlayId, sport, event, betType, pick, odds, gameDate, status]
+
+    ParlayInput:
+      type: object
+      properties:
+        userId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        stake:
+          type: number
+        confidenceScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+        rationale:
+          type: string
+        legs:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/ParlayLegInput"
+      required: [userId, name, stake, confidenceScore, legs]
+
+    ParlayLegInput:
+      type: object
+      properties:
+        sport:
+          type: string
+          minLength: 1
+        event:
+          type: string
+          minLength: 1
+        betType:
+          type: string
+          enum: [moneyline, spread, total, prop]
+        pick:
+          type: string
+          minLength: 1
+        odds:
+          type: integer
+        gameDate:
+          type: string
+      required: [sport, event, betType, pick, odds, gameDate]
+
+    ParlayUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        stake:
+          type: number
+        confidenceScore:
+          type: integer
+          minimum: 1
+          maximum: 10
+        rationale:
+          type: string
+
+    ParlaySettlement:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [won, lost, push, void]
+        postGameReview:
+          type: string
+        legResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/LegResult"
+      required: [status]
+
+    LegResult:
+      type: object
+      properties:
+        legId:
+          type: integer
+        status:
+          type: string
+          enum: [won, lost, push, void]
+      required: [legId, status]
+
+    Bankroll:
+      type: object
+      properties:
+        userId:
+          type: integer
+        currentBalance:
+          type: number
+        startingBalance:
+          type: number
+        totalDeposited:
+          type: number
+        totalWithdrawn:
+          type: number
+        netProfitLoss:
+          type: number
+        roi:
+          type: number
+          description: Return on investment percentage
+      required: [userId, currentBalance, startingBalance, totalDeposited, totalWithdrawn, netProfitLoss, roi]
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          enum: [deposit, withdraw, bet_win, bet_loss, bet_push, adjustment]
+        amount:
+          type: number
+        balanceAfter:
+          type: number
+        note:
+          type: ["string", "null"]
+        referenceId:
+          type: ["integer", "null"]
+          description: Bet or parlay ID if this is a bet result
+        referenceType:
+          type: ["string", "null"]
+          enum: [bet, parlay, null]
+        createdAt:
+          type: string
+      required: [id, userId, type, amount, balanceAfter, createdAt]
+
+    TransactionInput:
+      type: object
+      properties:
+        userId:
+          type: integer
+        type:
+          type: string
+          enum: [deposit, withdraw, adjustment]
+        amount:
+          type: number
+        note:
+          type: string
+      required: [userId, type, amount]
+
+    StatsSummary:
+      type: object
+      properties:
+        userId:
+          type: integer
+        totalBets:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        pushes:
+          type: integer
+        pending:
+          type: integer
+        winRate:
+          type: number
+        totalWagered:
+          type: number
+        totalProfit:
+          type: number
+        roi:
+          type: number
+        avgOdds:
+          type: number
+        avgConfidence:
+          type: number
+        longestWinStreak:
+          type: integer
+        longestLossStreak:
+          type: integer
+        currentStreak:
+          type: integer
+        currentStreakType:
+          type: string
+          enum: [win, loss, none]
+        bestBetProfit:
+          type: number
+        worstBetLoss:
+          type: number
+        parlayRecord:
+          $ref: "#/components/schemas/Record"
+        straightBetRecord:
+          $ref: "#/components/schemas/Record"
+      required: [userId, totalBets, wins, losses, pushes, pending, winRate, totalWagered, totalProfit, roi, avgOdds, avgConfidence, longestWinStreak, longestLossStreak, currentStreak, currentStreakType, bestBetProfit, worstBetLoss, parlayRecord, straightBetRecord]
+
+    Record:
+      type: object
+      properties:
+        wins:
+          type: integer
+        losses:
+          type: integer
+        pushes:
+          type: integer
+      required: [wins, losses, pushes]
+
+    SportStats:
+      type: object
+      properties:
+        sport:
+          type: string
+        wins:
+          type: integer
+        losses:
+          type: integer
+        pushes:
+          type: integer
+        winRate:
+          type: number
+        totalWagered:
+          type: number
+        profit:
+          type: number
+        roi:
+          type: number
+        avgConfidence:
+          type: number
+      required: [sport, wins, losses, pushes, winRate, totalWagered, profit, roi, avgConfidence]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [bet, parlay]
+        referenceId:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, won, lost, push, void]
+        stake:
+          type: number
+        profit:
+          type: ["number", "null"]
+        sport:
+          type: string
+        createdAt:
+          type: string
+      required: [id, type, referenceId, userId, userName, description, status, stake, sport, createdAt]
+
+    ConfidenceBucket:
+      type: object
+      properties:
+        confidenceRange:
+          type: string
+          description: e.g. "1-3", "4-6", "7-10"
+        totalBets:
+          type: integer
+        wins:
+          type: integer
+        winRate:
+          type: number
+        avgOdds:
+          type: number
+      required: [confidenceRange, totalBets, wins, winRate, avgOdds]
+
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        totalBets:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, name, members, totalBets, createdAt]
+
+    MemberComparison:
+      type: object
+      properties:
+        userId:
+          type: integer
+        userName:
+          type: string
+        avatarColor:
+          type: string
+        totalBets:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        winRate:
+          type: number
+        roi:
+          type: number
+        totalProfit:
+          type: number
+        currentBankroll:
+          type: number
+        avgConfidence:
+          type: number
+        hotSport:
+          type: ["string", "null"]
+      required: [userId, userName, avatarColor, totalBets, wins, losses, winRate, roi, totalProfit, currentBankroll, avgConfidence]

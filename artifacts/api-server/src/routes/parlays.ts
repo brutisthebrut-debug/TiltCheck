@@ -1,0 +1,278 @@
+import { Router, type IRouter } from "express";
+import { eq, desc, and } from "drizzle-orm";
+import { db, parlaysTable, parlayLegsTable, usersTable, transactionsTable } from "@workspace/db";
+import {
+  ListParlaysQueryParams,
+  CreateParlayBody,
+  GetParlayParams,
+  UpdateParlayParams,
+  UpdateParlayBody,
+  DeleteParlayParams,
+  SettleParlayParams,
+  SettleParlayBody,
+} from "@workspace/api-zod";
+
+const router: IRouter = Router();
+
+function formatLeg(leg: typeof parlayLegsTable.$inferSelect) {
+  return {
+    id: leg.id,
+    parlayId: leg.parlayId,
+    sport: leg.sport,
+    event: leg.event,
+    betType: leg.betType,
+    pick: leg.pick,
+    odds: leg.odds,
+    gameDate: leg.gameDate,
+    status: leg.status,
+  };
+}
+
+async function formatParlay(p: typeof parlaysTable.$inferSelect, userName: string) {
+  const legs = await db.select().from(parlayLegsTable).where(eq(parlayLegsTable.parlayId, p.id));
+  return {
+    id: p.id,
+    userId: p.userId,
+    userName,
+    name: p.name,
+    stake: Number(p.stake),
+    odds: p.odds,
+    potentialPayout: Number(p.potentialPayout),
+    actualPayout: p.actualPayout != null ? Number(p.actualPayout) : null,
+    status: p.status,
+    legs: legs.map(formatLeg),
+    confidenceScore: p.confidenceScore,
+    rationale: p.rationale ?? null,
+    postGameReview: p.postGameReview ?? null,
+    createdAt: p.createdAt.toISOString(),
+    settledAt: p.settledAt ? p.settledAt.toISOString() : null,
+  };
+}
+
+// Calculate combined parlay odds from decimal legs
+function americanToDecimal(odds: number): number {
+  if (odds > 0) return odds / 100 + 1;
+  return 100 / Math.abs(odds) + 1;
+}
+
+function decimalToAmerican(decimal: number): number {
+  if (decimal >= 2) return Math.round((decimal - 1) * 100);
+  return Math.round(-100 / (decimal - 1));
+}
+
+function combineParlayOdds(legOdds: number[]): number {
+  const combined = legOdds.reduce((acc, o) => acc * americanToDecimal(o), 1);
+  return decimalToAmerican(combined);
+}
+
+function calcParlayPayout(combinedDecimal: number, stake: number): number {
+  return combinedDecimal * stake;
+}
+
+// GET /parlays
+router.get("/parlays", async (req, res): Promise<void> => {
+  const query = ListParlaysQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const { userId, status } = query.data;
+  const conditions = [];
+  if (userId != null) conditions.push(eq(parlaysTable.userId, userId));
+  if (status != null) conditions.push(eq(parlaysTable.status, status));
+
+  const rows = await db
+    .select({ parlay: parlaysTable, user: usersTable })
+    .from(parlaysTable)
+    .leftJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(parlaysTable.createdAt));
+
+  const results = await Promise.all(
+    rows.map(({ parlay, user }) => formatParlay(parlay, user?.displayName ?? "Unknown"))
+  );
+  res.json(results);
+});
+
+// POST /parlays
+router.post("/parlays", async (req, res): Promise<void> => {
+  const parsed = CreateParlayBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const d = parsed.data;
+  const legOddsArr = d.legs.map((l) => l.odds);
+  const combinedOdds = combineParlayOdds(legOddsArr);
+  const combinedDecimal = legOddsArr.reduce((acc, o) => acc * americanToDecimal(o), 1);
+  const payout = calcParlayPayout(combinedDecimal, Number(d.stake));
+
+  const [parlay] = await db
+    .insert(parlaysTable)
+    .values({
+      userId: d.userId,
+      name: d.name,
+      stake: String(d.stake),
+      odds: combinedOdds,
+      potentialPayout: String(payout.toFixed(2)),
+      confidenceScore: d.confidenceScore,
+      rationale: d.rationale ?? null,
+    })
+    .returning();
+
+  await db.insert(parlayLegsTable).values(
+    d.legs.map((leg) => ({
+      parlayId: parlay.id,
+      sport: leg.sport,
+      event: leg.event,
+      betType: leg.betType,
+      pick: leg.pick,
+      odds: leg.odds,
+      gameDate: leg.gameDate,
+    }))
+  );
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, parlay.userId));
+  res.status(201).json(await formatParlay(parlay, user?.displayName ?? "Unknown"));
+});
+
+// GET /parlays/:id
+router.get("/parlays/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = GetParlayParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const rows = await db
+    .select({ parlay: parlaysTable, user: usersTable })
+    .from(parlaysTable)
+    .leftJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
+    .where(eq(parlaysTable.id, params.data.id));
+  if (rows.length === 0) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  res.json(await formatParlay(rows[0].parlay, rows[0].user?.displayName ?? "Unknown"));
+});
+
+// PATCH /parlays/:id
+router.patch("/parlays/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = UpdateParlayParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const parsed = UpdateParlayBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const d = parsed.data;
+  const updateValues: Record<string, unknown> = {};
+  if (d.name !== undefined) updateValues.name = d.name;
+  if (d.stake !== undefined) updateValues.stake = String(d.stake);
+  if (d.confidenceScore !== undefined) updateValues.confidenceScore = d.confidenceScore;
+  if (d.rationale !== undefined) updateValues.rationale = d.rationale;
+
+  const [updated] = await db
+    .update(parlaysTable)
+    .set(updateValues)
+    .where(eq(parlaysTable.id, params.data.id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
+  res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
+});
+
+// DELETE /parlays/:id
+router.delete("/parlays/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = DeleteParlayParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [deleted] = await db.delete(parlaysTable).where(eq(parlaysTable.id, params.data.id)).returning();
+  if (!deleted) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  res.sendStatus(204);
+});
+
+// PATCH /parlays/:id/settle
+router.patch("/parlays/:id/settle", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = SettleParlayParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const parsed = SettleParlayBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { status, postGameReview, legResults } = parsed.data;
+  const [existing] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+
+  const actualPayout = status === "won"
+    ? Number(existing.potentialPayout)
+    : status === "push"
+    ? Number(existing.stake)
+    : 0;
+
+  const [updated] = await db
+    .update(parlaysTable)
+    .set({ status, actualPayout: String(actualPayout.toFixed(2)), postGameReview: postGameReview ?? null, settledAt: new Date() })
+    .where(eq(parlaysTable.id, params.data.id))
+    .returning();
+
+  // Update leg statuses if provided
+  if (legResults && legResults.length > 0) {
+    await Promise.all(
+      legResults.map((lr: { legId: number; status: string }) =>
+        db.update(parlayLegsTable).set({ status: lr.status }).where(eq(parlayLegsTable.id, lr.legId))
+      )
+    );
+  }
+
+  // Record transaction
+  const txRows = await db
+    .select()
+    .from(transactionsTable)
+    .where(eq(transactionsTable.userId, existing.userId))
+    .orderBy(desc(transactionsTable.createdAt))
+    .limit(1);
+  const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(
+    (await db.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0
+  );
+
+  const profit = actualPayout - Number(existing.stake);
+  const newBalance = currentBalance + profit;
+  const txType = status === "won" ? "bet_win" : status === "push" ? "bet_push" : "bet_loss";
+
+  await db.insert(transactionsTable).values({
+    userId: existing.userId,
+    type: txType,
+    amount: String(profit.toFixed(2)),
+    balanceAfter: String(newBalance.toFixed(2)),
+    referenceId: existing.id,
+    referenceType: "parlay",
+    note: `${status === "won" ? "Won" : status === "push" ? "Push" : "Lost"} parlay: ${existing.name}`,
+  });
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
+  res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
+});
+
+export default router;
