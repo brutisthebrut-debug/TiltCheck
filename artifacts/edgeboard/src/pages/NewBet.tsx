@@ -15,9 +15,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { calculatePotentialPayout, formatCurrency } from "@/lib/format"
+import { formatCurrency } from "@/lib/format"
 import { getApiErrorMessage } from "@/lib/api-error"
-import { createBetBodyOddsMin, createBetBodyOddsMax } from "@workspace/api-zod"
+import { createBetBodyOddsMax } from "@workspace/api-zod"
+import { isValidAmericanOdds, payoutFromAmerican } from "@workspace/odds"
+import { OddsInput } from "@/components/OddsInput"
+import { OddsFormatToggle } from "@/components/OddsFormatToggle"
+import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 
 const SPORTSBOOKS = [
@@ -29,11 +33,13 @@ const formSchema = z.object({
   event: z.string().min(1, "Event is required"),
   betType: z.enum(["moneyline", "spread", "total", "prop", "futures"]),
   pick: z.string().min(1, "Pick is required"),
-  odds: z.coerce
-    .number()
-    .int("Odds must be a whole number")
-    .min(createBetBodyOddsMin, `Odds must be between ${createBetBodyOddsMin.toLocaleString()} and +${createBetBodyOddsMax.toLocaleString()}`)
-    .max(createBetBodyOddsMax, `Odds must be between ${createBetBodyOddsMin.toLocaleString()} and +${createBetBodyOddsMax.toLocaleString()}`),
+  odds: z.custom<number>(
+    (v) =>
+      typeof v === "number" &&
+      isValidAmericanOdds(v) &&
+      Math.abs(v) <= createBetBodyOddsMax,
+    { message: "Enter the price your book shows (e.g. -110, 1.91, or 10/11)" }
+  ),
   stake: z.coerce.number().positive("Stake must be greater than 0"),
   gameDate: z.string().min(1, "Game date is required"),
   confidenceScore: z.number().min(1).max(10),
@@ -71,7 +77,9 @@ export default function NewBet() {
   const watchStake = form.watch("stake")
   const watchSportsbook = form.watch("sportsbook")
   
-  const potentialPayout = watchStake && watchOdds ? calculatePotentialPayout(watchStake, watchOdds) : 0
+  const [oddsFormat, setOddsFormatPref] = useOddsFormat()
+  const potentialPayout =
+    watchStake && isValidAmericanOdds(watchOdds) ? payoutFromAmerican(watchOdds, watchStake) : 0
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!activeUser) return
@@ -201,9 +209,17 @@ export default function NewBet() {
                   name="odds"
                   render={({ field }) => (
                     <FormItem className="col-span-2 sm:col-span-1">
-                      <FormLabel>Odds (American)</FormLabel>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <FormLabel>Odds</FormLabel>
+                        <OddsFormatToggle value={oddsFormat} onChange={setOddsFormatPref} />
+                      </div>
                       <FormControl>
-                        <Input type="number" placeholder="-110" {...field} />
+                        <OddsInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          format={oddsFormat}
+                          data-testid="input-odds"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

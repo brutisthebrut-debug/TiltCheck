@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
+import { formatOddsAs } from "@workspace/odds"
+import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -31,6 +33,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 export default function Bets() {
   const { activeUser } = useUser()
+  const [oddsFormat] = useOddsFormat()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [myBets, setMyBets] = useState(false)
   const [sportFilter, setSportFilter] = useState<string | null>(null)
@@ -181,7 +184,7 @@ export default function Bets() {
                             </Badge>
                           </div>
                         ) : (
-                          formatOdds(bet.odds)
+                          formatOddsAs(bet.odds, oddsFormat)
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(bet.stake)}</TableCell>

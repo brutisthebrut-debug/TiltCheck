@@ -15,9 +15,19 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { calculatePotentialPayout, formatCurrency } from "@/lib/format"
+import { formatCurrency } from "@/lib/format"
 import { getApiErrorMessage } from "@/lib/api-error"
-import { createParlayBodyLegsItemOddsMin, createParlayBodyLegsItemOddsMax } from "@workspace/api-zod"
+import { createParlayBodyLegsItemOddsMax } from "@workspace/api-zod"
+import {
+  combineDecimalExact,
+  combineDecimalBookStyle,
+  decimalToAmerican,
+  formatAmerican,
+  isValidAmericanOdds,
+} from "@workspace/odds"
+import { OddsInput } from "@/components/OddsInput"
+import { OddsFormatToggle } from "@/components/OddsFormatToggle"
+import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react"
 
 const SPORTSBOOKS = [
@@ -29,11 +39,13 @@ const legSchema = z.object({
   event: z.string().min(1, "Event is required"),
   betType: z.enum(["moneyline", "spread", "total", "prop"]),
   pick: z.string().min(1, "Pick is required"),
-  odds: z.coerce
-    .number()
-    .int("Odds must be a whole number")
-    .min(createParlayBodyLegsItemOddsMin, `Odds must be between ${createParlayBodyLegsItemOddsMin.toLocaleString()} and +${createParlayBodyLegsItemOddsMax.toLocaleString()}`)
-    .max(createParlayBodyLegsItemOddsMax, `Odds must be between ${createParlayBodyLegsItemOddsMin.toLocaleString()} and +${createParlayBodyLegsItemOddsMax.toLocaleString()}`),
+  odds: z.custom<number>(
+    (v) =>
+      typeof v === "number" &&
+      isValidAmericanOdds(v) &&
+      Math.abs(v) <= createParlayBodyLegsItemOddsMax,
+    { message: "Enter the price your book shows (e.g. -110, 1.91, or 10/11)" }
+  ),
   gameDate: z.string().min(1, "Game date is required"),
 })
 
@@ -85,31 +97,22 @@ export default function NewParlay() {
   const watchLegs = form.watch("legs")
   const watchStake = form.watch("stake")
   const watchSportsbook = form.watch("sportsbook")
-  
-  const calculateCombinedOdds = (legs: Array<{ odds: number }>) => {
-    if (legs.length === 0) return 0
-    if (legs.some(leg => !leg.odds)) return 0
-    
-    let combinedDecimal = 1
-    for (const leg of legs) {
-      if (leg.odds < 0) {
-        combinedDecimal *= (100 / Math.abs(leg.odds)) + 1
-      } else if (leg.odds > 0) {
-        combinedDecimal *= (leg.odds / 100) + 1
-      }
-    }
-    
-    if (combinedDecimal <= 1) return 0
-    
-    if (combinedDecimal >= 2) {
-      return Math.round((combinedDecimal - 1) * 100)
-    } else {
-      return Math.round(-100 / (combinedDecimal - 1))
-    }
-  }
+  const [oddsFormat, setOddsFormatPref] = useOddsFormat()
 
-  const combinedOdds = calculateCombinedOdds(watchLegs)
-  const potentialPayout = watchStake && combinedOdds !== 0 ? calculatePotentialPayout(watchStake, combinedOdds) : 0
+  // Only price the slip once every leg carries a real American price.
+  const legOdds = watchLegs.map((leg) => leg.odds)
+  const allLegsPriced = legOdds.length > 0 && legOdds.every((o) => isValidAmericanOdds(o))
+
+  // Exact math — identical to what the server stores. No double rounding:
+  // the payout comes from the exact decimal product, and the American price
+  // is rounded once, only for display.
+  const combinedDecimal = allLegsPriced ? combineDecimalExact(legOdds) : 0
+  const combinedOdds = allLegsPriced ? decimalToAmerican(combinedDecimal) : 0
+  const potentialPayout = allLegsPriced && watchStake ? combinedDecimal * watchStake : 0
+
+  // What a book like bet365 shows for the same slip: it multiplies the
+  // 2-decimal displayed prices, so its total can differ by a little.
+  const bookStylePayout = allLegsPriced && watchStake ? combineDecimalBookStyle(legOdds) * watchStake : 0
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!activeUser) return
@@ -283,16 +286,9 @@ export default function NewParlay() {
           </Card>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl font-semibold">Legs ({fields.length})</h2>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm"
-                onClick={() => append(defaultLeg)}
-              >
-                <Plus className="h-4 w-4 mr-2" /> Add Leg
-              </Button>
+              <OddsFormatToggle value={oddsFormat} onChange={setOddsFormatPref} />
             </div>
 
             {fields.map((field, index) => (
@@ -404,7 +400,13 @@ export default function NewParlay() {
                         <FormItem className="col-span-1">
                           <FormLabel className="text-xs">Odds</FormLabel>
                           <FormControl>
-                            <Input className="h-9" type="number" placeholder="-110" {...field} />
+                            <OddsInput
+                              className="h-9"
+                              value={field.value}
+                              onChange={field.onChange}
+                              format={oddsFormat}
+                              data-testid={`input-leg-odds-${index}`}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -428,6 +430,16 @@ export default function NewParlay() {
                 </CardContent>
               </Card>
             ))}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed border-primary/40 text-primary hover:bg-primary/10 h-12"
+              onClick={() => append(defaultLeg)}
+              data-testid="button-add-leg"
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Leg {fields.length + 1}
+            </Button>
           </div>
 
           <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
@@ -437,24 +449,36 @@ export default function NewParlay() {
                   {getApiErrorMessage(createParlay.error, "Couldn't log this parlay. Please check the form and try again.")}
                 </div>
               )}
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="grid grid-cols-2 gap-8">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Estimated Odds</div>
-                    <div className="text-xl font-bold font-mono text-primary">
-                      {combinedOdds > 0 ? `+${combinedOdds}` : combinedOdds === 0 ? '-' : combinedOdds}
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="grid grid-cols-2 gap-8">
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground">Estimated Odds</div>
+                      <div className="text-xl font-bold font-mono text-primary" data-testid="text-combined-odds">
+                        {allLegsPriced ? formatAmerican(combinedOdds) : '-'}
+                      </div>
+                      {allLegsPriced && (
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {combinedDecimal.toFixed(2)} decimal
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground">Est. Payout</div>
+                      <div className="text-xl font-bold font-mono" data-testid="text-est-payout">
+                        {formatCurrency(potentialPayout)}
+                      </div>
+                      {allLegsPriced && Math.abs(bookStylePayout - potentialPayout) >= 0.01 && (
+                        <div className="text-xs text-muted-foreground font-mono">
+                          ~{formatCurrency(bookStylePayout)} at book prices
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Est. Payout</div>
-                    <div className="text-xl font-bold font-mono">
-                      {formatCurrency(potentialPayout)}
-                    </div>
-                  </div>
+                  <Button type="submit" size="lg" disabled={createParlay.isPending || fields.length < 2}>
+                    {createParlay.isPending ? "Logging..." : "Log Parlay"}
+                  </Button>
                 </div>
-                <Button type="submit" size="lg" disabled={createParlay.isPending || fields.length < 2}>
-                  {createParlay.isPending ? "Logging..." : "Log Parlay"}
-                </Button>
               </CardContent>
             </Card>
           </div>

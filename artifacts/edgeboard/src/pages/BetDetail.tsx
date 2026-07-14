@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
+import { formatOddsAs } from "@workspace/odds"
+import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
@@ -30,6 +32,7 @@ const MISS_REASONS = [
 
 export default function BetDetail() {
   const { id } = useParams()
+  const [oddsFormat] = useOddsFormat()
   const betId = Number(id)
   const [, setLocation] = useLocation()
   const { activeUser } = useUser()
@@ -194,7 +197,7 @@ export default function BetDetail() {
               <div className="text-sm text-muted-foreground mb-1">The Pick</div>
               <div className="text-xl font-bold flex justify-between items-center">
                 <span>{bet.pick}</span>
-                <span className="font-mono text-primary">{formatOdds(bet.odds)}</span>
+                <span className="font-mono text-primary">{formatOddsAs(bet.odds, oddsFormat)}</span>
               </div>
             </div>
 
@@ -361,7 +364,7 @@ export default function BetDetail() {
               Grading as: <span className={`font-semibold ${pendingStatus === 'won' ? 'text-green-500' : pendingStatus === 'lost' ? 'text-red-500' : pendingStatus === 'void' ? 'text-blue-400' : ''}`}>
                 {pendingStatus ? statusLabel[pendingStatus] : ''}
               </span>
-              {' '}— {bet.pick} · {formatOdds(bet.odds)}
+              {' '}— {bet.pick} · {formatOddsAs(bet.odds, oddsFormat)}
             </DialogDescription>
           </DialogHeader>
 

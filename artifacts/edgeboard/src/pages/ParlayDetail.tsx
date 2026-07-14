@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
+import { formatOddsAs } from "@workspace/odds"
+import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
@@ -31,6 +33,7 @@ const MISS_REASONS = [
 
 export default function ParlayDetail() {
   const { id } = useParams()
+  const [oddsFormat] = useOddsFormat()
   const parlayId = Number(id)
   const [, setLocation] = useLocation()
   const { activeUser } = useUser()
@@ -244,7 +247,7 @@ export default function ParlayDetail() {
                       <div className="font-medium text-muted-foreground text-sm">{leg.event}</div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-lg font-bold">{leg.pick}</span>
-                        <span className={`font-mono font-medium ${isDeadZoneOdds(leg.odds) ? 'text-amber-500' : 'text-primary'}`}>{formatOdds(leg.odds)}</span>
+                        <span className={`font-mono font-medium ${isDeadZoneOdds(leg.odds) ? 'text-amber-500' : 'text-primary'}`}>{isDeadZoneOdds(leg.odds) ? formatOdds(leg.odds) : formatOddsAs(leg.odds, oddsFormat)}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-2">{formatDate(leg.gameDate)}</div>
                       
@@ -338,7 +341,7 @@ export default function ParlayDetail() {
                 <span className="text-muted-foreground">Combined Odds</span>
                 <span className={`font-mono font-bold text-lg flex items-center gap-1.5 ${hasDeadZoneCombined || deadZoneLegs.length > 0 ? 'text-amber-500' : 'text-primary'}`}>
                   {(hasDeadZoneCombined || deadZoneLegs.length > 0) && <AlertTriangle className="h-4 w-4" />}
-                  {formatOdds(parlay.odds)}
+                  {hasDeadZoneCombined || deadZoneLegs.length > 0 ? formatOdds(parlay.odds) : formatOddsAs(parlay.odds, oddsFormat)}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b">

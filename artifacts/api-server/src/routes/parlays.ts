@@ -7,7 +7,12 @@ import {
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
-import { isValidAmericanOdds, INVALID_ODDS_MESSAGE } from "../lib/odds";
+import {
+  isValidAmericanOdds,
+  INVALID_ODDS_MESSAGE,
+  combineAmerican,
+  combineDecimalExact,
+} from "../lib/odds";
 import {
   GetParlayParams,
   UpdateParlayParams,
@@ -59,21 +64,6 @@ async function formatParlay(p: typeof parlaysTable.$inferSelect, userName: strin
     createdAt: p.createdAt.toISOString(),
     settledAt: p.settledAt ? p.settledAt.toISOString() : null,
   };
-}
-
-function americanToDecimal(odds: number): number {
-  if (odds > 0) return odds / 100 + 1;
-  return 100 / Math.abs(odds) + 1;
-}
-
-function decimalToAmerican(decimal: number): number {
-  if (decimal >= 2) return Math.round((decimal - 1) * 100);
-  return Math.round(-100 / (decimal - 1));
-}
-
-function combineParlayOdds(legOdds: number[]): number {
-  const combined = legOdds.reduce((acc, o) => acc * americanToDecimal(o), 1);
-  return decimalToAmerican(combined);
 }
 
 function calcParlayPayout(combinedDecimal: number, stake: number): number {
@@ -128,8 +118,8 @@ router.post("/parlays", requireProfile, async (req, res): Promise<void> => {
     return;
   }
   const legOddsArr = d.legs.map((l) => l.odds);
-  const combinedOdds = combineParlayOdds(legOddsArr);
-  const combinedDecimal = legOddsArr.reduce((acc, o) => acc * americanToDecimal(o), 1);
+  const combinedOdds = combineAmerican(legOddsArr);
+  const combinedDecimal = combineDecimalExact(legOddsArr);
   const payout = calcParlayPayout(combinedDecimal, Number(d.stake));
 
   // Even with each leg's odds bounded, the *combined* odds of many long-shot
@@ -306,8 +296,8 @@ router.patch("/parlays/:id/legs/:legId", requireProfile, async (req, res): Promi
 
   // Recompute combined odds and payout from all legs with the corrected price.
   const legOddsArr = legs.map((l) => (l.id === targetLeg.id ? newOdds : l.odds));
-  const combinedOdds = combineParlayOdds(legOddsArr);
-  const combinedDecimal = legOddsArr.reduce((acc, o) => acc * americanToDecimal(o), 1);
+  const combinedOdds = combineAmerican(legOddsArr);
+  const combinedDecimal = combineDecimalExact(legOddsArr);
   const payout = calcParlayPayout(combinedDecimal, Number(parlay.stake));
 
   // Same storage bounds as POST /parlays (int4 odds, numeric(12,2) payout).

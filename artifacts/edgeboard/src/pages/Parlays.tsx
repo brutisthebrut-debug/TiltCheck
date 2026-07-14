@@ -6,7 +6,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
+import { formatCurrency, formatDate } from "@/lib/format"
+import { formatOddsAs } from "@workspace/odds"
+import { useOddsFormat } from "@/hooks/use-odds-format"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Layers } from "lucide-react"
@@ -30,6 +32,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 export default function Parlays() {
   const { activeUser } = useUser()
+  const [oddsFormat] = useOddsFormat()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [myParlays, setMyParlays] = useState(false)
   const [sportFilter, setSportFilter] = useState<string | null>(null)
@@ -165,7 +168,7 @@ export default function Parlays() {
                       <TableCell>
                         <Badge variant="outline">{parlay.legs?.length || 0} legs</Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-primary">{formatOdds(parlay.odds)}</TableCell>
+                      <TableCell className="font-mono text-primary">{formatOddsAs(parlay.odds, oddsFormat)}</TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(parlay.stake)}</TableCell>
                       <TableCell>
                         <Badge variant={parlay.status as any}>{parlay.status.toUpperCase()}</Badge>
