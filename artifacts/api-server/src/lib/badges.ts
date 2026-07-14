@@ -1,3 +1,4 @@
+import { addDays, dayOf } from "@workspace/weeks";
 import { isValidAmericanOdds } from "./odds";
 
 /**
@@ -53,13 +54,6 @@ export type BadgeInput = {
   startingBankroll: number;
   /** "Today" as a UTC calendar date, injectable for tests. */
   today?: string;
-};
-
-const dayOf = (d: Date) => d.toISOString().slice(0, 10);
-const addDays = (day: string, n: number) => {
-  const d = new Date(`${day}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return dayOf(d);
 };
 
 /** Longest run of consecutive calendar days present in the set. */
