@@ -25,7 +25,7 @@ import { formatCurrency, formatOdds } from "@/lib/format"
 import { Link } from "wouter"
 import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy, Newspaper, ArrowRight } from "lucide-react"
 import { formatDate } from "@/lib/format"
-import { latestRecapWeekStart, RECAP_SEEN_KEY } from "@/pages/Recap"
+import { isRecapUnseen } from "@/lib/recapTeaser"
 
 export default function Dashboard() {
   const { activeUser, isLoading: isUserLoading } = useUser();
@@ -88,9 +88,7 @@ export default function Dashboard() {
   const hasData = totalBets > 0;
 
   // Weekly recap teaser — shows once per week until the recap is opened
-  const latestRecapWeek = latestRecapWeekStart();
-  const recapUnseen = !!activeUser
-    && localStorage.getItem(RECAP_SEEN_KEY(activeUser.id)) !== latestRecapWeek;
+  const recapUnseen = !!activeUser && isRecapUnseen(activeUser.id);
 
   if (isLoading) {
     return (

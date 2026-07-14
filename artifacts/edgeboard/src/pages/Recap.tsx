@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
 import { ChevronLeft, ChevronRight, Trophy, Skull, Droplets, Users, Sparkles, Crown, Rocket, CloudRain, WifiOff, RotateCw } from "lucide-react"
+import { addDays, latestRecapWeekStart, markRecapSeen } from "@/lib/recapTeaser"
 
 const MISS_REASON_PHRASES: Record<string, string> = {
   bad_read: "bad reads",
@@ -13,22 +14,6 @@ const MISS_REASON_PHRASES: Record<string, string> = {
   emotional: "emotional bets",
   misunderstood_market: "markets you didn't understand",
 }
-
-// ── Week math (UTC, Monday-start) — mirrors the server ──────────────────────
-function addDays(day: string, delta: number): string {
-  const d = new Date(`${day}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + delta)
-  return d.toISOString().slice(0, 10)
-}
-function mondayOf(day: string): string {
-  const d = new Date(`${day}T00:00:00Z`)
-  return addDays(day, -((d.getUTCDay() + 6) % 7))
-}
-export function latestRecapWeekStart(): string {
-  const today = new Date().toISOString().slice(0, 10)
-  return addDays(mondayOf(today), -7)
-}
-export const RECAP_SEEN_KEY = (userId: number) => `edgeboard-recap-seen-${userId}`
 
 function formatWeekRange(weekStart: string, weekEnd: string): string {
   const fmt = (day: string) =>
@@ -43,7 +28,7 @@ export default function Recap() {
 
   // Reading any recap counts as having seen this week's — kills the teaser.
   useEffect(() => {
-    if (activeUser?.id) localStorage.setItem(RECAP_SEEN_KEY(activeUser.id), latest)
+    if (activeUser?.id) markRecapSeen(activeUser.id)
   }, [activeUser?.id, latest])
 
   const { data: recap, isLoading, isError, refetch, isRefetching } = useGetWeeklyRecap(

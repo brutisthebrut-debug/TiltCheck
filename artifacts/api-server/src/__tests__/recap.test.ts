@@ -75,6 +75,28 @@ describe("computeWeeklyRecap", () => {
     expect(r.personal.profit).toBeCloseTo(90.91, 2);
   });
 
+  it("Sunday/Monday boundary: Sunday 23:59:59.999Z stays in the week, Monday 00:00:00.000Z moves to the next", () => {
+    // WEEK = Mon 2026-07-06 → Sun 2026-07-12 (UTC)
+    const lastInstantOfSunday = bet({ settledAt: new Date("2026-07-12T23:59:59.999Z"), pick: "Sunday buzzer" });
+    const firstInstantOfMonday = bet({ settledAt: new Date("2026-07-13T00:00:00.000Z"), pick: "Monday opener" });
+
+    // The week ending Sunday 7/12 counts only the Sunday play
+    const thisWeek = recap([lastInstantOfSunday, firstInstantOfMonday]);
+    expect(thisWeek.personal.settledCount).toBe(1);
+    expect(thisWeek.personal.bestWin?.title).toContain("Sunday buzzer");
+
+    // The following week (Mon 7/13 →) counts only the Monday play
+    const nextWeek = computeWeeklyRecap({
+      users: USERS,
+      bets: [lastInstantOfSunday, firstInstantOfMonday],
+      parlays: [],
+      userId: 1,
+      weekStart: "2026-07-13",
+    });
+    expect(nextWeek.personal.settledCount).toBe(1);
+    expect(nextWeek.personal.bestWin?.title).toContain("Monday opener");
+  });
+
   it("empty week produces zeros and nulls, not crashes", () => {
     const r = recap([]);
     expect(r.personal.settledCount).toBe(0);
