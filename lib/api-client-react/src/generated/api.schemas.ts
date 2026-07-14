@@ -114,6 +114,10 @@ export interface BetInput {
   /** @minLength 1 */
   pick: string;
   odds: number;
+  /**
+     * @maximum 1000000
+     * @exclusiveMinimum 0
+     */
   stake: number;
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   gameDate: string;
@@ -145,6 +149,10 @@ export interface BetUpdate {
   betType?: BetUpdateBetType;
   pick?: string;
   odds?: number;
+  /**
+     * @maximum 1000000
+     * @exclusiveMinimum 0
+     */
   stake?: number;
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   gameDate?: string;
@@ -302,6 +310,10 @@ export interface ParlayInput {
   userId?: number;
   /** @minLength 1 */
   name: string;
+  /**
+     * @maximum 1000000
+     * @exclusiveMinimum 0
+     */
   stake: number;
   /**
      * @minimum 1
@@ -317,6 +329,10 @@ export interface ParlayInput {
 
 export interface ParlayUpdate {
   name?: string;
+  /**
+     * @maximum 1000000
+     * @exclusiveMinimum 0
+     */
   stake?: number;
   /**
      * @minimum 1

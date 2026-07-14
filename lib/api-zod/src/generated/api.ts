@@ -125,6 +125,9 @@ export const ListBetsResponse = zod.array(ListBetsResponseItem)
 
 
 
+export const createBetBodyStakeExclusiveMin = 0;
+export const createBetBodyStakeMax = 1000000;
+
 export const createBetBodyGameDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createBetBodyConfidenceScoreMax = 10;
 
@@ -137,7 +140,7 @@ export const CreateBetBody = zod.object({
   "betType": zod.enum(['moneyline', 'spread', 'total', 'prop', 'futures']),
   "pick": zod.string().min(1),
   "odds": zod.number(),
-  "stake": zod.number(),
+  "stake": zod.number().gt(createBetBodyStakeExclusiveMin).max(createBetBodyStakeMax),
   "gameDate": zod.string().regex(createBetBodyGameDateRegExp),
   "confidenceScore": zod.number().min(1).max(createBetBodyConfidenceScoreMax),
   "rationale": zod.string().optional(),
@@ -216,6 +219,9 @@ export const UpdateBetParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateBetBodyStakeExclusiveMin = 0;
+export const updateBetBodyStakeMax = 1000000;
+
 export const updateBetBodyGameDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateBetBodyConfidenceScoreMax = 10;
 
@@ -227,7 +233,7 @@ export const UpdateBetBody = zod.object({
   "betType": zod.enum(['moneyline', 'spread', 'total', 'prop', 'futures']).optional(),
   "pick": zod.string().optional(),
   "odds": zod.number().optional(),
-  "stake": zod.number().optional(),
+  "stake": zod.number().gt(updateBetBodyStakeExclusiveMin).max(updateBetBodyStakeMax).optional(),
   "gameDate": zod.string().regex(updateBetBodyGameDateRegExp).optional(),
   "confidenceScore": zod.number().min(1).max(updateBetBodyConfidenceScoreMax).optional(),
   "rationale": zod.string().optional(),
@@ -363,6 +369,9 @@ export const ListParlaysResponse = zod.array(ListParlaysResponseItem)
  * @summary Create a parlay
  */
 
+export const createParlayBodyStakeExclusiveMin = 0;
+export const createParlayBodyStakeMax = 1000000;
+
 export const createParlayBodyConfidenceScoreMax = 10;
 
 
@@ -376,7 +385,7 @@ export const createParlayBodyLegsMin = 2;
 export const CreateParlayBody = zod.object({
   "userId": zod.number().optional(),
   "name": zod.string().min(1),
-  "stake": zod.number(),
+  "stake": zod.number().gt(createParlayBodyStakeExclusiveMin).max(createParlayBodyStakeMax),
   "confidenceScore": zod.number().min(1).max(createParlayBodyConfidenceScoreMax),
   "rationale": zod.string().optional(),
   "legs": zod.array(zod.object({
@@ -473,13 +482,16 @@ export const UpdateParlayParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateParlayBodyStakeExclusiveMin = 0;
+export const updateParlayBodyStakeMax = 1000000;
+
 export const updateParlayBodyConfidenceScoreMax = 10;
 
 
 
 export const UpdateParlayBody = zod.object({
   "name": zod.string().optional(),
-  "stake": zod.number().optional(),
+  "stake": zod.number().gt(updateParlayBodyStakeExclusiveMin).max(updateParlayBodyStakeMax).optional(),
   "confidenceScore": zod.number().min(1).max(updateParlayBodyConfidenceScoreMax).optional(),
   "rationale": zod.string().optional()
 })

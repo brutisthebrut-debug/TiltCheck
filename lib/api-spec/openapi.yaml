@@ -671,6 +671,8 @@ components:
           type: integer
         stake:
           type: number
+          exclusiveMinimum: 0
+          maximum: 1000000
         gameDate:
           type: string
           pattern: '^\d{4}-\d{2}-\d{2}$'
@@ -706,6 +708,8 @@ components:
           type: integer
         stake:
           type: number
+          exclusiveMinimum: 0
+          maximum: 1000000
         gameDate:
           type: string
           pattern: '^\d{4}-\d{2}-\d{2}$'
@@ -825,6 +829,8 @@ components:
           minLength: 1
         stake:
           type: number
+          exclusiveMinimum: 0
+          maximum: 1000000
         confidenceScore:
           type: integer
           minimum: 1
@@ -871,6 +877,8 @@ components:
           type: string
         stake:
           type: number
+          exclusiveMinimum: 0
+          maximum: 1000000
         confidenceScore:
           type: integer
           minimum: 1

@@ -8,6 +8,10 @@
 
 export interface ParlayUpdate {
   name?: string;
+  /**
+     * @maximum 1000000
+     * @exclusiveMinimum 0
+     */
   stake?: number;
   /**
      * @minimum 1
