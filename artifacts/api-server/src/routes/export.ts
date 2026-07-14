@@ -1,13 +1,14 @@
 import { Router, type IRouter } from "express";
 import { eq, asc, inArray } from "drizzle-orm";
 import { db, betsTable, parlaysTable, parlayLegsTable, transactionsTable } from "@workspace/db";
+import { dayOf } from "@workspace/weeks";
 import { requireProfile } from "../middlewares/auth";
 import { toCsv, type CsvValue } from "../lib/csv";
 
 const router: IRouter = Router();
 
 function sendCsv(res: import("express").Response, filenameStem: string, csv: string): void {
-  const date = new Date().toISOString().slice(0, 10);
+  const date = dayOf(new Date());
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="edgeboard-${filenameStem}-${date}.csv"`);
   // UTF-8 BOM so Excel detects the encoding for non-ASCII characters.

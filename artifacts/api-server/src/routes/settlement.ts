@@ -1,16 +1,12 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, lt, gte, inArray, notInArray } from "drizzle-orm";
 import { db, betsTable, parlaysTable, parlayLegsTable, usersTable } from "@workspace/db";
+import { dayOf } from "@workspace/weeks";
 import { requireProfile } from "../middlewares/auth";
 import { formatBet } from "./bets";
 import { formatParlay } from "./parlays";
 
 const router: IRouter = Router();
-
-/** Today's date (UTC) as YYYY-MM-DD — game dates are stored as plain dates. */
-function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 // GET /settlement/needs-settling — the signed-in user's overdue pending items.
 //
@@ -19,7 +15,8 @@ function todayUTC(): string {
 // a parlay can't be graded while any leg is still upcoming.
 router.get("/settlement/needs-settling", requireProfile, async (req, res): Promise<void> => {
   const userId = req.currentUser!.id;
-  const today = todayUTC();
+  // Today's date (UTC) as YYYY-MM-DD — game dates are stored as plain dates.
+  const today = dayOf(new Date());
 
   const betRows = await db
     .select({ bet: betsTable, user: usersTable })

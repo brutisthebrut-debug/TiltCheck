@@ -5,12 +5,12 @@
 // opened. The seen week lives server-side (users.recapSeenWeek), so the teaser
 // stays hidden across devices once the recap is opened anywhere.
 
-import { addDays, lastCompletedWeekStart } from "@workspace/weeks"
+import { addDays, dayOf, lastCompletedWeekStart } from "@workspace/weeks"
 
 export { addDays, mondayOf } from "@workspace/weeks"
 
 /** Monday of the most recently *completed* week — the week the recap covers. */
-export function latestRecapWeekStart(today: string = new Date().toISOString().slice(0, 10)): string {
+export function latestRecapWeekStart(today: string = dayOf(new Date())): string {
   return lastCompletedWeekStart(today)
 }
 

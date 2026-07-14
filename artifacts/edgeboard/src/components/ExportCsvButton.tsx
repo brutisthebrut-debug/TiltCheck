@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { dayOf } from "@workspace/weeks"
 import { Button } from "@/components/ui/button"
 import { Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -27,7 +28,7 @@ export function ExportCsvButton({
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `edgeboard-${filenameStem}-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `edgeboard-${filenameStem}-${dayOf(new Date())}.csv`
       document.body.appendChild(a)
       a.click()
       a.remove()
