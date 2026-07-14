@@ -7,6 +7,7 @@ import {
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
+import { isValidAmericanOdds, INVALID_ODDS_MESSAGE } from "../lib/odds";
 import {
   GetParlayParams,
   UpdateParlayParams,
@@ -114,6 +115,13 @@ router.post("/parlays", requireProfile, async (req, res): Promise<void> => {
   if (badDateLeg) {
     res.status(400).json({
       error: `${INVALID_GAME_DATE_MESSAGE} (got "${badDateLeg.gameDate}" for ${badDateLeg.event})`,
+    });
+    return;
+  }
+  const badOddsLeg = d.legs.find((l) => !isValidAmericanOdds(l.odds));
+  if (badOddsLeg) {
+    res.status(400).json({
+      error: `${INVALID_ODDS_MESSAGE} (got ${badOddsLeg.odds} for ${badOddsLeg.event})`,
     });
     return;
   }

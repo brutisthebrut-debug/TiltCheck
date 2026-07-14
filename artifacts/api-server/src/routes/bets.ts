@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
+import { isValidAmericanOdds, INVALID_ODDS_MESSAGE } from "../lib/odds";
 
 const router: IRouter = Router();
 
@@ -87,6 +88,10 @@ router.post("/bets", requireProfile, async (req, res): Promise<void> => {
     res.status(400).json({ error: INVALID_GAME_DATE_MESSAGE });
     return;
   }
+  if (!isValidAmericanOdds(d.odds)) {
+    res.status(400).json({ error: INVALID_ODDS_MESSAGE });
+    return;
+  }
   const payout = calcPayout(d.odds, Number(d.stake));
 
   const [bet] = await db
@@ -149,6 +154,10 @@ router.patch("/bets/:id", requireProfile, async (req, res): Promise<void> => {
   const d = parsed.data;
   if (d.gameDate !== undefined && !isRealCalendarDate(d.gameDate)) {
     res.status(400).json({ error: INVALID_GAME_DATE_MESSAGE });
+    return;
+  }
+  if (d.odds !== undefined && !isValidAmericanOdds(d.odds)) {
+    res.status(400).json({ error: INVALID_ODDS_MESSAGE });
     return;
   }
   const updateValues: Record<string, unknown> = {};
