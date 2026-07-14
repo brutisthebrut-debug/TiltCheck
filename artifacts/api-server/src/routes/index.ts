@@ -6,10 +6,15 @@ import parlaysRouter from "./parlays";
 import bankrollRouter from "./bankroll";
 import statsRouter from "./stats";
 import workspaceRouter from "./workspace";
+import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
+// Public
 router.use(healthRouter);
+
+// Everything below requires a signed-in session
+router.use(requireAuth);
 router.use(usersRouter);
 router.use(betsRouter);
 router.use(parlaysRouter);

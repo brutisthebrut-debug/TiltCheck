@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="40" viewBox="0 0 220 40" fill="none">
+  <g stroke="hsl(220, 90%, 60%)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M20 6 L33 13 L20 20 L7 13 Z"/>
+    <path d="M7 20 L20 27 L33 20"/>
+    <path d="M7 27 L20 34 L33 27"/>
+  </g>
+  <text x="42" y="27" font-family="'Space Mono', monospace" font-weight="700" font-size="19" letter-spacing="1.5" fill="hsl(0, 0%, 95%)">EDGE<tspan fill="hsl(220, 90%, 60%)">BOARD</tspan></text>
+</svg>

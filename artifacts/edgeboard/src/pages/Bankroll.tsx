@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Wallet, ArrowUpRight, ArrowDownRight, Activity, Pencil } from "lucide-react"
 
 export default function Bankroll() {
-  const { activeUser, setActiveUser } = useUser()
+  const { activeUser, refreshUser } = useUser()
   const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const [isEditBankrollOpen, setIsEditBankrollOpen] = useState(false)
@@ -70,8 +70,7 @@ export default function Bankroll() {
         body: JSON.stringify({ startingBankroll: Number(newStartingBankroll) }),
       })
       if (response.ok) {
-        const updated = await response.json()
-        setActiveUser({ ...activeUser, startingBankroll: updated.startingBankroll })
+        refreshUser()
         queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
         setIsEditBankrollOpen(false)
         setNewStartingBankroll("")

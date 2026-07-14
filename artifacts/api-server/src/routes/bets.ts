@@ -11,6 +11,7 @@ import {
   SettleBetParams,
   SettleBetBody,
 } from "@workspace/api-zod";
+import { requireProfile } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -73,8 +74,8 @@ router.get("/bets", async (req, res): Promise<void> => {
   res.json(rows.map(({ bet, user }) => formatBet(bet, user?.displayName ?? "Unknown")));
 });
 
-// POST /bets
-router.post("/bets", async (req, res): Promise<void> => {
+// POST /bets — always created for the signed-in user
+router.post("/bets", requireProfile, async (req, res): Promise<void> => {
   const parsed = CreateBetBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -86,7 +87,7 @@ router.post("/bets", async (req, res): Promise<void> => {
   const [bet] = await db
     .insert(betsTable)
     .values({
-      userId: d.userId,
+      userId: req.currentUser!.id,
       sport: d.sport,
       event: d.event,
       betType: d.betType,
@@ -128,7 +129,7 @@ router.get("/bets/:id", async (req, res): Promise<void> => {
 });
 
 // PATCH /bets/:id
-router.patch("/bets/:id", async (req, res): Promise<void> => {
+router.patch("/bets/:id", requireProfile, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdateBetParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -159,6 +160,10 @@ router.patch("/bets/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Bet not found" });
     return;
   }
+  if (existing.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only edit your own bets" });
+    return;
+  }
   if (d.odds !== undefined || d.stake !== undefined) {
     const newOdds = d.odds ?? existing.odds;
     const newStake = d.stake ?? Number(existing.stake);
@@ -179,11 +184,20 @@ router.patch("/bets/:id", async (req, res): Promise<void> => {
 });
 
 // DELETE /bets/:id
-router.delete("/bets/:id", async (req, res): Promise<void> => {
+router.delete("/bets/:id", requireProfile, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteBetParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [existing] = await db.select().from(betsTable).where(eq(betsTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Bet not found" });
+    return;
+  }
+  if (existing.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only delete your own bets" });
     return;
   }
   const [deleted] = await db.delete(betsTable).where(eq(betsTable.id, params.data.id)).returning();
@@ -195,7 +209,7 @@ router.delete("/bets/:id", async (req, res): Promise<void> => {
 });
 
 // PATCH /bets/:id/settle
-router.patch("/bets/:id/settle", async (req, res): Promise<void> => {
+router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = SettleBetParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -211,6 +225,10 @@ router.patch("/bets/:id/settle", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(betsTable).where(eq(betsTable.id, params.data.id));
   if (!existing) {
     res.status(404).json({ error: "Bet not found" });
+    return;
+  }
+  if (existing.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only settle your own bets" });
     return;
   }
   if (existing.status !== "pending" || existing.settledAt != null) {

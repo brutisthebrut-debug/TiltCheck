@@ -26,6 +26,7 @@ import type {
   BetInput,
   BetSettlement,
   BetUpdate,
+  ClaimProfileInput,
   ConfidenceBucket,
   GetBankrollParams,
   GetConfidenceAnalysisParams,
@@ -48,7 +49,6 @@ import type {
   Transaction,
   TransactionInput,
   User,
-  UserInput,
   Workspace
 } from './api.schemas';
 
@@ -165,7 +165,7 @@ export const getGetCurrentUserUrl = () => {
 }
 
 /**
- * @summary Get current user (or create on first visit)
+ * @summary Get the signed-in user's bettor profile
  */
 export const getCurrentUser = async ( options?: RequestInit): Promise<User> => {
 
@@ -189,7 +189,7 @@ export const getGetCurrentUserQueryKey = () => {
     }
 
 
-export const getGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCurrentUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -208,14 +208,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetCurrentUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
-export type GetCurrentUserQueryError = ErrorType<unknown>
+export type GetCurrentUserQueryError = ErrorType<void>
 
 
 /**
- * @summary Get current user (or create on first visit)
+ * @summary Get the signed-in user's bettor profile
  */
 
-export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<unknown>>(
+export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUser>>, TError = ErrorType<void>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -232,6 +232,154 @@ export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUs
 
 
 
+
+export const getListUnclaimedUsersUrl = () => {
+
+
+
+
+  return `/api/users/unclaimed`
+}
+
+/**
+ * @summary List bettor profiles not yet linked to a sign-in account
+ */
+export const listUnclaimedUsers = async ( options?: RequestInit): Promise<User[]> => {
+
+  return customFetch<User[]>(getListUnclaimedUsersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUnclaimedUsersQueryKey = () => {
+    return [
+    `/api/users/unclaimed`
+    ] as const;
+    }
+
+
+export const getListUnclaimedUsersQueryOptions = <TData = Awaited<ReturnType<typeof listUnclaimedUsers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUnclaimedUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUnclaimedUsersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUnclaimedUsers>>> = ({ signal }) => listUnclaimedUsers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUnclaimedUsers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListUnclaimedUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listUnclaimedUsers>>>
+export type ListUnclaimedUsersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List bettor profiles not yet linked to a sign-in account
+ */
+
+export function useListUnclaimedUsers<TData = Awaited<ReturnType<typeof listUnclaimedUsers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUnclaimedUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListUnclaimedUsersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getClaimProfileUrl = () => {
+
+
+
+
+  return `/api/users/claim`
+}
+
+/**
+ * @summary Claim an existing bettor profile or create a fresh one for the signed-in account
+ */
+export const claimProfile = async (claimProfileInput: ClaimProfileInput, options?: RequestInit): Promise<User> => {
+
+  return customFetch<User>(getClaimProfileUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(claimProfileInput)
+  }
+);}
+
+
+
+
+
+export const getClaimProfileMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimProfile>>, TError,{data: BodyType<ClaimProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimProfile>>, TError,{data: BodyType<ClaimProfileInput>}, TContext> => {
+
+const mutationKey = ['claimProfile'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimProfile>>, {data: BodyType<ClaimProfileInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  claimProfile(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimProfileMutationResult = NonNullable<Awaited<ReturnType<typeof claimProfile>>>
+    export type ClaimProfileMutationBody = BodyType<ClaimProfileInput>
+    export type ClaimProfileMutationError = ErrorType<void>
+
+    /**
+ * @summary Claim an existing bettor profile or create a fresh one for the signed-in account
+ */
+export const useClaimProfile = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimProfile>>, TError,{data: BodyType<ClaimProfileInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimProfile>>,
+        TError,
+        {data: BodyType<ClaimProfileInput>},
+        TContext
+      > => {
+      return useMutation(getClaimProfileMutationOptions(options));
+    }
 
 export const getListUsersUrl = () => {
 
@@ -309,77 +457,6 @@ export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TErr
 
 
 
-
-export const getCreateUserUrl = () => {
-
-
-
-
-  return `/api/users`
-}
-
-/**
- * @summary Create a user
- */
-export const createUser = async (userInput: UserInput, options?: RequestInit): Promise<User> => {
-
-  return customFetch<User>(getCreateUserUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(userInput)
-  }
-);}
-
-
-
-
-
-export const getCreateUserMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUser>>, TError,{data: BodyType<UserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createUser>>, TError,{data: BodyType<UserInput>}, TContext> => {
-
-const mutationKey = ['createUser'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createUser>>, {data: BodyType<UserInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  createUser(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateUserMutationResult = NonNullable<Awaited<ReturnType<typeof createUser>>>
-    export type CreateUserMutationBody = BodyType<UserInput>
-    export type CreateUserMutationError = ErrorType<unknown>
-
-    /**
- * @summary Create a user
- */
-export const useCreateUser = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUser>>, TError,{data: BodyType<UserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createUser>>,
-        TError,
-        {data: BodyType<UserInput>},
-        TContext
-      > => {
-      return useMutation(getCreateUserMutationOptions(options));
-    }
 
 export const getListBetsUrl = (params?: ListBetsParams,) => {
   const normalizedParams = new URLSearchParams();

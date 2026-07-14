@@ -1,15 +1,19 @@
 import * as React from "react"
 import { Link, useLocation } from "wouter"
 import { useUser } from "@/contexts/UserContext"
-import { 
-  LayoutDashboard, 
-  ListOrdered, 
-  Layers, 
-  BarChart2, 
-  Users, 
+import { useClerk } from "@clerk/react"
+import {
+  LayoutDashboard,
+  ListOrdered,
+  Layers,
+  BarChart2,
+  Users,
   Wallet,
+  LogOut,
 } from "lucide-react"
 import { Button } from "./ui/button"
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -22,7 +26,10 @@ const navItems = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
-  const { activeUser, allUsers, setActiveUser } = useUser()
+  const { activeUser } = useUser()
+  const { signOut } = useClerk()
+
+  const handleSignOut = () => signOut({ redirectUrl: basePath || "/" })
 
   return (
     <div className="flex min-h-screen flex-col bg-background md:flex-row dark">
@@ -33,24 +40,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Layers className="h-6 w-6" />
             <span className="text-xl">EDGEBOARD</span>
           </div>
-        </div>
-
-        <div className="p-4 border-b border-border/50">
-          <label className="text-xs text-muted-foreground font-medium mb-2 block uppercase tracking-wider">Active Bettor</label>
-          <select 
-            className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            value={activeUser?.id || ""}
-            onChange={(e) => {
-              const user = allUsers.find(u => u.id === Number(e.target.value));
-              if (user) setActiveUser(user);
-            }}
-          >
-            {allUsers.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.displayName}
-              </option>
-            ))}
-          </select>
         </div>
 
         <nav className="flex-1 space-y-1 p-4">
@@ -90,6 +79,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </nav>
+
+        {/* Signed-in identity */}
+        <div className="border-t border-border/50 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span
+                className="h-8 w-8 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                style={{ backgroundColor: activeUser?.avatarColor ?? "#6366f1" }}
+              >
+                {activeUser?.displayName?.charAt(0).toUpperCase() ?? "?"}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate" data-testid="text-signed-in-name">
+                  {activeUser?.displayName ?? ""}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">@{activeUser?.username ?? ""}</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={handleSignOut}
+              aria-label="Sign out"
+              data-testid="button-sign-out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </aside>
 
       {/* Header (Mobile) */}
@@ -98,21 +117,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Layers className="h-5 w-5" />
           <span>EDGEBOARD</span>
         </div>
-        
-        <select 
-          className="bg-background border border-input rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring max-w-[140px]"
-          value={activeUser?.id || ""}
-          onChange={(e) => {
-            const user = allUsers.find(u => u.id === Number(e.target.value));
-            if (user) setActiveUser(user);
-          }}
-        >
-          {allUsers.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.displayName}
-            </option>
-          ))}
-        </select>
+
+        <div className="flex items-center gap-2">
+          <span
+            className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+            style={{ backgroundColor: activeUser?.avatarColor ?? "#6366f1" }}
+          >
+            {activeUser?.displayName?.charAt(0).toUpperCase() ?? "?"}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            data-testid="button-sign-out-mobile"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
       </header>
 
       {/* Main Content — extra bottom padding so content clears the bottom nav + safe area */}

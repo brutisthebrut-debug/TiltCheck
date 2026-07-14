@@ -4,6 +4,9 @@ import { db, parlaysTable, parlayLegsTable, usersTable, transactionsTable } from
 import {
   ListParlaysQueryParams,
   CreateParlayBody,
+} from "@workspace/api-zod";
+import { requireProfile } from "../middlewares/auth";
+import {
   GetParlayParams,
   UpdateParlayParams,
   UpdateParlayBody,
@@ -98,8 +101,8 @@ router.get("/parlays", async (req, res): Promise<void> => {
   res.json(results);
 });
 
-// POST /parlays
-router.post("/parlays", async (req, res): Promise<void> => {
+// POST /parlays — always created for the signed-in user
+router.post("/parlays", requireProfile, async (req, res): Promise<void> => {
   const parsed = CreateParlayBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -114,7 +117,7 @@ router.post("/parlays", async (req, res): Promise<void> => {
   const [parlay] = await db
     .insert(parlaysTable)
     .values({
-      userId: d.userId,
+      userId: req.currentUser!.id,
       name: d.name,
       stake: String(d.stake),
       odds: combinedOdds,
@@ -163,7 +166,7 @@ router.get("/parlays/:id", async (req, res): Promise<void> => {
 });
 
 // PATCH /parlays/:id
-router.patch("/parlays/:id", async (req, res): Promise<void> => {
+router.patch("/parlays/:id", requireProfile, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = UpdateParlayParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -176,6 +179,15 @@ router.patch("/parlays/:id", async (req, res): Promise<void> => {
     return;
   }
   const d = parsed.data;
+  const [owned] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
+  if (!owned) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  if (owned.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only edit your own parlays" });
+    return;
+  }
   const updateValues: Record<string, unknown> = {};
   if (d.name !== undefined) updateValues.name = d.name;
   if (d.stake !== undefined) updateValues.stake = String(d.stake);
@@ -196,11 +208,20 @@ router.patch("/parlays/:id", async (req, res): Promise<void> => {
 });
 
 // DELETE /parlays/:id
-router.delete("/parlays/:id", async (req, res): Promise<void> => {
+router.delete("/parlays/:id", requireProfile, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = DeleteParlayParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [owned] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
+  if (!owned) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  if (owned.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only delete your own parlays" });
     return;
   }
   const [deleted] = await db.delete(parlaysTable).where(eq(parlaysTable.id, params.data.id)).returning();
@@ -212,7 +233,7 @@ router.delete("/parlays/:id", async (req, res): Promise<void> => {
 });
 
 // PATCH /parlays/:id/settle
-router.patch("/parlays/:id/settle", async (req, res): Promise<void> => {
+router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = SettleParlayParams.safeParse({ id: parseInt(raw, 10) });
   if (!params.success) {
@@ -228,6 +249,10 @@ router.patch("/parlays/:id/settle", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
   if (!existing) {
     res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  if (existing.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only settle your own parlays" });
     return;
   }
   if (existing.status !== "pending" || existing.settledAt != null) {

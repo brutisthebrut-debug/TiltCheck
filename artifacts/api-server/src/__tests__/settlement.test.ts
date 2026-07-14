@@ -8,9 +8,30 @@
  * Each test creates its own isolated user so bankroll math is deterministic.
  * All rows created by the tests are removed in afterAll.
  */
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import request from "supertest";
 import { eq, inArray } from "drizzle-orm";
+
+// The app now derives identity from the Clerk session. Tests control identity
+// through this variable: `createUser` (and `actAs`) point it at a test user's
+// clerkUserId, and setting it to null simulates a signed-out request.
+let currentClerkUserId: string | null = null;
+
+vi.mock("@clerk/express", () => ({
+  getAuth: () => ({ userId: currentClerkUserId }),
+  clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  clerkClient: {
+    users: {
+      getUser: async () => ({
+        primaryEmailAddress: null,
+        emailAddresses: [],
+        firstName: null,
+        lastName: null,
+      }),
+    },
+  },
+}));
+
 import app from "../app";
 import {
   db,
@@ -25,15 +46,37 @@ import {
 const createdUserIds: number[] = [];
 let counter = 0;
 
+/** Creates an isolated test user directly in the DB and acts as them. */
 async function createUser(startingBankroll = 1000) {
   const username = `test_${Date.now()}_${counter++}`;
-  const res = await request(app)
-    .post("/api/users")
-    .send({ username, displayName: "Test User", startingBankroll });
-  expect(res.status).toBe(201);
-  createdUserIds.push(res.body.id);
-  return res.body as { id: number; startingBankroll: number };
+  const clerkUserId = `clerk_${username}`;
+  const [row] = await db
+    .insert(usersTable)
+    .values({
+      username,
+      displayName: "Test User",
+      avatarColor: "#6366f1",
+      startingBankroll: String(startingBankroll),
+      clerkUserId,
+    })
+    .returning();
+  createdUserIds.push(row.id);
+  currentClerkUserId = clerkUserId;
+  return {
+    id: row.id,
+    startingBankroll: Number(row.startingBankroll),
+    clerkUserId,
+  };
 }
+
+function actAs(user: { clerkUserId: string }) {
+  currentClerkUserId = user.clerkUserId;
+}
+
+beforeAll(async () => {
+  // Ensure a signed-in actor exists even for tests that don't create their own
+  await createUser(1000);
+});
 
 async function createBet(
   userId: number,
@@ -569,15 +612,16 @@ describe("PATCH /api/users/:id", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 for a non-numeric id and 404 for an unknown id", async () => {
+  it("returns 400 for a non-numeric id and 403 for someone else's id", async () => {
     const bad = await request(app)
       .patch(`/api/users/abc`)
       .send({ startingBankroll: 100 });
     expect(bad.status).toBe(400);
 
+    // Not the signed-in user's own id → 403 (existence is not leaked)
     const missing = await request(app)
       .patch(`/api/users/99999999`)
       .send({ startingBankroll: 100 });
-    expect(missing.status).toBe(404);
+    expect(missing.status).toBe(403);
   });
 });

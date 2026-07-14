@@ -1,10 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, asc } from "drizzle-orm";
+import { clerkClient } from "@clerk/express";
 import { db, usersTable } from "@workspace/db";
 import {
-  CreateUserBody,
-  CreateUserResponse,
+  ClaimProfileBody,
+  ClaimProfileResponse,
   GetCurrentUserResponse,
+  ListUnclaimedUsersResponse,
   ListUsersResponse,
 } from "@workspace/api-zod";
 import * as z from "zod";
@@ -17,18 +19,116 @@ const UpdateUserBody = z.object({
   avatarColor: z.string().optional(),
 });
 
-// GET /users/me — return first user or create default
+const AVATAR_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
+
+// GET /users/me — the signed-in user's linked bettor profile
 router.get("/users/me", async (req, res): Promise<void> => {
-  const users = await db.select().from(usersTable).orderBy(usersTable.id).limit(1);
-  if (users.length === 0) {
-    const [user] = await db
-      .insert(usersTable)
-      .values({ username: "player1", displayName: "Player One", avatarColor: "#6366f1", startingBankroll: "1000" })
-      .returning();
-    res.json(GetCurrentUserResponse.parse(formatUser(user)));
+  if (!req.currentUser) {
+    res.status(404).json({ error: "No bettor profile linked to this account" });
     return;
   }
-  res.json(GetCurrentUserResponse.parse(formatUser(users[0])));
+  res.json(GetCurrentUserResponse.parse(formatUser(req.currentUser)));
+});
+
+// GET /users/unclaimed — profiles not yet linked to a sign-in account
+router.get("/users/unclaimed", async (_req, res): Promise<void> => {
+  const users = await db
+    .select()
+    .from(usersTable)
+    .where(isNull(usersTable.clerkUserId))
+    .orderBy(asc(usersTable.id));
+  res.json(ListUnclaimedUsersResponse.parse(users.map(formatUser)));
+});
+
+// POST /users/claim — claim an existing unclaimed profile or create a fresh one
+router.post("/users/claim", async (req, res): Promise<void> => {
+  const clerkUserId = req.clerkUserId!;
+  if (req.currentUser) {
+    res.status(409).json({ error: "This account is already linked to a bettor profile" });
+    return;
+  }
+  const parsed = ClaimProfileBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { userId, displayName } = parsed.data;
+
+  // Look up the Clerk account for email / name defaults
+  let email: string | null = null;
+  let fallbackName: string | null = null;
+  try {
+    const clerkUser = await clerkClient.users.getUser(clerkUserId);
+    email = clerkUser.primaryEmailAddress?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress ?? null;
+    const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim();
+    fallbackName = fullName || null;
+  } catch {
+    // Clerk lookup is best-effort; claiming still works without it
+  }
+
+  if (userId != null) {
+    // Claim an existing profile — the isNull guard makes this atomic, so two
+    // accounts can never claim the same profile
+    const [claimed] = await db
+      .update(usersTable)
+      .set({ clerkUserId, email })
+      .where(and(eq(usersTable.id, userId), isNull(usersTable.clerkUserId)))
+      .returning();
+    if (!claimed) {
+      const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+      if (!existing) {
+        res.status(404).json({ error: "Profile not found" });
+      } else {
+        res.status(409).json({ error: "Profile already claimed by another account" });
+      }
+      return;
+    }
+    res.json(ClaimProfileResponse.parse(formatUser(claimed)));
+    return;
+  }
+
+  // Start fresh — derive a unique username from email (or account id)
+  const name = displayName?.trim() || fallbackName || email?.split("@")[0] || "Bettor";
+  const base = (email?.split("@")[0] ?? name)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 24) || "bettor";
+  let username = base;
+  for (let attempt = 0; ; attempt++) {
+    const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, username)).limit(1);
+    if (existing.length === 0) break;
+    username = `${base}${attempt + 2}`;
+  }
+  const usedColors = (await db.select({ c: usersTable.avatarColor }).from(usersTable)).map((r) => r.c);
+  const avatarColor = AVATAR_COLORS.find((c) => !usedColors.includes(c)) ?? AVATAR_COLORS[0];
+
+  try {
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        username,
+        displayName: name,
+        avatarColor,
+        startingBankroll: "1000",
+        clerkUserId,
+        email,
+      })
+      .returning();
+    res.json(ClaimProfileResponse.parse(formatUser(created)));
+  } catch {
+    // Unique-constraint race (double-submit or username collision). If this
+    // account got linked by the concurrent request, return that profile.
+    const [linked] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId))
+      .limit(1);
+    if (linked) {
+      res.json(ClaimProfileResponse.parse(formatUser(linked)));
+      return;
+    }
+    res.status(409).json({ error: "Could not create profile — try again" });
+  }
 });
 
 // GET /users
@@ -37,31 +137,15 @@ router.get("/users", async (_req, res): Promise<void> => {
   res.json(ListUsersResponse.parse(users.map(formatUser)));
 });
 
-// POST /users
-router.post("/users", async (req, res): Promise<void> => {
-  const parsed = CreateUserBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-  const { username, displayName, avatarColor, startingBankroll } = parsed.data;
-  const [user] = await db
-    .insert(usersTable)
-    .values({
-      username,
-      displayName,
-      avatarColor: avatarColor ?? "#6366f1",
-      startingBankroll: String(startingBankroll),
-    })
-    .returning();
-  res.status(201).json(CreateUserResponse.parse(formatUser(user)));
-});
-
-// PATCH /users/:id — update startingBankroll and/or display name
+// PATCH /users/:id — update own profile only
 router.patch("/users/:id", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid user id" });
+    return;
+  }
+  if (!req.currentUser || req.currentUser.id !== id) {
+    res.status(403).json({ error: "You can only update your own profile" });
     return;
   }
   const parsed = UpdateUserBody.safeParse(req.body);

@@ -6,6 +6,7 @@ import {
   ListTransactionsQueryParams,
   CreateTransactionBody,
 } from "@workspace/api-zod";
+import { requireProfile } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -66,30 +67,20 @@ async function getTotalWagered(userId: number): Promise<number> {
   return Number(betRows[0]?.total ?? 0) + Number(parlayRows[0]?.total ?? 0);
 }
 
-// GET /bankroll
-router.get("/bankroll", async (req, res): Promise<void> => {
+// GET /bankroll — financial data is private: always scoped to the signed-in
+// user. A userId param is only accepted when it matches the session user.
+router.get("/bankroll", requireProfile, async (req, res): Promise<void> => {
   const query = GetBankrollQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
     return;
   }
-  const userId = query.data.userId;
-  if (userId == null) {
-    // Return first user's bankroll
-    const [firstUser] = await db.select().from(usersTable).orderBy(usersTable.id).limit(1);
-    if (!firstUser) {
-      res.status(404).json({ error: "No users found" });
-      return;
-    }
-    const bankroll = await getUserBankroll(firstUser.id);
-    if (!bankroll) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-    res.json(bankroll);
+  const self = req.currentUser!.id;
+  if (query.data.userId != null && query.data.userId !== self) {
+    res.status(403).json({ error: "You can only view your own bankroll" });
     return;
   }
-  const bankroll = await getUserBankroll(userId);
+  const bankroll = await getUserBankroll(self);
   if (!bankroll) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -97,21 +88,24 @@ router.get("/bankroll", async (req, res): Promise<void> => {
   res.json(bankroll);
 });
 
-// GET /bankroll/transactions
-router.get("/bankroll/transactions", async (req, res): Promise<void> => {
+// GET /bankroll/transactions — private, scoped to the signed-in user
+router.get("/bankroll/transactions", requireProfile, async (req, res): Promise<void> => {
   const query = ListTransactionsQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
     return;
   }
   const { userId, limit } = query.data;
-  const conditions = [];
-  if (userId != null) conditions.push(eq(transactionsTable.userId, userId));
+  const self = req.currentUser!.id;
+  if (userId != null && userId !== self) {
+    res.status(403).json({ error: "You can only view your own transactions" });
+    return;
+  }
 
   const rows = await db
     .select()
     .from(transactionsTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(eq(transactionsTable.userId, self))
     .orderBy(desc(transactionsTable.createdAt))
     .limit(limit ?? 20);
 
@@ -128,14 +122,15 @@ router.get("/bankroll/transactions", async (req, res): Promise<void> => {
   })));
 });
 
-// POST /bankroll/transactions
-router.post("/bankroll/transactions", async (req, res): Promise<void> => {
+// POST /bankroll/transactions — always posted for the signed-in user
+router.post("/bankroll/transactions", requireProfile, async (req, res): Promise<void> => {
   const parsed = CreateTransactionBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { userId, type, amount, note } = parsed.data;
+  const { type, amount, note } = parsed.data;
+  const userId = req.currentUser!.id;
   const bankroll = await getUserBankroll(userId);
   if (!bankroll) {
     res.status(404).json({ error: "User not found" });

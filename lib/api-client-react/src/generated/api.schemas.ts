@@ -18,12 +18,13 @@ export interface User {
   createdAt: string;
 }
 
-export interface UserInput {
-  /** @minLength 2 */
-  username: string;
-  displayName: string;
-  avatarColor?: string;
-  startingBankroll: number;
+/**
+ * Provide userId to claim an existing unclaimed profile, or displayName to start fresh
+ */
+export interface ClaimProfileInput {
+  userId?: number;
+  /** @minLength 1 */
+  displayName?: string;
 }
 
 export type BetBetType = typeof BetBetType[keyof typeof BetBetType];
@@ -104,7 +105,7 @@ export const BetInputBetType = {
 } as const;
 
 export interface BetInput {
-  userId: number;
+  userId?: number;
   /** @minLength 1 */
   sport: string;
   /** @minLength 1 */
@@ -295,7 +296,7 @@ export interface ParlayLegInput {
 }
 
 export interface ParlayInput {
-  userId: number;
+  userId?: number;
   /** @minLength 1 */
   name: string;
   stake: number;
@@ -441,7 +442,7 @@ export const TransactionInputType = {
 } as const;
 
 export interface TransactionInput {
-  userId: number;
+  userId?: number;
   type: TransactionInputType;
   amount: number;
   note?: string;

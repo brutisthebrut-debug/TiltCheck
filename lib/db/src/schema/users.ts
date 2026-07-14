@@ -5,6 +5,8 @@ import { z } from "zod/v4";
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
+  clerkUserId: text("clerk_user_id").unique(),
+  email: text("email"),
   displayName: text("display_name").notNull(),
   avatarColor: text("avatar_color").notNull().default("#6366f1"),
   startingBankroll: numeric("starting_bankroll", { precision: 12, scale: 2 }).notNull().default("1000"),

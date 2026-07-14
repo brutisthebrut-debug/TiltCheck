@@ -17,9 +17,44 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * @summary Get current user (or create on first visit)
+ * @summary Get the signed-in user's bettor profile
  */
 export const GetCurrentUserResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "avatarColor": zod.string(),
+  "startingBankroll": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List bettor profiles not yet linked to a sign-in account
+ */
+export const ListUnclaimedUsersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "avatarColor": zod.string(),
+  "startingBankroll": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListUnclaimedUsersResponse = zod.array(ListUnclaimedUsersResponseItem)
+
+
+/**
+ * @summary Claim an existing bettor profile or create a fresh one for the signed-in account
+ */
+
+
+
+export const ClaimProfileBody = zod.object({
+  "userId": zod.number().optional(),
+  "displayName": zod.string().min(1).optional()
+}).describe('Provide userId to claim an existing unclaimed profile, or displayName to start fresh')
+
+export const ClaimProfileResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
@@ -41,30 +76,6 @@ export const ListUsersResponseItem = zod.object({
   "createdAt": zod.string()
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
-
-
-/**
- * @summary Create a user
- */
-export const createUserBodyUsernameMin = 2;
-
-
-
-export const CreateUserBody = zod.object({
-  "username": zod.string().min(createUserBodyUsernameMin),
-  "displayName": zod.string(),
-  "avatarColor": zod.string().optional(),
-  "startingBankroll": zod.number()
-})
-
-export const CreateUserResponse = zod.object({
-  "id": zod.number(),
-  "username": zod.string(),
-  "displayName": zod.string(),
-  "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
-  "createdAt": zod.string()
-})
 
 
 /**
@@ -119,7 +130,7 @@ export const createBetBodyConfidenceScoreMax = 10;
 
 
 export const CreateBetBody = zod.object({
-  "userId": zod.number(),
+  "userId": zod.number().optional(),
   "sport": zod.string().min(1),
   "event": zod.string().min(1),
   "betType": zod.enum(['moneyline', 'spread', 'total', 'prop', 'futures']),
@@ -360,7 +371,7 @@ export const createParlayBodyLegsMin = 2;
 
 
 export const CreateParlayBody = zod.object({
-  "userId": zod.number(),
+  "userId": zod.number().optional(),
   "name": zod.string().min(1),
   "stake": zod.number(),
   "confidenceScore": zod.number().min(1).max(createParlayBodyConfidenceScoreMax),
@@ -614,7 +625,7 @@ export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem)
  * @summary Add a bankroll transaction (deposit, withdraw, adjustment)
  */
 export const CreateTransactionBody = zod.object({
-  "userId": zod.number(),
+  "userId": zod.number().optional(),
   "type": zod.enum(['deposit', 'withdraw', 'adjustment']),
   "amount": zod.number(),
   "note": zod.string().optional()

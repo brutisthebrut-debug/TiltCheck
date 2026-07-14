@@ -1,35 +1,49 @@
-import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { useGetCurrentUser, useListUsers } from '@workspace/api-client-react';
+import { createContext, useContext, ReactNode } from 'react';
+import {
+  useGetCurrentUser,
+  useListUsers,
+  getGetCurrentUserQueryKey,
+  getListUsersQueryKey,
+} from '@workspace/api-client-react';
 import type { User } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface UserContextType {
+  /** The signed-in user's bettor profile (null while loading or unclaimed) */
   activeUser: User | null;
-  setActiveUser: (user: User) => void;
   allUsers: User[];
   isLoading: boolean;
+  /** Signed in, but no bettor profile linked yet — show the claim screen */
+  needsClaim: boolean;
+  /** Re-fetch the current user (e.g. after profile edits) */
+  refreshUser: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const { data: currentUser, isLoading: isCurrentUserLoading } = useGetCurrentUser();
-  const { data: allUsers = [], isLoading: isUsersLoading } = useListUsers();
-  
-  const [activeUser, setActiveUser] = useState<User | null>(null);
+  const queryClient = useQueryClient();
+  const {
+    data: currentUser,
+    isLoading: isCurrentUserLoading,
+    error,
+  } = useGetCurrentUser({ query: { retry: false, queryKey: getGetCurrentUserQueryKey() } });
+  const needsClaim = (error as { status?: number } | null)?.status === 404;
 
-  useEffect(() => {
-    if (currentUser && !activeUser) {
-      setActiveUser(currentUser);
-    }
-  }, [currentUser, activeUser]);
+  const { data: allUsers = [], isLoading: isUsersLoading } = useListUsers({
+    query: { enabled: !!currentUser, queryKey: getListUsersQueryKey() },
+  });
 
   return (
     <UserContext.Provider
       value={{
-        activeUser,
-        setActiveUser,
+        activeUser: currentUser ?? null,
         allUsers,
-        isLoading: isCurrentUserLoading || isUsersLoading,
+        isLoading: isCurrentUserLoading || (!!currentUser && isUsersLoading),
+        needsClaim,
+        refreshUser: () => {
+          queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+        },
       }}
     >
       {children}

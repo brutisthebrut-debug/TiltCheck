@@ -8,7 +8,7 @@
 import type { BetInputBetType } from './betInputBetType';
 
 export interface BetInput {
-  userId: number;
+  userId?: number;
   /** @minLength 1 */
   sport: string;
   /** @minLength 1 */

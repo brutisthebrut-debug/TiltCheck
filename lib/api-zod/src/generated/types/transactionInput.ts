@@ -8,7 +8,7 @@
 import type { TransactionInputType } from './transactionInputType';
 
 export interface TransactionInput {
-  userId: number;
+  userId?: number;
   type: TransactionInputType;
   amount: number;
   note?: string;

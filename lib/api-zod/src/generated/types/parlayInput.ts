@@ -8,7 +8,7 @@
 import type { ParlayLegInput } from './parlayLegInput';
 
 export interface ParlayInput {
-  userId: number;
+  userId?: number;
   /** @minLength 1 */
   name: string;
   stake: number;

@@ -42,7 +42,7 @@ paths:
     get:
       operationId: getCurrentUser
       tags: [users]
-      summary: Get current user (or create on first visit)
+      summary: Get the signed-in user's bettor profile
       responses:
         "200":
           description: Current user
@@ -50,6 +50,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "401":
+          description: Not signed in
+        "404":
+          description: Signed in but no bettor profile linked yet
+
+  /users/unclaimed:
+    get:
+      operationId: listUnclaimedUsers
+      tags: [users]
+      summary: List bettor profiles not yet linked to a sign-in account
+      responses:
+        "200":
+          description: Unclaimed profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/claim:
+    post:
+      operationId: claimProfile
+      tags: [users]
+      summary: Claim an existing bettor profile or create a fresh one for the signed-in account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimProfileInput"
+      responses:
+        "200":
+          description: Linked bettor profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          description: Profile already claimed or account already linked
 
   /users:
     get:
@@ -65,23 +105,6 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/User"
-    post:
-      operationId: createUser
-      tags: [users]
-      summary: Create a user
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UserInput"
-      responses:
-        "201":
-          description: Created user
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
 
   # ── Bets ──────────────────────────────────────────────────────────────────
   /bets:
@@ -556,19 +579,15 @@ components:
           type: string
       required: [id, username, displayName, avatarColor, startingBankroll, createdAt]
 
-    UserInput:
+    ClaimProfileInput:
       type: object
+      description: Provide userId to claim an existing unclaimed profile, or displayName to start fresh
       properties:
-        username:
-          type: string
-          minLength: 2
+        userId:
+          type: integer
         displayName:
           type: string
-        avatarColor:
-          type: string
-        startingBankroll:
-          type: number
-      required: [username, displayName, startingBankroll]
+          minLength: 1
 
     Bet:
       type: object
@@ -668,7 +687,7 @@ components:
           type: string
         promoNote:
           type: string
-      required: [userId, sport, event, betType, pick, odds, stake, gameDate, confidenceScore]
+      required: [sport, event, betType, pick, odds, stake, gameDate, confidenceScore]
 
     BetUpdate:
       type: object
@@ -819,7 +838,7 @@ components:
           type: string
         promoNote:
           type: string
-      required: [userId, name, stake, confidenceScore, legs]
+      required: [name, stake, confidenceScore, legs]
 
     ParlayLegInput:
       type: object
@@ -948,7 +967,7 @@ components:
           type: number
         note:
           type: string
-      required: [userId, type, amount]
+      required: [type, amount]
 
     StatsSummary:
       type: object
