@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter"
-import { useGetBet, useSettleBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey } from "@workspace/api-client-react"
+import { useGetBet, useSettleBet, useUpdateBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -12,7 +12,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
-import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock } from "lucide-react"
+import { isDeadZoneOdds } from "@/lib/odds"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
 
 type SettleStatus = 'won' | 'lost' | 'push' | 'void'
 
@@ -38,6 +40,35 @@ export default function BetDetail() {
   })
   
   const settleBet = useSettleBet()
+  const updateBet = useUpdateBet()
+
+  // Odds re-entry (dead-zone repair) state
+  const [fixOpen, setFixOpen] = useState(false)
+  const [newOdds, setNewOdds] = useState('')
+  const [fixError, setFixError] = useState<string | null>(null)
+
+  const handleFixOdds = () => {
+    const parsed = Number(newOdds)
+    if (!Number.isInteger(parsed) || isDeadZoneOdds(parsed)) {
+      setFixError('Enter valid American odds: -100 or lower, or +100 or higher.')
+      return
+    }
+    setFixError(null)
+    updateBet.mutate({ id: betId, data: { odds: parsed } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetBetQueryKey(betId) })
+        queryClient.invalidateQueries({ queryKey: getListBetsQueryKey() })
+        if (activeUser) {
+          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
+        }
+        setFixOpen(false)
+        setNewOdds('')
+      },
+      onError: (err: any) => {
+        setFixError(err?.message ?? 'Could not update the odds. Please try again.')
+      },
+    })
+  }
 
   // Modal state
   const [pendingStatus, setPendingStatus] = useState<SettleStatus | null>(null)
@@ -95,6 +126,8 @@ export default function BetDetail() {
   const isPending = bet.status === 'pending'
   const canSettle = isPending && activeUser?.id === bet.userId
   const isSettled = !isPending
+  const hasDeadZoneOdds = isDeadZoneOdds(bet.odds)
+  const isOwner = activeUser?.id === bet.userId
 
   const statusLabel: Record<SettleStatus, string> = { won: 'Won ✓', lost: 'Lost ✗', push: 'Push', void: 'Void' }
   const statusColor: Record<SettleStatus, string> = {
@@ -115,6 +148,31 @@ export default function BetDetail() {
           <p className="text-muted-foreground mt-1">Logged by {bet.userName}</p>
         </div>
       </div>
+
+      {hasDeadZoneOdds && (
+        <Alert className="border-amber-500/40 bg-amber-500/10 [&>svg]:text-amber-500">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="text-amber-500">These odds aren't a real price — please re-enter them</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            <p>
+              American odds are never between -99 and +99, so <span className="font-mono text-amber-500">{formatOdds(bet.odds)}</span> can't
+              be right. This bet is left out of your stats until the odds are corrected — once fixed, it counts again automatically.
+            </p>
+            {isOwner ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-500/40 text-amber-500 hover:bg-amber-500/20"
+                onClick={() => { setFixError(null); setNewOdds(''); setFixOpen(true) }}
+              >
+                Re-enter odds
+              </Button>
+            ) : (
+              <p className="mt-2 text-xs">Only {bet.userName} knows the real price, so only they can correct it.</p>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-2 bg-card">
@@ -259,6 +317,40 @@ export default function BetDetail() {
           </Card>
         )}
       </div>
+
+      {/* Odds re-entry modal (dead-zone repair) */}
+      <Dialog open={fixOpen} onOpenChange={(open) => { if (!open) setFixOpen(false) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Re-enter the real odds</DialogTitle>
+            <DialogDescription>
+              {bet.pick} · currently recorded as <span className="font-mono text-amber-500">{formatOdds(bet.odds)}</span>, which isn't a
+              real American price. Enter the odds you actually got — the potential payout recalculates automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="fix-odds">Correct American odds</Label>
+            <Input
+              id="fix-odds"
+              type="number"
+              step="1"
+              placeholder="e.g. -110 or +150"
+              value={newOdds}
+              onChange={e => setNewOdds(e.target.value)}
+              className="bg-background font-mono"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">Must be -100 or lower, or +100 or higher.</p>
+            {fixError && <p className="text-xs text-destructive">{fixError}</p>}
+          </div>
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setFixOpen(false)} className="sm:w-auto w-full">Cancel</Button>
+            <Button onClick={handleFixOdds} disabled={updateBet.isPending || newOdds.trim() === ''} className="sm:w-auto w-full">
+              {updateBet.isPending ? 'Saving...' : 'Save corrected odds'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Post-result review modal */}
       <Dialog open={pendingStatus !== null} onOpenChange={(open) => { if (!open) resetModal() }}>

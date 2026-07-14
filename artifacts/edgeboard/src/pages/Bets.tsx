@@ -7,9 +7,10 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
+import { isDeadZoneOdds } from "@/lib/odds"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, ClipboardList } from "lucide-react"
+import { Plus, ClipboardList, AlertTriangle } from "lucide-react"
 
 type StatusFilter = 'all' | 'pending' | 'won' | 'lost' | 'push' | 'void'
 
@@ -167,7 +168,22 @@ export default function Bets() {
                           <span className="text-xs text-muted-foreground">{bet.event} · {bet.betType}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono">{formatOdds(bet.odds)}</TableCell>
+                      <TableCell className="font-mono">
+                        {isDeadZoneOdds(bet.odds) ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-500">{formatOdds(bet.odds)}</span>
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500/40 bg-amber-500/10 text-amber-500 font-sans text-[10px] gap-1 whitespace-nowrap"
+                              title="These odds aren't a real American price. Open the bet to re-enter them."
+                            >
+                              <AlertTriangle className="h-3 w-3" /> Re-enter odds
+                            </Badge>
+                          </div>
+                        ) : (
+                          formatOdds(bet.odds)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(bet.stake)}</TableCell>
                       <TableCell>
                         <Badge variant={bet.status as any}>{bet.status.toUpperCase()}</Badge>

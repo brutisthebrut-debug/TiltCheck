@@ -12,7 +12,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
-import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock } from "lucide-react"
+import { isDeadZoneOdds } from "@/lib/odds"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
 import type { LegResult } from "@workspace/api-client-react"
 
 type SettleStatus = 'won' | 'lost' | 'push' | 'void'
@@ -106,6 +108,10 @@ export default function ParlayDetail() {
   const isPending = parlay.status === 'pending'
   const canSettle = isPending && activeUser?.id === parlay.userId
   const isSettled = !isPending
+  const deadZoneLegs = parlay.legs.filter(leg => isDeadZoneOdds(leg.odds))
+  const hasDeadZoneCombined = isDeadZoneOdds(parlay.odds)
+  const hasDeadZoneIssue = deadZoneLegs.length > 0 || hasDeadZoneCombined
+  const isOwner = activeUser?.id === parlay.userId
 
   const statusLabel: Record<SettleStatus, string> = { won: 'Won ✓', lost: 'Lost ✗', push: 'Push', void: 'Void' }
 
@@ -120,6 +126,31 @@ export default function ParlayDetail() {
           <p className="text-muted-foreground mt-1">Logged by {parlay.userName}</p>
         </div>
       </div>
+
+      {hasDeadZoneIssue && (
+        <Alert className="border-amber-500/40 bg-amber-500/10 [&>svg]:text-amber-500">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="text-amber-500">
+            {deadZoneLegs.length > 0
+              ? `${deadZoneLegs.length === 1 ? 'One leg carries' : `${deadZoneLegs.length} legs carry`} odds that aren't a real price`
+              : "The combined odds aren't a real price"}
+          </AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+            <p>
+              American odds are never between -99 and +99.{' '}
+              {deadZoneLegs.length > 0
+                ? 'The flagged legs below need their odds re-entered — until then, the combined odds and payout can\'t be trusted, and this parlay is left out of your stats.'
+                : 'The stored combined odds are impossible, so this parlay is left out of your stats until they are corrected.'}
+              {' '}Once corrected, it counts in your stats again automatically.
+            </p>
+            <p className="mt-2 text-xs">
+              {isOwner
+                ? 'Only you know the real prices. Re-entering leg odds in-app isn\'t available yet — re-create the parlay with the correct odds, or ask an admin to repair it.'
+                : `Only ${parlay.userName} knows the real prices, so only they can correct this parlay.`}
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
@@ -145,6 +176,15 @@ export default function ParlayDetail() {
                         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Leg {index + 1}</span>
                         <Badge variant="outline" className="text-xs">{leg.sport}</Badge>
                         <Badge variant="outline" className="text-xs">{leg.betType}</Badge>
+                        {isDeadZoneOdds(leg.odds) && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] border-amber-500/40 bg-amber-500/10 text-amber-500 gap-1"
+                            title="These odds aren't a real American price — they need to be re-entered."
+                          >
+                            <AlertTriangle className="h-3 w-3" /> Re-enter odds
+                          </Badge>
+                        )}
                       </div>
                       <Badge variant={leg.status as any} className="text-xs shrink-0">{leg.status.toUpperCase()}</Badge>
                     </div>
@@ -153,7 +193,7 @@ export default function ParlayDetail() {
                       <div className="font-medium text-muted-foreground text-sm">{leg.event}</div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-lg font-bold">{leg.pick}</span>
-                        <span className="font-mono text-primary font-medium">{formatOdds(leg.odds)}</span>
+                        <span className={`font-mono font-medium ${isDeadZoneOdds(leg.odds) ? 'text-amber-500' : 'text-primary'}`}>{formatOdds(leg.odds)}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-2">{formatDate(leg.gameDate)}</div>
                       
@@ -245,7 +285,10 @@ export default function ParlayDetail() {
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-muted-foreground">Combined Odds</span>
-                <span className="font-mono font-bold text-lg text-primary">{formatOdds(parlay.odds)}</span>
+                <span className={`font-mono font-bold text-lg flex items-center gap-1.5 ${hasDeadZoneCombined || deadZoneLegs.length > 0 ? 'text-amber-500' : 'text-primary'}`}>
+                  {(hasDeadZoneCombined || deadZoneLegs.length > 0) && <AlertTriangle className="h-4 w-4" />}
+                  {formatOdds(parlay.odds)}
+                </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-muted-foreground">Stake</span>

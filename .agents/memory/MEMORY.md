@@ -1,3 +1,4 @@
 - [OpenAPI codegen source of truth](openapi-codegen-source-of-truth.md) — orval `clean: true` wipes hand edits in generated clients; add fields to openapi.yaml only, then codegen.
 - [Clerk e2e testing limits](clerk-e2e-testing.md) — Cloudflare CAPTCHA blocks automated Clerk sign-up; test auth server-side with curl and UI only up to the Clerk card.
 - [OpenAPI spec file integrity](openapi-spec-file-integrity.md) — openapi.yaml can gain a duplicated tail during parallel task edits; check for duplicate schema keys before codegen.
+- [Stale TS project references](stale-ts-project-references.md) — phantom "no exported member" errors for @workspace libs mean stale dist; run `tsc -b lib/api-zod lib/api-client-react` first.
