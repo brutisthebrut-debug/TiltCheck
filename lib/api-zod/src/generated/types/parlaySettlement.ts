@@ -14,6 +14,11 @@ export interface ParlaySettlement {
   status: ParlaySettlementStatus;
   postGameReview?: string;
   legResults?: LegResult[];
+  /**
+     * Actual amount returned on a won parlay. Never negative — a won parlay cannot reduce the bankroll. Capped at the ledger's storage ceiling.
+     * @minimum 0
+     * @maximum 9999999999.99
+     */
   actualPayoutOverride?: number;
   reasoningQuality?: ParlaySettlementReasoningQuality;
   whatHappened?: string;

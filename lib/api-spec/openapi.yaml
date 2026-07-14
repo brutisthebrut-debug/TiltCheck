@@ -88,6 +88,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "403":
+          description: >-
+            Claim rejected — `error` is `not_invited` (email not on the
+            BETA_ALLOWED_EMAILS allowlist, or the account has no email while an
+            allowlist is configured) or `beta_full` (seat cap reached).
         "409":
           description: Profile already claimed or account already linked
 
@@ -1082,6 +1087,11 @@ components:
           type: string
         actualPayoutOverride:
           type: number
+          minimum: 0
+          maximum: 9999999999.99
+          description: >-
+            Actual amount returned on a won bet. Never negative — a won bet
+            cannot reduce the bankroll. Capped at the ledger's storage ceiling.
         reasoningQuality:
           type: string
           enum: [sound, flawed]
@@ -1261,6 +1271,12 @@ components:
             $ref: "#/components/schemas/LegResult"
         actualPayoutOverride:
           type: number
+          minimum: 0
+          maximum: 9999999999.99
+          description: >-
+            Actual amount returned on a won parlay. Never negative — a won
+            parlay cannot reduce the bankroll. Capped at the ledger's storage
+            ceiling.
         reasoningQuality:
           type: string
           enum: [sound, flawed]
@@ -1337,6 +1353,12 @@ components:
           enum: [deposit, withdraw, adjustment]
         amount:
           type: number
+          minimum: -1000000
+          maximum: 1000000
+          description: >-
+            Deposits and withdrawals must be entered as positive amounts (the
+            server records the direction). Manual adjustments may be negative,
+            but never zero.
         note:
           type: string
       required: [type, amount]

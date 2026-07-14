@@ -343,10 +343,15 @@ export const SettleBetParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const settleBetBodyActualPayoutOverrideMin = 0;
+export const settleBetBodyActualPayoutOverrideMax = 9999999999.99;
+
+
+
 export const SettleBetBody = zod.object({
   "status": zod.enum(['won', 'lost', 'push', 'void']),
   "postGameReview": zod.string().optional(),
-  "actualPayoutOverride": zod.number().optional(),
+  "actualPayoutOverride": zod.number().min(settleBetBodyActualPayoutOverrideMin).max(settleBetBodyActualPayoutOverrideMax).optional().describe('Actual amount returned on a won bet. Never negative — a won bet cannot reduce the bankroll. Capped at the ledger\'s storage ceiling.'),
   "reasoningQuality": zod.enum(['sound', 'flawed']).optional(),
   "whatHappened": zod.string().optional(),
   "missReason": zod.enum(['bad_read', 'bad_price', 'lineup_injury', 'emotional', 'misunderstood_market', 'normal_variance', 'na']).optional()
@@ -669,6 +674,11 @@ export const SettleParlayParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const settleParlayBodyActualPayoutOverrideMin = 0;
+export const settleParlayBodyActualPayoutOverrideMax = 9999999999.99;
+
+
+
 export const SettleParlayBody = zod.object({
   "status": zod.enum(['won', 'lost', 'push', 'void']),
   "postGameReview": zod.string().optional(),
@@ -676,7 +686,7 @@ export const SettleParlayBody = zod.object({
   "legId": zod.number(),
   "status": zod.enum(['won', 'lost', 'push', 'void'])
 })).optional(),
-  "actualPayoutOverride": zod.number().optional(),
+  "actualPayoutOverride": zod.number().min(settleParlayBodyActualPayoutOverrideMin).max(settleParlayBodyActualPayoutOverrideMax).optional().describe('Actual amount returned on a won parlay. Never negative — a won parlay cannot reduce the bankroll. Capped at the ledger\'s storage ceiling.'),
   "reasoningQuality": zod.enum(['sound', 'flawed']).optional(),
   "whatHappened": zod.string().optional(),
   "missReason": zod.enum(['bad_read', 'bad_price', 'lineup_injury', 'emotional', 'misunderstood_market', 'normal_variance', 'na']).optional()
@@ -849,10 +859,15 @@ export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem)
 /**
  * @summary Add a bankroll transaction (deposit, withdraw, adjustment)
  */
+export const createTransactionBodyAmountMin = -1000000;
+export const createTransactionBodyAmountMax = 1000000;
+
+
+
 export const CreateTransactionBody = zod.object({
   "userId": zod.number().optional(),
   "type": zod.enum(['deposit', 'withdraw', 'adjustment']),
-  "amount": zod.number(),
+  "amount": zod.number().min(createTransactionBodyAmountMin).max(createTransactionBodyAmountMax).describe('Deposits and withdrawals must be entered as positive amounts (the server records the direction). Manual adjustments may be negative, but never zero.'),
   "note": zod.string().optional()
 })
 

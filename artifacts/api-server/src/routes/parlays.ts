@@ -249,6 +249,17 @@ router.patch("/parlays/:id", requireProfile, async (req, res): Promise<void> => 
     res.status(403).json({ error: "You can only edit your own parlays" });
     return;
   }
+  // The stake is frozen once a parlay is settled: the recorded payout and its
+  // bankroll ledger entry were computed from the original stake, so editing it
+  // would silently desync the parlay from the money that moved. (Leg odds are
+  // guarded the same way in PATCH /parlays/:id/legs/:legId.)
+  if (d.stake !== undefined && (owned.status !== "pending" || owned.settledAt != null)) {
+    res.status(409).json({
+      error:
+        "This parlay is already settled — its stake is locked into the recorded result and bankroll ledger. If the numbers were wrong, delete the parlay and re-log it.",
+    });
+    return;
+  }
   const updateValues: Record<string, unknown> = {};
   if (d.name !== undefined) updateValues.name = d.name;
   if (d.stake !== undefined) updateValues.stake = String(d.stake);

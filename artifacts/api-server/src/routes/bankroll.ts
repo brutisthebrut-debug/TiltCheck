@@ -130,6 +130,21 @@ router.post("/bankroll/transactions", requireProfile, async (req, res): Promise<
     return;
   }
   const { type, amount, note } = parsed.data;
+
+  // Sign discipline: zero moves are meaningless, and deposits/withdrawals are
+  // entered as positive amounts — the server applies the direction. A
+  // positive "withdrawal" or negative "deposit" would silently skew balances.
+  const amt = Number(amount);
+  if (amt === 0) {
+    res.status(400).json({ error: "Amount can't be zero." });
+    return;
+  }
+  if ((type === "deposit" || type === "withdraw") && amt < 0) {
+    res.status(400).json({
+      error: `Enter the ${type === "deposit" ? "deposit" : "withdrawal"} as a positive amount — the ledger records the direction for you.`,
+    });
+    return;
+  }
   const userId = req.currentUser!.id;
   const bankroll = await getUserBankroll(userId);
   if (!bankroll) {

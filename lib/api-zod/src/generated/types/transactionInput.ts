@@ -10,6 +10,11 @@ import type { TransactionInputType } from './transactionInputType';
 export interface TransactionInput {
   userId?: number;
   type: TransactionInputType;
+  /**
+     * Deposits and withdrawals must be entered as positive amounts (the server records the direction). Manual adjustments may be negative, but never zero.
+     * @minimum -1000000
+     * @maximum 1000000
+     */
   amount: number;
   note?: string;
 }

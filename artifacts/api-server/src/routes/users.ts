@@ -30,6 +30,23 @@ async function betaIsFull(dbx: Dbish = db): Promise<boolean> {
   return linked >= limit;
 }
 
+// Optional email allowlist for the private beta. When BETA_ALLOWED_EMAILS is
+// set (comma-separated, case-insensitive), only those addresses may claim or
+// create a profile; everyone else gets a clear "not invited" rejection.
+// Accounts that are already linked are never affected. Read at request time so
+// config changes apply without a rebuild. Unset/empty means no restriction.
+function allowedEmailSet(): Set<string> | null {
+  const raw = process.env.BETA_ALLOWED_EMAILS;
+  if (!raw?.trim()) return null;
+  const set = new Set(
+    raw
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  return set.size > 0 ? set : null;
+}
+
 // Advisory-lock key that serializes claim requests, so the seat-cap check and
 // the claim/create write are atomic (concurrent claims can't overshoot the cap).
 const CLAIM_LOCK_KEY = 0x5ea75;
@@ -96,6 +113,14 @@ router.post("/users/claim", async (req, res): Promise<void> => {
         .limit(1);
       if (alreadyLinked) {
         return { status: 200, body: ClaimProfileResponse.parse(formatUser(alreadyLinked)) };
+      }
+
+      // Email allowlist runs before the seat-cap check: an uninvited account
+      // should hear "not invited", not "beta full". No email on the Clerk
+      // account counts as not invited when an allowlist is configured.
+      const allowlist = allowedEmailSet();
+      if (allowlist && (!email || !allowlist.has(email.toLowerCase()))) {
+        return { status: 403, body: { error: "not_invited" } };
       }
 
       if (await betaIsFull(tx)) {

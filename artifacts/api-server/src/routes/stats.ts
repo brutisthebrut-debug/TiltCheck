@@ -47,8 +47,17 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
   const pushes = settled.filter((b) => b.status === "push").length;
   const pending = bets.filter((b) => b.status === "pending").length;
 
-  const totalWagered = settled.reduce((acc, b) => acc + Number(b.stake), 0);
-  const totalPayout = settled.reduce((acc, b) => acc + (b.actualPayout != null ? Number(b.actualPayout) : 0), 0);
+  // Money math (totalWagered/totalProfit/ROI) includes settled parlays
+  // (won/lost/push; void excluded) so the stats page agrees with the bankroll
+  // page's rule. Top-level win/loss/push counts stay straight-bet-only — the
+  // parlay record is broken out separately in parlayRecord.
+  const parlaySettled = parlays.filter((p) => ["won", "lost", "push"].includes(p.status));
+  const totalWagered =
+    settled.reduce((acc, b) => acc + Number(b.stake), 0) +
+    parlaySettled.reduce((acc, p) => acc + Number(p.stake), 0);
+  const totalPayout =
+    settled.reduce((acc, b) => acc + (b.actualPayout != null ? Number(b.actualPayout) : 0), 0) +
+    parlaySettled.reduce((acc, p) => acc + (p.actualPayout != null ? Number(p.actualPayout) : 0), 0);
   const totalProfit = totalPayout - totalWagered;
   const roi = totalWagered > 0 ? (totalProfit / totalWagered) * 100 : 0;
 
@@ -75,7 +84,6 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
     return p < (worst ? (Number(worst.actualPayout ?? 0) - Number(worst.stake)) : Infinity) ? b : worst;
   }, null as (typeof betsTable.$inferSelect) | null);
 
-  const parlaySettled = parlays.filter((p) => ["won", "lost", "push"].includes(p.status));
   const parlayWins = parlaySettled.filter((p) => p.status === "won").length;
   const parlayLosses = parlaySettled.filter((p) => p.status === "lost").length;
   const parlayPushes = parlaySettled.filter((p) => p.status === "push").length;

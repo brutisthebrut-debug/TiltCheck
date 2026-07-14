@@ -305,6 +305,11 @@ export const BetSettlementMissReason = {
 export interface BetSettlement {
   status: BetSettlementStatus;
   postGameReview?: string;
+  /**
+     * Actual amount returned on a won bet. Never negative — a won bet cannot reduce the bankroll. Capped at the ledger's storage ceiling.
+     * @minimum 0
+     * @maximum 9999999999.99
+     */
   actualPayoutOverride?: number;
   reasoningQuality?: BetSettlementReasoningQuality;
   whatHappened?: string;
@@ -434,6 +439,11 @@ export interface ParlaySettlement {
   status: ParlaySettlementStatus;
   postGameReview?: string;
   legResults?: LegResult[];
+  /**
+     * Actual amount returned on a won parlay. Never negative — a won parlay cannot reduce the bankroll. Capped at the ledger's storage ceiling.
+     * @minimum 0
+     * @maximum 9999999999.99
+     */
   actualPayoutOverride?: number;
   reasoningQuality?: ParlaySettlementReasoningQuality;
   whatHappened?: string;
@@ -505,6 +515,11 @@ export const TransactionInputType = {
 export interface TransactionInput {
   userId?: number;
   type: TransactionInputType;
+  /**
+     * Deposits and withdrawals must be entered as positive amounts (the server records the direction). Manual adjustments may be negative, but never zero.
+     * @minimum -1000000
+     * @maximum 1000000
+     */
   amount: number;
   note?: string;
 }

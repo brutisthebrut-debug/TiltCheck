@@ -12,6 +12,11 @@ import type { BetSettlementStatus } from './betSettlementStatus';
 export interface BetSettlement {
   status: BetSettlementStatus;
   postGameReview?: string;
+  /**
+     * Actual amount returned on a won bet. Never negative — a won bet cannot reduce the bankroll. Capped at the ledger's storage ceiling.
+     * @minimum 0
+     * @maximum 9999999999.99
+     */
   actualPayoutOverride?: number;
   reasoningQuality?: BetSettlementReasoningQuality;
   whatHappened?: string;

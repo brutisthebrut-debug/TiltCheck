@@ -60,7 +60,10 @@ export default function ClaimProfile() {
 
   const onError = (e: unknown) => {
     const status = (e as { status?: number })?.status
-    if (status === 403) {
+    const code = (e as { data?: { error?: string } })?.data?.error
+    if (status === 403 && code === "not_invited") {
+      setError("EdgeBoard is a private beta — this email isn't on the guest list. Ask whoever runs the board to add you.")
+    } else if (status === 403) {
       setError("The board's at capacity right now. Ask whoever runs it to open more seats.")
     } else if (status === 409) {
       setError("That profile was just claimed. Pick another or start fresh.")

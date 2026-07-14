@@ -191,6 +191,20 @@ router.patch("/bets/:id", requireProfile, async (req, res): Promise<void> => {
     res.status(403).json({ error: "You can only edit your own bets" });
     return;
   }
+  // Financial fields are frozen once a bet is settled: the recorded result
+  // and its bankroll ledger entry were computed from the original odds/stake,
+  // so editing them would silently desync the bet from the money that moved.
+  // Non-financial fields (rationale, tags, etc.) stay editable.
+  if (
+    (d.odds !== undefined || d.stake !== undefined) &&
+    (existing.status !== "pending" || existing.settledAt != null)
+  ) {
+    res.status(409).json({
+      error:
+        "This bet is already settled — its odds and stake are locked into the recorded result and bankroll ledger. If the numbers were wrong, delete the bet and re-log it.",
+    });
+    return;
+  }
   if (d.odds !== undefined || d.stake !== undefined) {
     const newOdds = d.odds ?? existing.odds;
     const newStake = d.stake ?? Number(existing.stake);
