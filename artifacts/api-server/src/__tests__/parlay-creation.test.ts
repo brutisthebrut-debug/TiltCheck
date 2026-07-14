@@ -4,10 +4,11 @@
  * The route inserts the parlay row and its legs in a single DB transaction.
  * These tests prove:
  *   1. A successful create persists both the parlay and all its legs.
- *   2. A failure while inserting legs (a DB constraint violation) rolls the
- *      whole transaction back, leaving no orphan zero-leg parlay row behind.
- *   3. Malformed or impossible gameDate values are rejected with a 400
- *      before touching the database.
+ *   2. A failure while inserting legs (injected by making the leg insert
+ *      throw mid-transaction) rolls the whole transaction back, leaving no
+ *      orphan zero-leg parlay row behind.
+ *   3. Malformed or impossible gameDate values and out-of-range odds are
+ *      rejected with a 400 before touching the database.
  *
  * Each test creates its own isolated user; all rows are removed in afterAll.
  */
@@ -114,10 +115,36 @@ const validLegs = [
   },
 ];
 
-// Passes Zod validation (odds is just a number) but overflows the Postgres
-// `integer` column on the leg insert. Negative so the parlay's *combined*
-// odds stays tiny and the parlay row itself inserts without error.
-const OVERFLOW_ODDS = -2147483649;
+// Odds are now bounded by the OpenAPI spec (-100000..100000), so an
+// int4-overflow value can no longer sneak past request validation. To test
+// transaction rollback, we instead make the *leg* insert throw inside the
+// real transaction: db.transaction is wrapped so the parlay row insert runs
+// for real, but inserting into parlay_legs raises. The thrown error causes a
+// genuine Postgres ROLLBACK.
+function injectLegInsertFailure() {
+  const originalTransaction = db.transaction.bind(db);
+  const spy = vi.spyOn(db, "transaction").mockImplementation(((
+    callback: (tx: never) => Promise<unknown>,
+  ) =>
+    originalTransaction(async (tx) => {
+      const proxied = new Proxy(tx as object, {
+        get(target, prop) {
+          if (prop === "insert") {
+            return (table: unknown) => {
+              if (table === parlayLegsTable) {
+                throw new Error("injected leg insert failure");
+              }
+              return (target as typeof tx).insert(table as never);
+            };
+          }
+          const value = Reflect.get(target, prop);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      return callback(proxied as never);
+    })) as typeof db.transaction);
+  return spy;
+}
 
 describe("POST /api/parlays", () => {
   it("creates the parlay with all its legs persisted and matching the request", async () => {
@@ -159,23 +186,94 @@ describe("POST /api/parlays", () => {
   it("rolls back the parlay row when a leg insert fails mid-transaction", async () => {
     const user = await createUser(1000);
 
-    // gameDate is now validated up front, so failure is injected via a leg
-    // odds value that passes request validation (any number) but overflows
-    // the Postgres `integer` column. The huge *negative* odds keeps the
-    // parlay's combined odds tiny, so the parlay row inserts fine inside the
-    // transaction; the failing leg insert must then roll it back.
-    const res = await request(app).post("/api/parlays").send({
-      name: "Doomed Parlay",
-      stake: 50,
-      confidenceScore: 6,
-      legs: [
-        validLegs[0],
-        { ...validLegs[1], odds: OVERFLOW_ODDS },
-      ],
-    });
-    expect(res.status).toBeGreaterThanOrEqual(500);
+    // Both gameDate and odds are now validated up front, so failure is
+    // injected by making the leg insert throw mid-transaction. The parlay
+    // row inserts fine inside the transaction; the failing leg insert must
+    // then roll it back.
+    const spy = injectLegInsertFailure();
+    try {
+      const res = await request(app).post("/api/parlays").send({
+        name: "Doomed Parlay",
+        stake: 50,
+        confidenceScore: 6,
+        legs: validLegs,
+      });
+      expect(res.status).toBeGreaterThanOrEqual(500);
+    } finally {
+      spy.mockRestore();
+    }
 
     // No orphan parlay row may remain for this user
+    const parlays = await db
+      .select()
+      .from(parlaysTable)
+      .where(eq(parlaysTable.userId, user.id));
+    expect(parlays).toHaveLength(0);
+  });
+
+  it("rejects a leg with odds beyond the allowed range with a 400 (no DB overflow 500)", async () => {
+    const user = await createUser(1000);
+
+    // Would overflow Postgres int4 — must be caught by request validation now
+    const res = await request(app).post("/api/parlays").send({
+      name: "Overflow Odds Parlay",
+      stake: 50,
+      confidenceScore: 6,
+      legs: [validLegs[0], { ...validLegs[1], odds: -2147483649 }],
+    });
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain("odds");
+
+    const parlays = await db
+      .select()
+      .from(parlaysTable)
+      .where(eq(parlaysTable.userId, user.id));
+    expect(parlays).toHaveLength(0);
+  });
+
+  it("rejects odds just outside the bounds and accepts odds at the bounds", async () => {
+    await createUser(1000);
+
+    const tooBig = await request(app).post("/api/parlays").send({
+      name: "Too Big Odds",
+      stake: 10,
+      confidenceScore: 5,
+      legs: [validLegs[0], { ...validLegs[1], odds: 100001 }],
+    });
+    expect(tooBig.status).toBe(400);
+
+    const atBound = await request(app).post("/api/parlays").send({
+      name: "At Bound Odds",
+      stake: 10,
+      confidenceScore: 5,
+      legs: [validLegs[0], { ...validLegs[1], odds: 100000 }],
+    });
+    expect(atBound.status).toBe(201);
+  });
+
+  it("rejects a parlay whose combined odds would overflow storage with a 400", async () => {
+    const user = await createUser(1000);
+
+    // Each leg is within the per-leg bounds, but the combined odds explode
+    // multiplicatively far past int4 range.
+    const longShotLegs = Array.from({ length: 6 }, (_, i) => ({
+      sport: "NBA",
+      event: `Long Shot ${i + 1}`,
+      betType: "moneyline",
+      pick: `Team ${i + 1}`,
+      odds: 100000,
+      gameDate: "2026-07-14",
+    }));
+
+    const res = await request(app).post("/api/parlays").send({
+      name: "Impossible Long Shot",
+      stake: 10,
+      confidenceScore: 3,
+      legs: longShotLegs,
+    });
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain("too large");
+
     const parlays = await db
       .select()
       .from(parlaysTable)
@@ -227,16 +325,18 @@ describe("POST /api/parlays", () => {
       .select({ id: parlayLegsTable.id })
       .from(parlayLegsTable);
 
-    const res = await request(app).post("/api/parlays").send({
-      name: "Doomed Parlay 2",
-      stake: 25,
-      confidenceScore: 5,
-      legs: [
-        { ...validLegs[0], odds: OVERFLOW_ODDS },
-        validLegs[1],
-      ],
-    });
-    expect(res.status).toBeGreaterThanOrEqual(500);
+    const spy = injectLegInsertFailure();
+    try {
+      const res = await request(app).post("/api/parlays").send({
+        name: "Doomed Parlay 2",
+        stake: 25,
+        confidenceScore: 5,
+        legs: validLegs,
+      });
+      expect(res.status).toBeGreaterThanOrEqual(500);
+    } finally {
+      spy.mockRestore();
+    }
 
     const after = await db
       .select({ id: parlayLegsTable.id })

@@ -12,6 +12,11 @@ export interface BetUpdate {
   event?: string;
   betType?: BetUpdateBetType;
   pick?: string;
+  /**
+     * American odds (e.g. -110, +150)
+     * @minimum -100000
+     * @maximum 100000
+     */
   odds?: number;
   /**
      * @maximum 1000000

@@ -113,6 +113,11 @@ export interface BetInput {
   betType: BetInputBetType;
   /** @minLength 1 */
   pick: string;
+  /**
+     * American odds (e.g. -110, +150)
+     * @minimum -100000
+     * @maximum 100000
+     */
   odds: number;
   /**
      * @maximum 1000000
@@ -148,6 +153,11 @@ export interface BetUpdate {
   event?: string;
   betType?: BetUpdateBetType;
   pick?: string;
+  /**
+     * American odds (e.g. -110, +150)
+     * @minimum -100000
+     * @maximum 100000
+     */
   odds?: number;
   /**
      * @maximum 1000000
@@ -301,6 +311,11 @@ export interface ParlayLegInput {
   betType: ParlayLegInputBetType;
   /** @minLength 1 */
   pick: string;
+  /**
+     * American odds (e.g. -110, +150)
+     * @minimum -100000
+     * @maximum 100000
+     */
   odds: number;
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   gameDate: string;

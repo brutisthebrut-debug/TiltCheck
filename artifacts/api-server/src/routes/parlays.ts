@@ -122,6 +122,19 @@ router.post("/parlays", requireProfile, async (req, res): Promise<void> => {
   const combinedDecimal = legOddsArr.reduce((acc, o) => acc * americanToDecimal(o), 1);
   const payout = calcParlayPayout(combinedDecimal, Number(d.stake));
 
+  // Even with each leg's odds bounded, the *combined* odds of many long-shot
+  // legs can exceed what the database can store (int4 odds, numeric(12,2)
+  // payout). Reject those up front with a clear 400 instead of a DB 500.
+  const INT4_MAX = 2147483647;
+  const MAX_PAYOUT = 9_999_999_999.99; // numeric(12,2) ceiling
+  if (!Number.isFinite(combinedOdds) || Math.abs(combinedOdds) > INT4_MAX || payout > MAX_PAYOUT) {
+    res.status(400).json({
+      error:
+        "Combined parlay odds are too large to store. Remove a leg or use less extreme odds.",
+    });
+    return;
+  }
+
   // Insert the parlay and its legs atomically so an interrupted request
   // can't leave a parlay row with zero legs.
   const parlay = await db.transaction(async (tx) => {

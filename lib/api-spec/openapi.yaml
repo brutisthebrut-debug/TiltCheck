@@ -669,6 +669,9 @@ components:
           minLength: 1
         odds:
           type: integer
+          minimum: -100000
+          maximum: 100000
+          description: American odds (e.g. -110, +150)
         stake:
           type: number
           exclusiveMinimum: 0
@@ -706,6 +709,9 @@ components:
           type: string
         odds:
           type: integer
+          minimum: -100000
+          maximum: 100000
+          description: American odds (e.g. -110, +150)
         stake:
           type: number
           exclusiveMinimum: 0
@@ -865,6 +871,9 @@ components:
           minLength: 1
         odds:
           type: integer
+          minimum: -100000
+          maximum: 100000
+          description: American odds (e.g. -110, +150)
         gameDate:
           type: string
           pattern: '^\d{4}-\d{2}-\d{2}$'
