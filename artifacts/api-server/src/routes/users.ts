@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, isNull, asc } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, asc, count, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
 import { db, usersTable } from "@workspace/db";
 import {
@@ -20,6 +20,24 @@ const UpdateUserBody = z.object({
 });
 
 const AVATAR_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
+
+// Seats in the private beta = accounts linked to a sign-in. Raise (or set to
+// 0 for unlimited) via the BETA_SEAT_LIMIT env var when opening the beta up.
+// Read at request time so config changes apply without a rebuild.
+type Dbish = Pick<typeof db, "select">;
+async function betaIsFull(dbx: Dbish = db): Promise<boolean> {
+  const limit = Number(process.env.BETA_SEAT_LIMIT ?? 5);
+  if (!Number.isFinite(limit) || limit <= 0) return false;
+  const [{ linked }] = await dbx
+    .select({ linked: count() })
+    .from(usersTable)
+    .where(isNotNull(usersTable.clerkUserId));
+  return linked >= limit;
+}
+
+// Advisory-lock key that serializes claim requests, so the seat-cap check and
+// the claim/create write are atomic (concurrent claims can't overshoot the cap).
+const CLAIM_LOCK_KEY = 0x5ea75;
 
 // GET /users/me — the signed-in user's linked bettor profile
 router.get("/users/me", async (req, res): Promise<void> => {
@@ -66,69 +84,88 @@ router.post("/users/claim", async (req, res): Promise<void> => {
     // Clerk lookup is best-effort; claiming still works without it
   }
 
-  if (userId != null) {
-    // Claim an existing profile — the isNull guard makes this atomic, so two
-    // accounts can never claim the same profile
-    const [claimed] = await db
-      .update(usersTable)
-      .set({ clerkUserId, email })
-      .where(and(eq(usersTable.id, userId), isNull(usersTable.clerkUserId)))
-      .returning();
-    if (!claimed) {
-      const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-      if (!existing) {
-        res.status(404).json({ error: "Profile not found" });
-      } else {
-        res.status(409).json({ error: "Profile already claimed by another account" });
-      }
-      return;
-    }
-    res.json(ClaimProfileResponse.parse(formatUser(claimed)));
-    return;
-  }
-
-  // Start fresh — derive a unique username from email (or account id)
-  const name = displayName?.trim() || fallbackName || email?.split("@")[0] || "Bettor";
-  const base = (email?.split("@")[0] ?? name)
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, "")
-    .slice(0, 24) || "bettor";
-  let username = base;
-  for (let attempt = 0; ; attempt++) {
-    const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, username)).limit(1);
-    if (existing.length === 0) break;
-    username = `${base}${attempt + 2}`;
-  }
-  const usedColors = (await db.select({ c: usersTable.avatarColor }).from(usersTable)).map((r) => r.c);
-  const avatarColor = AVATAR_COLORS.find((c) => !usedColors.includes(c)) ?? AVATAR_COLORS[0];
-
+  type ClaimOutcome = { status: number; body: unknown };
+  let outcome: ClaimOutcome;
   try {
-    const [created] = await db
-      .insert(usersTable)
-      .values({
-        username,
-        displayName: name,
-        avatarColor,
-        startingBankroll: "1000",
-        clerkUserId,
-        email,
-      })
-      .returning();
-    res.json(ClaimProfileResponse.parse(formatUser(created)));
+    outcome = await db.transaction(async (tx): Promise<ClaimOutcome> => {
+      // Serialize seat-cap check + write: concurrent claims queue up here, so
+      // the count can never be observed stale and the cap can't be overshot.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${CLAIM_LOCK_KEY})`);
+
+      // Double-submit: if this account got linked while waiting on the lock,
+      // return the existing profile instead of failing.
+      const [alreadyLinked] = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.clerkUserId, clerkUserId))
+        .limit(1);
+      if (alreadyLinked) {
+        return { status: 200, body: ClaimProfileResponse.parse(formatUser(alreadyLinked)) };
+      }
+
+      if (await betaIsFull(tx)) {
+        return { status: 403, body: { error: "beta_full" } };
+      }
+
+      if (userId != null) {
+        // Claim an existing profile — the isNull guard means two accounts can
+        // never claim the same profile
+        const [claimed] = await tx
+          .update(usersTable)
+          .set({ clerkUserId, email })
+          .where(and(eq(usersTable.id, userId), isNull(usersTable.clerkUserId)))
+          .returning();
+        if (!claimed) {
+          const [existing] = await tx.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+          if (!existing) {
+            return { status: 404, body: { error: "Profile not found" } };
+          }
+          return { status: 409, body: { error: "Profile already claimed by another account" } };
+        }
+        return { status: 200, body: ClaimProfileResponse.parse(formatUser(claimed)) };
+      }
+
+      // Start fresh — derive a unique username from email (or account id)
+      const name = displayName?.trim() || fallbackName || email?.split("@")[0] || "Bettor";
+      const base = (email?.split("@")[0] ?? name)
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, "")
+        .slice(0, 24) || "bettor";
+      let username = base;
+      for (let attempt = 0; ; attempt++) {
+        const existing = await tx.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, username)).limit(1);
+        if (existing.length === 0) break;
+        username = `${base}${attempt + 2}`;
+      }
+      const usedColors = (await tx.select({ c: usersTable.avatarColor }).from(usersTable)).map((r) => r.c);
+      const avatarColor = AVATAR_COLORS.find((c) => !usedColors.includes(c)) ?? AVATAR_COLORS[0];
+
+      const [created] = await tx
+        .insert(usersTable)
+        .values({
+          username,
+          displayName: name,
+          avatarColor,
+          startingBankroll: "1000",
+          clerkUserId,
+          email,
+        })
+        .returning();
+      return { status: 200, body: ClaimProfileResponse.parse(formatUser(created)) };
+    });
   } catch {
-    // Unique-constraint race (double-submit or username collision). If this
-    // account got linked by the concurrent request, return that profile.
+    // Unexpected write failure (e.g. unique-constraint collision). If this
+    // account did end up linked, return that profile; otherwise ask to retry.
     const [linked] = await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.clerkUserId, clerkUserId))
       .limit(1);
-    if (linked) {
-      res.json(ClaimProfileResponse.parse(formatUser(linked)));
-      return;
-    }
-    res.status(409).json({ error: "Could not create profile — try again" });
+    outcome = linked
+      ? { status: 200, body: ClaimProfileResponse.parse(formatUser(linked)) }
+      : { status: 409, body: { error: "Could not create profile — try again" } };
   }
+  res.status(outcome.status).json(outcome.body);
 });
 
 // GET /users

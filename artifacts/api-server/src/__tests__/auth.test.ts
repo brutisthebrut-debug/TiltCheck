@@ -11,12 +11,16 @@
  */
 import { describe, it, expect, afterAll, vi } from "vitest";
 import request from "supertest";
-import { inArray } from "drizzle-orm";
+import { inArray, isNotNull, count } from "drizzle-orm";
 
 let currentClerkUserId: string | null = null;
 
 vi.mock("@clerk/express", () => ({
-  getAuth: () => ({ userId: currentClerkUserId }),
+  // Identity comes from the shared variable, or per-request via the
+  // x-test-clerk-id header (needed for concurrent requests).
+  getAuth: (req: { headers?: Record<string, string | string[] | undefined> }) => ({
+    userId: (req?.headers?.["x-test-clerk-id"] as string | undefined) ?? currentClerkUserId,
+  }),
   clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),
   clerkClient: {
     users: {
@@ -29,6 +33,10 @@ vi.mock("@clerk/express", () => ({
     },
   },
 }));
+
+// Tests create many linked users; lift the beta seat cap except where a test
+// sets it explicitly (it is read per-request).
+process.env.BETA_SEAT_LIMIT = "0";
 
 import app from "../app";
 import {
@@ -169,6 +177,46 @@ describe("signed in without a linked profile", () => {
 
     const again = await request(app).post("/api/users/claim").send({ displayName: "Fresh Tester" });
     expect(again.status).toBe(409); // already linked
+  });
+
+  it("under concurrency, only as many claims succeed as there are free seats", async () => {
+    // Leave exactly one free seat relative to whatever is already linked
+    const [{ linked }] = await db
+      .select({ linked: count() })
+      .from(usersTable)
+      .where(isNotNull(usersTable.clerkUserId));
+    process.env.BETA_SEAT_LIMIT = String(linked + 1);
+    try {
+      const contenders = [uniqueClerkId(), uniqueClerkId(), uniqueClerkId()];
+      const results = await Promise.all(
+        contenders.map((id, i) =>
+          request(app)
+            .post("/api/users/claim")
+            .set("x-test-clerk-id", id)
+            .send({ displayName: `Racer ${i}` }),
+        ),
+      );
+      const wins = results.filter((r) => r.status === 200);
+      const fulls = results.filter((r) => r.status === 403 && r.body.error === "beta_full");
+      for (const w of wins) createdUserIds.push(w.body.id);
+      expect(wins.length).toBe(1);
+      expect(fulls.length).toBe(2);
+    } finally {
+      process.env.BETA_SEAT_LIMIT = "0";
+    }
+  });
+
+  it("rejects new claims with 403 beta_full when all seats are taken", async () => {
+    await createLinkedUser(); // ensure at least one linked account exists
+    process.env.BETA_SEAT_LIMIT = "1";
+    try {
+      currentClerkUserId = uniqueClerkId();
+      const res = await request(app).post("/api/users/claim").send({ displayName: "Too Late" });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe("beta_full");
+    } finally {
+      process.env.BETA_SEAT_LIMIT = "0";
+    }
   });
 });
 

@@ -32,6 +32,9 @@ vi.mock("@clerk/express", () => ({
   },
 }));
 
+// Tests create many linked users; lift the beta seat cap (read per-request).
+process.env.BETA_SEAT_LIMIT = "0";
+
 import app from "../app";
 import {
   db,
