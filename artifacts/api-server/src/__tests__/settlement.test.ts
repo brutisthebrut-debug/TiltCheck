@@ -525,6 +525,70 @@ describe("PATCH /api/parlays/:id/settle", () => {
     expect(txs.length).toBe(1);
   });
 
+  it("rejects legResults containing a legId from a different parlay with 400 and touches nothing", async () => {
+    const user = await createUser(1000);
+    const target = await createParlay(user.id, 50);
+    const other = await createParlay(user.id, 50);
+
+    // Attempt to settle `target` while sneaking in a leg from `other`
+    const res = await request(app)
+      .patch(`/api/parlays/${target.id}/settle`)
+      .send({
+        status: "won",
+        legResults: [
+          { legId: target.legs[0].id, status: "won" },
+          { legId: other.legs[0].id, status: "lost" },
+        ],
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/do not belong/i);
+
+    // The other parlay's legs must be untouched
+    const otherAfter = await request(app).get(`/api/parlays/${other.id}`);
+    expect(otherAfter.status).toBe(200);
+    for (const leg of otherAfter.body.legs) {
+      expect(leg.status).toBe("pending");
+    }
+
+    // The target parlay must be fully rolled back: still pending, legs pending
+    const targetAfter = await request(app).get(`/api/parlays/${target.id}`);
+    expect(targetAfter.status).toBe(200);
+    expect(targetAfter.body.status).toBe("pending");
+    expect(targetAfter.body.settledAt).toBeNull();
+    for (const leg of targetAfter.body.legs) {
+      expect(leg.status).toBe("pending");
+    }
+
+    // No bankroll movement
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
+
+    const txs = await db
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, user.id));
+    expect(txs.length).toBe(0);
+  });
+
+  it("rejects a legId that doesn't exist at all with 400", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        legResults: [{ legId: 99999999, status: "won" }],
+      });
+    expect(res.status).toBe(400);
+
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.status).toBe("pending");
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
+  });
+
   it("rejects a repeat settle of a lost parlay with 409, bankroll unchanged", async () => {
     const user = await createUser(1000);
     const parlay = await createParlay(user.id, 50);

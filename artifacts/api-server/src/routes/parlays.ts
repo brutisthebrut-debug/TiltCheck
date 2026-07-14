@@ -308,6 +308,25 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
     return;
   }
 
+  // Verify every legId in legResults belongs to this parlay before touching
+  // anything — a stray legId must never mutate another parlay's legs.
+  if (legResults && legResults.length > 0) {
+    const ownLegs = await db
+      .select({ id: parlayLegsTable.id })
+      .from(parlayLegsTable)
+      .where(eq(parlayLegsTable.parlayId, params.data.id));
+    const ownLegIds = new Set(ownLegs.map((l) => l.id));
+    const foreignLegIds = (legResults as Array<{ legId: number }>)
+      .map((lr) => lr.legId)
+      .filter((legId) => !ownLegIds.has(legId));
+    if (foreignLegIds.length > 0) {
+      res.status(400).json({
+        error: `legResults contains leg IDs that do not belong to this parlay: ${foreignLegIds.join(", ")}`,
+      });
+      return;
+    }
+  }
+
   let actualPayout: number;
   if (status === "won") {
     actualPayout = actualPayoutOverride != null ? actualPayoutOverride : Number(existing.potentialPayout);
@@ -320,7 +339,9 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
   // Perform the parlay update, leg updates, and the bankroll ledger insert
   // atomically so a mid-settle crash can't leave the parlay settled without
   // the balance moving.
-  const updated = await db.transaction(async (tx) => {
+  let updated: typeof parlaysTable.$inferSelect;
+  try {
+    updated = await db.transaction(async (tx) => {
     const [updatedParlay] = await tx
       .update(parlaysTable)
       .set({
@@ -338,7 +359,18 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
     // Update leg statuses if provided
     if (legResults && legResults.length > 0) {
       for (const lr of legResults as Array<{ legId: number; status: string }>) {
-        await tx.update(parlayLegsTable).set({ status: lr.status }).where(eq(parlayLegsTable.id, lr.legId));
+        // Scope the update to this parlay so a stray legId can never touch
+        // another parlay's legs; a non-matching row aborts the transaction.
+        const updatedLegs = await tx
+          .update(parlayLegsTable)
+          .set({ status: lr.status })
+          .where(and(eq(parlayLegsTable.id, lr.legId), eq(parlayLegsTable.parlayId, params.data.id)))
+          .returning({ id: parlayLegsTable.id });
+        if (updatedLegs.length === 0) {
+          throw Object.assign(new Error(`Leg ${lr.legId} does not belong to parlay ${params.data.id}`), {
+            statusCode: 400,
+          });
+        }
       }
     }
 
@@ -375,7 +407,15 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
     });
 
     return updatedParlay;
-  });
+    });
+  } catch (err) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    if (statusCode === 400) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    throw err;
+  }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
   res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
