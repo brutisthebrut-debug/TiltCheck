@@ -36,6 +36,7 @@ import type {
   GetStatsInsightsParams,
   GetStatsSummaryParams,
   GetStreaksParams,
+  GetWeeklyRecapParams,
   GetWorkspaceLeaderboardParams,
   HealthStatus,
   InsightsResponse,
@@ -57,6 +58,7 @@ import type {
   TransactionInput,
   UpdateUserInput,
   User,
+  WeeklyRecap,
   Workspace
 } from './api.schemas';
 
@@ -2543,6 +2545,91 @@ export function useGetStatsInsights<TData = Awaited<ReturnType<typeof getStatsIn
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStatsInsightsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetWeeklyRecapUrl = (params?: GetWeeklyRecapParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stats/recap?${stringifiedParams}` : `/api/stats/recap`
+}
+
+/**
+ * Computes recap facts for one Monday-to-Sunday week (UTC) from settled plays. Defaults to the signed-in bettor and the most recently completed week. weekStart accepts any date and snaps to its Monday; weeks after the last completed week are rejected.
+ * @summary Weekly recap facts for a bettor plus the crew's highlights
+ */
+export const getWeeklyRecap = async (params?: GetWeeklyRecapParams, options?: RequestInit): Promise<WeeklyRecap> => {
+
+  return customFetch<WeeklyRecap>(getGetWeeklyRecapUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWeeklyRecapQueryKey = (params?: GetWeeklyRecapParams,) => {
+    return [
+    `/api/stats/recap`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetWeeklyRecapQueryOptions = <TData = Awaited<ReturnType<typeof getWeeklyRecap>>, TError = ErrorType<void>>(params?: GetWeeklyRecapParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWeeklyRecap>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWeeklyRecapQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWeeklyRecap>>> = ({ signal }) => getWeeklyRecap(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWeeklyRecap>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWeeklyRecapQueryResult = NonNullable<Awaited<ReturnType<typeof getWeeklyRecap>>>
+export type GetWeeklyRecapQueryError = ErrorType<void>
+
+
+/**
+ * @summary Weekly recap facts for a bettor plus the crew's highlights
+ */
+
+export function useGetWeeklyRecap<TData = Awaited<ReturnType<typeof getWeeklyRecap>>, TError = ErrorType<void>>(
+ params?: GetWeeklyRecapParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWeeklyRecap>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWeeklyRecapQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

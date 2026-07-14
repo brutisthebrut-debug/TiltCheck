@@ -1007,6 +1007,83 @@ export const GetStatsInsightsResponse = zod.object({
 
 
 /**
+ * Computes recap facts for one Monday-to-Sunday week (UTC) from settled plays. Defaults to the signed-in bettor and the most recently completed week. weekStart accepts any date and snaps to its Monday; weeks after the last completed week are rejected.
+ * @summary Weekly recap facts for a bettor plus the crew's highlights
+ */
+export const GetWeeklyRecapQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish(),
+  "weekStart": zod.coerce.string().nullish().describe('Any date inside the desired week (YYYY-MM-DD)')
+})
+
+export const GetWeeklyRecapResponse = zod.object({
+  "weekStart": zod.string().describe('Monday of the recap week (YYYY-MM-DD, UTC)'),
+  "weekEnd": zod.string().describe('Sunday of the recap week (YYYY-MM-DD, UTC)'),
+  "personal": zod.object({
+  "userId": zod.number(),
+  "loggedCount": zod.number().describe('Plays logged during the week'),
+  "settledCount": zod.number(),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "pushes": zod.number(),
+  "profit": zod.number(),
+  "totalWagered": zod.number(),
+  "roi": zod.number(),
+  "bestWin": zod.union([zod.object({
+  "type": zod.enum(['bet', 'parlay']),
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "title": zod.string(),
+  "odds": zod.number().describe('American odds of the play'),
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+}).describe('One notable play inside the recap week'),zod.null()]),
+  "worstBeat": zod.union([zod.object({
+  "type": zod.enum(['bet', 'parlay']),
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "title": zod.string(),
+  "odds": zod.number().describe('American odds of the play'),
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+}).describe('One notable play inside the recap week'),zod.null()]),
+  "leak": zod.union([zod.object({
+  "kind": zod.enum(['sport', 'miss_reason', 'parlays']),
+  "label": zod.string().describe('The sport name, miss-reason code, or \"parlays\"'),
+  "amount": zod.number().describe('Net dollars lost to this pattern in the week (negative)'),
+  "count": zod.number().describe('Number of losing plays behind it')
+}).describe('The week\'s most expensive pattern, plainly stated'),zod.null()])
+}),
+  "crew": zod.object({
+  "winner": zod.union([zod.object({
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "profit": zod.number(),
+  "wins": zod.number(),
+  "losses": zod.number()
+}),zod.null()]),
+  "biggestUpset": zod.union([zod.object({
+  "type": zod.enum(['bet', 'parlay']),
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "title": zod.string(),
+  "odds": zod.number().describe('American odds of the play'),
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+}).describe('One notable play inside the recap week'),zod.null()]),
+  "worstBeat": zod.union([zod.object({
+  "type": zod.enum(['bet', 'parlay']),
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "title": zod.string(),
+  "odds": zod.number().describe('American odds of the play'),
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+}).describe('One notable play inside the recap week'),zod.null()])
+}).describe('Group highlights across every member\'s settled plays in the week')
+}).describe('One week\'s story — personal facts plus crew highlights')
+
+
+/**
  * @summary Logging streak and settle streak for a bettor
  */
 export const GetStreaksQueryParams = zod.object({

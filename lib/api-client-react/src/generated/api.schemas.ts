@@ -758,6 +758,97 @@ export interface BadgeStatus {
   earnedAt: string | null;
 }
 
+export type RecapPlayType = typeof RecapPlayType[keyof typeof RecapPlayType];
+
+
+export const RecapPlayType = {
+  bet: 'bet',
+  parlay: 'parlay',
+} as const;
+
+/**
+ * One notable play inside the recap week
+ */
+export interface RecapPlay {
+  type: RecapPlayType;
+  id: number;
+  userId: number;
+  userName: string;
+  title: string;
+  /** American odds of the play */
+  odds: number;
+  /** Net result in dollars (positive win, negative loss) */
+  amount: number;
+}
+
+export type RecapLeakKind = typeof RecapLeakKind[keyof typeof RecapLeakKind];
+
+
+export const RecapLeakKind = {
+  sport: 'sport',
+  miss_reason: 'miss_reason',
+  parlays: 'parlays',
+} as const;
+
+/**
+ * The week's most expensive pattern, plainly stated
+ */
+export interface RecapLeak {
+  kind: RecapLeakKind;
+  /** The sport name, miss-reason code, or "parlays" */
+  label: string;
+  /** Net dollars lost to this pattern in the week (negative) */
+  amount: number;
+  /** Number of losing plays behind it */
+  count: number;
+}
+
+export type WeeklyRecapPersonal = {
+  userId: number;
+  /** Plays logged during the week */
+  loggedCount: number;
+  settledCount: number;
+  wins: number;
+  losses: number;
+  pushes: number;
+  profit: number;
+  totalWagered: number;
+  roi: number;
+  bestWin: RecapPlay | null;
+  worstBeat: RecapPlay | null;
+  leak: RecapLeak | null;
+};
+
+export type WeeklyRecapCrewWinner = {
+  userId: number;
+  userName: string;
+  profit: number;
+  wins: number;
+  losses: number;
+} | null;
+
+/**
+ * Group highlights across every member's settled plays in the week
+ */
+export type WeeklyRecapCrew = {
+  winner: WeeklyRecapCrewWinner;
+  biggestUpset: RecapPlay | null;
+  worstBeat: RecapPlay | null;
+};
+
+/**
+ * One week's story — personal facts plus crew highlights
+ */
+export interface WeeklyRecap {
+  /** Monday of the recap week (YYYY-MM-DD, UTC) */
+  weekStart: string;
+  /** Sunday of the recap week (YYYY-MM-DD, UTC) */
+  weekEnd: string;
+  personal: WeeklyRecapPersonal;
+  /** Group highlights across every member's settled plays in the week */
+  crew: WeeklyRecapCrew;
+}
+
 /**
  * Habit streaks computed from logged plays (UTC calendar days)
  */
@@ -912,6 +1003,18 @@ export type GetStatsInsightsParams = {
  * @nullable
  */
 userId?: number | null;
+};
+
+export type GetWeeklyRecapParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+/**
+ * Any date inside the desired week (YYYY-MM-DD)
+ * @nullable
+ */
+weekStart?: string | null;
 };
 
 export type GetStreaksParams = {

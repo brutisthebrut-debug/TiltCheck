@@ -23,8 +23,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
 import { Link } from "wouter"
-import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy } from "lucide-react"
+import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy, Newspaper, ArrowRight } from "lucide-react"
 import { formatDate } from "@/lib/format"
+import { latestRecapWeekStart, RECAP_SEEN_KEY } from "@/pages/Recap"
 
 export default function Dashboard() {
   const { activeUser, isLoading: isUserLoading } = useUser();
@@ -85,6 +86,11 @@ export default function Dashboard() {
 
   const totalBets = (stats?.wins ?? 0) + (stats?.losses ?? 0) + (stats?.pushes ?? 0) + (stats?.pending ?? 0);
   const hasData = totalBets > 0;
+
+  // Weekly recap teaser — shows once per week until the recap is opened
+  const latestRecapWeek = latestRecapWeekStart();
+  const recapUnseen = !!activeUser
+    && localStorage.getItem(RECAP_SEEN_KEY(activeUser.id)) !== latestRecapWeek;
 
   if (isLoading) {
     return (
@@ -193,6 +199,26 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Weekly recap teaser */}
+      {recapUnseen && (
+        <Link href="/recap" data-testid="card-recap-teaser" className="block">
+          <Card className="border-primary/30 bg-primary/5 transition-colors hover:bg-primary/10">
+            <CardContent className="flex items-center gap-3 py-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                <Newspaper className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold">Your weekly recap is ready</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  Last week's wins, leaks, and the crew's highlights — plainly stated.
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
+            </CardContent>
+          </Card>
+        </Link>
       )}
 
       {/* Needs settling — overdue pending plays. Hidden when settled up. */}

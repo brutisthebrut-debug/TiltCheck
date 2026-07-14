@@ -7,8 +7,12 @@ import {
   GetRecentActivityQueryParams,
   GetConfidenceAnalysisQueryParams,
   GetStatsInsightsQueryParams,
+  GetWeeklyRecapQueryParams,
 } from "@workspace/api-zod";
 import { isValidAmericanOdds } from "../lib/odds";
+import { isRealCalendarDate } from "../lib/dates";
+import { computeWeeklyRecap, mondayOf, lastCompletedWeekStart, dayOf } from "../lib/recap";
+import { requireProfile } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -380,6 +384,40 @@ router.get("/stats/insights", async (req, res): Promise<void> => {
     flawedReasoning: qualityStats("flawed"),
     recentNotes,
   });
+});
+
+// GET /stats/recap — one week's story: personal facts + crew highlights.
+// Defaults to the signed-in bettor and the most recently completed week.
+router.get("/stats/recap", requireProfile, async (req, res): Promise<void> => {
+  const query = GetWeeklyRecapQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const userId = query.data.userId ?? req.currentUser!.id;
+
+  const today = dayOf(new Date());
+  const latest = lastCompletedWeekStart(today);
+  let weekStart = latest;
+  if (query.data.weekStart != null) {
+    if (!isRealCalendarDate(query.data.weekStart)) {
+      res.status(400).json({ error: "weekStart must be a valid calendar date in YYYY-MM-DD format" });
+      return;
+    }
+    weekStart = mondayOf(query.data.weekStart);
+    if (weekStart > latest) {
+      res.status(400).json({ error: "That week isn't finished yet — recaps cover completed weeks only" });
+      return;
+    }
+  }
+
+  const [users, bets, parlays] = await Promise.all([
+    db.select({ id: usersTable.id, displayName: usersTable.displayName }).from(usersTable),
+    db.select().from(betsTable),
+    db.select().from(parlaysTable),
+  ]);
+
+  res.json(computeWeeklyRecap({ users, bets, parlays, userId, weekStart }));
 });
 
 export default router;

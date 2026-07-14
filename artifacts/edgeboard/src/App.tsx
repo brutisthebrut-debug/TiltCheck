@@ -21,6 +21,7 @@ import ParlayDetail from './pages/ParlayDetail';
 import Stats from './pages/Stats';
 import Workspace from './pages/Workspace';
 import Bankroll from './pages/Bankroll';
+import Recap from './pages/Recap';
 
 const queryClient = new QueryClient();
 
@@ -172,6 +173,7 @@ function ProfileGate() {
         <Route path="/stats" component={Stats} />
         <Route path="/workspace" component={Workspace} />
         <Route path="/bankroll" component={Bankroll} />
+        <Route path="/recap" component={Recap} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

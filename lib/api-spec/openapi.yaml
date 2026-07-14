@@ -756,6 +756,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/InsightsResponse"
 
+  /stats/recap:
+    get:
+      operationId: getWeeklyRecap
+      tags: [stats]
+      summary: Weekly recap facts for a bettor plus the crew's highlights
+      description: >
+        Computes recap facts for one Monday-to-Sunday week (UTC) from settled
+        plays. Defaults to the signed-in bettor and the most recently
+        completed week. weekStart accepts any date and snaps to its Monday;
+        weeks after the last completed week are rejected.
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: weekStart
+          in: query
+          description: Any date inside the desired week (YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Weekly recap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeeklyRecap"
+        "400":
+          description: Week not finished yet or invalid date
+
   /stats/streaks:
     get:
       operationId: getStreaks
@@ -1623,6 +1653,123 @@ components:
           type: ["string", "null"]
           description: ISO timestamp when earned, null when not yet earned
       required: [id, name, description, emoji, earnedAt]
+
+    RecapPlay:
+      type: object
+      description: One notable play inside the recap week
+      properties:
+        type:
+          type: string
+          enum: [bet, parlay]
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        title:
+          type: string
+        odds:
+          type: integer
+          description: American odds of the play
+        amount:
+          type: number
+          description: Net result in dollars (positive win, negative loss)
+      required: [type, id, userId, userName, title, odds, amount]
+
+    RecapLeak:
+      type: object
+      description: The week's most expensive pattern, plainly stated
+      properties:
+        kind:
+          type: string
+          enum: [sport, miss_reason, parlays]
+        label:
+          type: string
+          description: The sport name, miss-reason code, or "parlays"
+        amount:
+          type: number
+          description: Net dollars lost to this pattern in the week (negative)
+        count:
+          type: integer
+          description: Number of losing plays behind it
+      required: [kind, label, amount, count]
+
+    WeeklyRecap:
+      type: object
+      description: One week's story — personal facts plus crew highlights
+      properties:
+        weekStart:
+          type: string
+          description: Monday of the recap week (YYYY-MM-DD, UTC)
+        weekEnd:
+          type: string
+          description: Sunday of the recap week (YYYY-MM-DD, UTC)
+        personal:
+          type: object
+          properties:
+            userId:
+              type: integer
+            loggedCount:
+              type: integer
+              description: Plays logged during the week
+            settledCount:
+              type: integer
+            wins:
+              type: integer
+            losses:
+              type: integer
+            pushes:
+              type: integer
+            profit:
+              type: number
+            totalWagered:
+              type: number
+            roi:
+              type: number
+            bestWin:
+              oneOf:
+                - $ref: "#/components/schemas/RecapPlay"
+                - type: "null"
+            worstBeat:
+              oneOf:
+                - $ref: "#/components/schemas/RecapPlay"
+                - type: "null"
+            leak:
+              oneOf:
+                - $ref: "#/components/schemas/RecapLeak"
+                - type: "null"
+          required: [userId, loggedCount, settledCount, wins, losses, pushes, profit, totalWagered, roi, bestWin, worstBeat, leak]
+        crew:
+          type: object
+          description: Group highlights across every member's settled plays in the week
+          properties:
+            winner:
+              oneOf:
+                - type: object
+                  properties:
+                    userId:
+                      type: integer
+                    userName:
+                      type: string
+                    profit:
+                      type: number
+                    wins:
+                      type: integer
+                    losses:
+                      type: integer
+                  required: [userId, userName, profit, wins, losses]
+                - type: "null"
+            biggestUpset:
+              oneOf:
+                - $ref: "#/components/schemas/RecapPlay"
+                - type: "null"
+            worstBeat:
+              oneOf:
+                - $ref: "#/components/schemas/RecapPlay"
+                - type: "null"
+          required: [winner, biggestUpset, worstBeat]
+      required: [weekStart, weekEnd, personal, crew]
 
     StreaksSummary:
       type: object
