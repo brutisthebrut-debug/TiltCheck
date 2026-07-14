@@ -146,10 +146,10 @@
   /* Cockpit dark mode */
   --background: 240 5% 6%;
   --foreground: 0 0% 95%;
-  --border: 240 5% 15%;
+  --border: 240 5% 20%;
   --card: 240 5% 8%;
   --card-foreground: 0 0% 95%;
-  --card-border: 240 5% 15%;
+  --card-border: 240 5% 18%;
   
   --sidebar: 240 6% 4%;
   --sidebar-foreground: 0 0% 95%;
@@ -167,19 +167,19 @@
   --primary: 220 90% 60%; /* Sharp blue */
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 240 5% 15%;
+  --secondary: 240 5% 18%;
   --secondary-foreground: 0 0% 95%;
   
   --muted: 240 5% 12%;
   --muted-foreground: 240 5% 65%;
   
-  --accent: 240 5% 15%;
+  --accent: 240 5% 18%;
   --accent-foreground: 0 0% 95%;
   
   --destructive: 0 75% 55%;
   --destructive-foreground: 0 0% 100%;
   
-  --input: 240 5% 15%;
+  --input: 240 5% 25%;
   --ring: 220 90% 60%;
   
   --chart-1: 142 70% 45%; /* Green */
