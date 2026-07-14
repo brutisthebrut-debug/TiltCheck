@@ -26,7 +26,8 @@ export const GetCurrentUserResponse = zod.object({
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
-  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
 })
 
 
@@ -41,7 +42,8 @@ export const MarkRecapSeenResponse = zod.object({
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
-  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
 })
 
 
@@ -55,7 +57,8 @@ export const ListUnclaimedUsersResponseItem = zod.object({
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
-  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
 })
 export const ListUnclaimedUsersResponse = zod.array(ListUnclaimedUsersResponseItem)
 
@@ -78,7 +81,8 @@ export const ClaimProfileResponse = zod.object({
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
-  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
 })
 
 
@@ -92,7 +96,8 @@ export const ListUsersResponseItem = zod.object({
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
-  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
@@ -122,7 +127,8 @@ export const UpdateUserResponse = zod.object({
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
-  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
 })
 
 
@@ -1147,7 +1153,8 @@ export const GetWorkspaceResponse = zod.object({
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
-  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
 })),
   "totalBets": zod.number(),
   "createdAt": zod.string()
@@ -1208,5 +1215,73 @@ export const GetWorkspaceLeaderboardResponseItem = zod.object({
 }).describe('Compact badge reference for showing chips beside a bettor\'s name')).describe('The member\'s most recently earned badges (up to 3, newest first)')
 }).describe('One crew member\'s ranked results over the requested window (settled plays only)')
 export const GetWorkspaceLeaderboardResponse = zod.array(GetWorkspaceLeaderboardResponseItem)
+
+
+/**
+ * @summary Founder dashboard overview — seats, invites, and crew activity
+ */
+export const GetAdminOverviewResponse = zod.object({
+  "betaLocked": zod.boolean().describe('True when an invite list (DB or env) is active, so new sign-ups are restricted'),
+  "linkedSeats": zod.number(),
+  "invitesOutstanding": zod.number().describe('Invited emails that have not claimed a profile yet'),
+  "playsThisWeek": zod.number(),
+  "wageredThisWeek": zod.number(),
+  "totalPlays": zod.number(),
+  "totalWagered": zod.number(),
+  "members": zod.array(zod.object({
+  "userId": zod.number(),
+  "displayName": zod.string(),
+  "avatarColor": zod.string(),
+  "email": zod.string().nullable(),
+  "linked": zod.boolean().describe('Whether a sign-in account is attached to this profile'),
+  "isFounder": zod.boolean(),
+  "playsLogged": zod.number().describe('Straight bets + parlays logged, all time'),
+  "playsThisWeek": zod.number().describe('Plays logged since Monday (UTC)'),
+  "totalWagered": zod.number(),
+  "lastPlayAt": zod.string().nullable().describe('When this member last logged a play, or null if never')
+}))
+})
+
+
+/**
+ * @summary List beta invite emails
+ */
+export const ListInvitesResponseItem = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "claimed": zod.boolean().describe('Whether a linked account with this email exists'),
+  "createdAt": zod.string()
+})
+export const ListInvitesResponse = zod.array(ListInvitesResponseItem)
+
+
+/**
+ * @summary Invite an email to the beta
+ */
+export const createInviteBodyEmailMin = 3;
+export const createInviteBodyEmailMax = 320;
+
+
+
+export const CreateInviteBody = zod.object({
+  "email": zod.string().min(createInviteBodyEmailMin).max(createInviteBodyEmailMax).describe('Email address (validated server-side)')
+})
+
+export const CreateInviteResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "claimed": zod.boolean().describe('Whether a linked account with this email exists'),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Remove an invite (does not unlink accounts that already claimed)
+ */
+export const DeleteInviteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteInviteResponse = zod.void()
 
 

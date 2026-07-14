@@ -111,9 +111,11 @@ paths:
                 $ref: "#/components/schemas/User"
         "403":
           description: >-
-            Claim rejected — `error` is `not_invited` (email not on the
-            BETA_ALLOWED_EMAILS allowlist, or the account has no email while an
-            allowlist is configured) or `beta_full` (seat cap reached).
+            Claim rejected — `error` is `not_invited` (the beta gate is active
+            — founder-managed invites table and/or BETA_ALLOWED_EMAILS env var
+            — and this account's email is on neither list, or the account has
+            no email) or `beta_full` (seat cap reached). The FOUNDER_EMAIL
+            account always passes both checks.
         "409":
           description: Profile already claimed or account already linked
 
@@ -892,6 +894,78 @@ paths:
         "403":
           description: Signed in but no bettor profile linked yet
 
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Founder dashboard overview — seats, invites, and crew activity
+      responses:
+        "200":
+          description: Founder overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "403":
+          description: Signed in but not the founder
+
+  /admin/invites:
+    get:
+      operationId: listInvites
+      tags: [admin]
+      summary: List beta invite emails
+      responses:
+        "200":
+          description: Invite list, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+        "403":
+          description: Signed in but not the founder
+    post:
+      operationId: createInvite
+      tags: [admin]
+      summary: Invite an email to the beta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteInput"
+      responses:
+        "201":
+          description: Invite created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+        "403":
+          description: Signed in but not the founder
+        "409":
+          description: Email already invited
+
+  /admin/invites/{id}:
+    delete:
+      operationId: deleteInvite
+      tags: [admin]
+      summary: Remove an invite (does not unlink accounts that already claimed)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Invite removed
+        "403":
+          description: Signed in but not the founder
+        "404":
+          description: Invite not found
+
 components:
   schemas:
     HealthStatus:
@@ -919,7 +993,88 @@ components:
         recapSeenWeek:
           type: ["string", "null"]
           description: Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never
-      required: [id, username, displayName, avatarColor, startingBankroll, createdAt]
+        isFounder:
+          type: boolean
+          description: Founder of the board — can manage beta invites and see the founder dashboard
+      required: [id, username, displayName, avatarColor, startingBankroll, createdAt, isFounder]
+
+    Invite:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        claimed:
+          type: boolean
+          description: Whether a linked account with this email exists
+        createdAt:
+          type: string
+      required: [id, email, claimed, createdAt]
+
+    InviteInput:
+      type: object
+      properties:
+        email:
+          type: string
+          minLength: 3
+          maxLength: 320
+          description: Email address (validated server-side)
+      required: [email]
+
+    AdminMember:
+      type: object
+      properties:
+        userId:
+          type: integer
+        displayName:
+          type: string
+        avatarColor:
+          type: string
+        email:
+          type: ["string", "null"]
+        linked:
+          type: boolean
+          description: Whether a sign-in account is attached to this profile
+        isFounder:
+          type: boolean
+        playsLogged:
+          type: number
+          description: Straight bets + parlays logged, all time
+        playsThisWeek:
+          type: number
+          description: Plays logged since Monday (UTC)
+        totalWagered:
+          type: number
+        lastPlayAt:
+          type: ["string", "null"]
+          description: When this member last logged a play, or null if never
+      required: [userId, displayName, avatarColor, email, linked, isFounder, playsLogged, playsThisWeek, totalWagered, lastPlayAt]
+
+    AdminOverview:
+      type: object
+      properties:
+        betaLocked:
+          type: boolean
+          description: True when an invite list (DB or env) is active, so new sign-ups are restricted
+        linkedSeats:
+          type: number
+        invitesOutstanding:
+          type: number
+          description: Invited emails that have not claimed a profile yet
+        playsThisWeek:
+          type: number
+        wageredThisWeek:
+          type: number
+        totalPlays:
+          type: number
+        totalWagered:
+          type: number
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminMember"
+      required: [betaLocked, linkedSeats, invitesOutstanding, playsThisWeek, wageredThisWeek, totalPlays, totalWagered, members]
 
     ClaimProfileInput:
       type: object

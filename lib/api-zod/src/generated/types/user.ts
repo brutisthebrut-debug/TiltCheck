@@ -18,4 +18,6 @@ export interface User {
      * @nullable
      */
   recapSeenWeek?: string | null;
+  /** Founder of the board — can manage beta invites and see the founder dashboard */
+  isFounder: boolean;
 }

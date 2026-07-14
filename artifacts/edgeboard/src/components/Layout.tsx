@@ -11,6 +11,7 @@ import {
   Users,
   Wallet,
   LogOut,
+  Crown,
 } from "lucide-react"
 import { Button } from "./ui/button"
 import { BadgeWatcher } from "./BadgeWatcher"
@@ -49,6 +50,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   )
   const settleCount = needsSettling?.count ?? 0
 
+  // Founder-only page joins the sidebar nav; the mobile bottom bar keeps the
+  // core six (founders can reach the dash from the desktop nav or /founder).
+  const sidebarNavItems = activeUser?.isFounder
+    ? [...navItems, { name: "Founder", href: "/founder", icon: Crown }]
+    : navItems
+
   const handleSignOut = () => signOut({ redirectUrl: basePath || "/" })
 
   return (
@@ -79,7 +86,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="space-y-1">
-            {navItems.map((item) => {
+            {sidebarNavItems.map((item) => {
               const isActive = location === item.href || 
                                (item.href !== '/' && location.startsWith(item.href));
               return (
@@ -140,6 +147,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {activeUser?.isFounder && (
+            <Link
+              href="/founder"
+              className={`h-8 w-8 rounded-md flex items-center justify-center ${
+                location === "/founder" ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground"
+              }`}
+              aria-label="Founder dash"
+              data-testid="link-founder-mobile"
+            >
+              <Crown className="h-4 w-4" />
+            </Link>
+          )}
           <span
             className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
             style={{ backgroundColor: activeUser?.avatarColor ?? "#6366f1" }}

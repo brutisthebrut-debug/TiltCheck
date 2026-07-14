@@ -21,6 +21,59 @@ export interface User {
      * @nullable
      */
   recapSeenWeek?: string | null;
+  /** Founder of the board — can manage beta invites and see the founder dashboard */
+  isFounder: boolean;
+}
+
+export interface Invite {
+  id: number;
+  email: string;
+  /** Whether a linked account with this email exists */
+  claimed: boolean;
+  createdAt: string;
+}
+
+export interface InviteInput {
+  /**
+     * Email address (validated server-side)
+     * @minLength 3
+     * @maxLength 320
+     */
+  email: string;
+}
+
+export interface AdminMember {
+  userId: number;
+  displayName: string;
+  avatarColor: string;
+  /** @nullable */
+  email: string | null;
+  /** Whether a sign-in account is attached to this profile */
+  linked: boolean;
+  isFounder: boolean;
+  /** Straight bets + parlays logged, all time */
+  playsLogged: number;
+  /** Plays logged since Monday (UTC) */
+  playsThisWeek: number;
+  totalWagered: number;
+  /**
+     * When this member last logged a play, or null if never
+     * @nullable
+     */
+  lastPlayAt: string | null;
+}
+
+export interface AdminOverview {
+  /** True when an invite list (DB or env) is active, so new sign-ups are restricted */
+  betaLocked: boolean;
+  linkedSeats: number;
+  /** Invited emails that have not claimed a profile yet */
+  invitesOutstanding: number;
+  playsThisWeek: number;
+  wageredThisWeek: number;
+  totalPlays: number;
+  totalWagered: number;
+  members: AdminMember[];
 }
 
 /**

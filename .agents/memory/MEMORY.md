@@ -2,3 +2,4 @@
 - [Clerk e2e testing limits](clerk-e2e-testing.md) — Cloudflare CAPTCHA blocks automated Clerk sign-up; test auth server-side with curl and UI only up to the Clerk card.
 - [OpenAPI spec file integrity](openapi-spec-file-integrity.md) — openapi.yaml can gain a duplicated tail during parallel task edits; check for duplicate schema keys before codegen.
 - [Stale TS project references](stale-ts-project-references.md) — phantom "no exported member" errors for @workspace libs mean stale dist; run `tsc -b lib/api-zod lib/api-client-react` first.
+- [Beta gate & founder config](beta-gate-founder-config.md) — invite gate = invites table ∪ BETA_ALLOWED_EMAILS; FOUNDER_EMAIL must be set in prod or first sign-in grabs the founder seat.

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,6 +12,9 @@ export const usersTable = pgTable("users", {
   startingBankroll: numeric("starting_bankroll", { precision: 12, scale: 2 }).notNull().default("1000"),
   // Monday (YYYY-MM-DD, UTC) of the last recap week this user opened; null = never
   recapSeenWeek: text("recap_seen_week"),
+  // Founder = owner of the board: can manage beta invites and see the founder
+  // dashboard. Assigned to the first account that links a profile.
+  isFounder: boolean("is_founder").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

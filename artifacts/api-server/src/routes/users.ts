@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq, isNull, isNotNull, asc, count, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, invitesTable } from "@workspace/db";
 import { dayOf, lastCompletedWeekStart } from "../lib/recap";
 import {
   MarkRecapSeenResponse,
@@ -47,6 +47,36 @@ function allowedEmailSet(): Set<string> | null {
       .filter(Boolean),
   );
   return set.size > 0 ? set : null;
+}
+
+// Authoritative founder control. When FOUNDER_EMAIL is set, the account with
+// that email (case-insensitive) becomes founder on claim, is always allowed
+// through the invite gate, and first-claim auto-assignment is disabled — so a
+// stranger can never grab the founder seat on a fresh database by signing in
+// first. Unset: the first account to link becomes founder (fine for dev, but
+// set FOUNDER_EMAIL in production).
+function founderEmail(): string | null {
+  return process.env.FOUNDER_EMAIL?.trim().toLowerCase() || null;
+}
+
+// The beta gate combines two invite sources: the founder-managed invites table
+// and the optional BETA_ALLOWED_EMAILS env var. The gate is open (no
+// restriction) only when both are empty. Emails in the invites table are
+// stored lowercased.
+type InviteGate = "open" | "allowed" | "blocked";
+async function inviteGate(dbx: Dbish, email: string | null): Promise<InviteGate> {
+  const envSet = allowedEmailSet();
+  const [{ invites }] = await dbx.select({ invites: count() }).from(invitesTable);
+  if (!envSet && invites === 0) return "open";
+  if (!email) return "blocked";
+  const lower = email.trim().toLowerCase();
+  if (envSet?.has(lower)) return "allowed";
+  const [row] = await dbx
+    .select({ id: invitesTable.id })
+    .from(invitesTable)
+    .where(eq(invitesTable.email, lower))
+    .limit(1);
+  return row ? "allowed" : "blocked";
 }
 
 // Advisory-lock key that serializes claim requests, so the seat-cap check and
@@ -138,16 +168,34 @@ router.post("/users/claim", async (req, res): Promise<void> => {
         return { status: 200, body: ClaimProfileResponse.parse(formatUser(alreadyLinked)) };
       }
 
-      // Email allowlist runs before the seat-cap check: an uninvited account
+      const configuredFounder = founderEmail();
+      const isConfiguredFounder =
+        configuredFounder != null && email != null && email.trim().toLowerCase() === configuredFounder;
+
+      // Invite gate runs before the seat-cap check: an uninvited account
       // should hear "not invited", not "beta full". No email on the Clerk
-      // account counts as not invited when an allowlist is configured.
-      const allowlist = allowedEmailSet();
-      if (allowlist && (!email || !allowlist.has(email.toLowerCase()))) {
+      // account counts as not invited when the gate is active. The configured
+      // founder is always allowed through.
+      if (!isConfiguredFounder && (await inviteGate(tx, email)) === "blocked") {
         return { status: 403, body: { error: "not_invited" } };
       }
 
-      if (await betaIsFull(tx)) {
+      if (!isConfiguredFounder && (await betaIsFull(tx))) {
         return { status: 403, body: { error: "beta_full" } };
+      }
+
+      // Founder assignment: FOUNDER_EMAIL is authoritative when set. Without
+      // it, the first account to link becomes founder (safe under the
+      // advisory lock — two simultaneous first claims can't both win).
+      let becomesFounder: boolean;
+      if (configuredFounder != null) {
+        becomesFounder = isConfiguredFounder;
+      } else {
+        const [{ linkedCount }] = await tx
+          .select({ linkedCount: count() })
+          .from(usersTable)
+          .where(isNotNull(usersTable.clerkUserId));
+        becomesFounder = linkedCount === 0;
       }
 
       if (userId != null) {
@@ -155,7 +203,7 @@ router.post("/users/claim", async (req, res): Promise<void> => {
         // never claim the same profile
         const [claimed] = await tx
           .update(usersTable)
-          .set({ clerkUserId, email })
+          .set({ clerkUserId, email, ...(becomesFounder ? { isFounder: true } : {}) })
           .where(and(eq(usersTable.id, userId), isNull(usersTable.clerkUserId)))
           .returning();
         if (!claimed) {
@@ -192,6 +240,7 @@ router.post("/users/claim", async (req, res): Promise<void> => {
           startingBankroll: "1000",
           clerkUserId,
           email,
+          isFounder: becomesFounder,
         })
         .returning();
       return { status: 200, body: ClaimProfileResponse.parse(formatUser(created)) };
@@ -266,6 +315,7 @@ function formatUser(u: typeof usersTable.$inferSelect) {
     startingBankroll: Number(u.startingBankroll),
     createdAt: u.createdAt.toISOString(),
     recapSeenWeek: u.recapSeenWeek,
+    isFounder: u.isFounder,
   };
 }
 

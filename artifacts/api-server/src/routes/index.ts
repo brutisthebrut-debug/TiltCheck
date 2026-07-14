@@ -9,6 +9,7 @@ import bankrollRouter from "./bankroll";
 import statsRouter from "./stats";
 import badgesRouter from "./badges";
 import workspaceRouter from "./workspace";
+import adminRouter from "./admin";
 import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -27,5 +28,6 @@ router.use(bankrollRouter);
 router.use(statsRouter);
 router.use(badgesRouter);
 router.use(workspaceRouter);
+router.use(adminRouter);
 
 export default router;

@@ -21,6 +21,7 @@ import type {
 
 import type {
   ActivityItem,
+  AdminOverview,
   BadgeStatus,
   Bankroll,
   Bet,
@@ -40,6 +41,8 @@ import type {
   GetWorkspaceLeaderboardParams,
   HealthStatus,
   InsightsResponse,
+  Invite,
+  InviteInput,
   LeaderboardEntry,
   ListBetsParams,
   ListParlaysParams,
@@ -3036,4 +3039,300 @@ export function useGetWorkspaceLeaderboard<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getGetAdminOverviewUrl = () => {
+
+
+
+
+  return `/api/admin/overview`
+}
+
+/**
+ * @summary Founder dashboard overview — seats, invites, and crew activity
+ */
+export const getAdminOverview = async ( options?: RequestInit): Promise<AdminOverview> => {
+
+  return customFetch<AdminOverview>(getGetAdminOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminOverviewQueryKey = () => {
+    return [
+    `/api/admin/overview`
+    ] as const;
+    }
+
+
+export const getGetAdminOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOverview>>> = ({ signal }) => getAdminOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminOverview>>>
+export type GetAdminOverviewQueryError = ErrorType<void>
+
+
+/**
+ * @summary Founder dashboard overview — seats, invites, and crew activity
+ */
+
+export function useGetAdminOverview<TData = Awaited<ReturnType<typeof getAdminOverview>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListInvitesUrl = () => {
+
+
+
+
+  return `/api/admin/invites`
+}
+
+/**
+ * @summary List beta invite emails
+ */
+export const listInvites = async ( options?: RequestInit): Promise<Invite[]> => {
+
+  return customFetch<Invite[]>(getListInvitesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInvitesQueryKey = () => {
+    return [
+    `/api/admin/invites`
+    ] as const;
+    }
+
+
+export const getListInvitesQueryOptions = <TData = Awaited<ReturnType<typeof listInvites>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInvitesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInvites>>> = ({ signal }) => listInvites({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInvites>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInvitesQueryResult = NonNullable<Awaited<ReturnType<typeof listInvites>>>
+export type ListInvitesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List beta invite emails
+ */
+
+export function useListInvites<TData = Awaited<ReturnType<typeof listInvites>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInvitesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateInviteUrl = () => {
+
+
+
+
+  return `/api/admin/invites`
+}
+
+/**
+ * @summary Invite an email to the beta
+ */
+export const createInvite = async (inviteInput: InviteInput, options?: RequestInit): Promise<Invite> => {
+
+  return customFetch<Invite>(getCreateInviteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(inviteInput)
+  }
+);}
+
+
+
+
+
+export const getCreateInviteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvite>>, TError,{data: BodyType<InviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInvite>>, TError,{data: BodyType<InviteInput>}, TContext> => {
+
+const mutationKey = ['createInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInvite>>, {data: BodyType<InviteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createInvite(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateInviteMutationResult = NonNullable<Awaited<ReturnType<typeof createInvite>>>
+    export type CreateInviteMutationBody = BodyType<InviteInput>
+    export type CreateInviteMutationError = ErrorType<void>
+
+    /**
+ * @summary Invite an email to the beta
+ */
+export const useCreateInvite = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInvite>>, TError,{data: BodyType<InviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createInvite>>,
+        TError,
+        {data: BodyType<InviteInput>},
+        TContext
+      > => {
+      return useMutation(getCreateInviteMutationOptions(options));
+    }
+
+export const getDeleteInviteUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/invites/${id}`
+}
+
+/**
+ * @summary Remove an invite (does not unlink accounts that already claimed)
+ */
+export const deleteInvite = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteInviteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteInviteMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteInvite>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteInvite>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteInvite(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteInviteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteInvite>>>
+
+    export type DeleteInviteMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove an invite (does not unlink accounts that already claimed)
+ */
+export const useDeleteInvite = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteInvite>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteInviteMutationOptions(options));
+    }
 

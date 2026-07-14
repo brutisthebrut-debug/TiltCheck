@@ -9,6 +9,8 @@
 export * from './activityItem';
 export * from './activityItemStatus';
 export * from './activityItemType';
+export * from './adminMember';
+export * from './adminOverview';
 export * from './badgeRef';
 export * from './badgeStatus';
 export * from './bankroll';
@@ -37,6 +39,8 @@ export * from './getWorkspaceLeaderboardParams';
 export * from './getWorkspaceLeaderboardPeriod';
 export * from './healthStatus';
 export * from './insightsResponse';
+export * from './invite';
+export * from './inviteInput';
 export * from './leaderboardEntry';
 export * from './leaderboardEntryCurrentStreakType';
 export * from './legResult';
