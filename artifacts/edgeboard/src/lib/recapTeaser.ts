@@ -1,23 +1,17 @@
 // ── Weekly recap teaser gating ───────────────────────────────────────────────
-// Week math (UTC, Monday-start) — mirrors the server's recap.ts.
-// The dashboard teaser shows once per week until the recap is opened.
-// The seen week lives server-side (users.recapSeenWeek), so the teaser stays
-// hidden across devices once the recap is opened anywhere.
+// Week math (UTC, Monday-start) comes from @workspace/weeks — the same module
+// the server's recap uses, so the two can never disagree about which week
+// "last week" is. The dashboard teaser shows once per week until the recap is
+// opened. The seen week lives server-side (users.recapSeenWeek), so the teaser
+// stays hidden across devices once the recap is opened anywhere.
 
-export function addDays(day: string, delta: number): string {
-  const d = new Date(`${day}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + delta)
-  return d.toISOString().slice(0, 10)
-}
+import { addDays, lastCompletedWeekStart } from "@workspace/weeks"
 
-export function mondayOf(day: string): string {
-  const d = new Date(`${day}T00:00:00Z`)
-  return addDays(day, -((d.getUTCDay() + 6) % 7))
-}
+export { addDays, mondayOf } from "@workspace/weeks"
 
 /** Monday of the most recently *completed* week — the week the recap covers. */
 export function latestRecapWeekStart(today: string = new Date().toISOString().slice(0, 10)): string {
-  return addDays(mondayOf(today), -7)
+  return lastCompletedWeekStart(today)
 }
 
 /**

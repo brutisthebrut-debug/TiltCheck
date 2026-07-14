@@ -1,28 +1,10 @@
 import { isValidAmericanOdds } from "./odds";
+import { addDays } from "@workspace/weeks";
 
-// ── Week math (UTC, Monday-start weeks) ─────────────────────────────────────
-
-export function dayOf(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-export function addDays(day: string, delta: number): string {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return dayOf(d);
-}
-
-/** Monday of the week containing `day`. */
-export function mondayOf(day: string): string {
-  const d = new Date(`${day}T00:00:00Z`);
-  const dow = d.getUTCDay(); // 0 = Sunday
-  return addDays(day, -((dow + 6) % 7));
-}
-
-/** Monday of the most recently *completed* week as of `today`. */
-export function lastCompletedWeekStart(today: string): string {
-  return addDays(mondayOf(today), -7);
-}
+// Week math (UTC, Monday-start weeks) lives in @workspace/weeks — shared with
+// the web app's recap teaser so the two can't drift. Re-exported here for
+// convenience of recap consumers.
+export { dayOf, addDays, mondayOf, lastCompletedWeekStart } from "@workspace/weeks";
 
 // ── Recap computation ───────────────────────────────────────────────────────
 

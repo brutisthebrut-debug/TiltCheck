@@ -23,6 +23,9 @@
     },
     {
       "path": "../../lib/odds"
+    },
+    {
+      "path": "../../lib/weeks"
     }
   ]
 }
