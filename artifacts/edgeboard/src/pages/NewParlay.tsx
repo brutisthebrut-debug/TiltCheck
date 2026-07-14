@@ -2,7 +2,7 @@ import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useLocation } from "wouter"
-import { useCreateParlay, getListParlaysQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey } from "@workspace/api-client-react"
+import { useCreateParlay, getListParlaysQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
@@ -127,6 +127,7 @@ export default function NewParlay() {
         queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
         queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
+        queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
         setLocation("/parlays")
       }
     })

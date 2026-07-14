@@ -699,6 +699,73 @@ export const SettleParlayResponse = zod.object({
 
 
 /**
+ * Returns pending straight bets whose game date is before today, and pending parlays whose every leg's game date is before today, for the signed-in user only. Used to nudge bettors to settle finished games.
+ * @summary List the signed-in user's pending bets and parlays whose games are already over
+ */
+export const GetNeedsSettlingResponse = zod.object({
+  "count": zod.number().describe('Total number of bets + parlays awaiting settlement'),
+  "bets": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().optional(),
+  "sport": zod.string(),
+  "event": zod.string(),
+  "betType": zod.enum(['moneyline', 'spread', 'total', 'prop', 'futures']),
+  "pick": zod.string(),
+  "odds": zod.number().describe('American odds (e.g. -110, +150)'),
+  "stake": zod.number(),
+  "potentialPayout": zod.number(),
+  "actualPayout": zod.number().nullish(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void']),
+  "gameDate": zod.string(),
+  "confidenceScore": zod.number().describe('1-10 confidence rating'),
+  "rationale": zod.string().nullish().describe('Pre-game reasoning'),
+  "postGameReview": zod.string().nullish().describe('Post-game reflection'),
+  "tags": zod.array(zod.string()).optional(),
+  "createdAt": zod.string(),
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
+})),
+  "parlays": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().optional(),
+  "name": zod.string(),
+  "stake": zod.number(),
+  "odds": zod.number().describe('Combined American odds'),
+  "potentialPayout": zod.number(),
+  "actualPayout": zod.number().nullish(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void']),
+  "legs": zod.array(zod.object({
+  "id": zod.number(),
+  "parlayId": zod.number(),
+  "sport": zod.string(),
+  "event": zod.string(),
+  "betType": zod.enum(['moneyline', 'spread', 'total', 'prop']),
+  "pick": zod.string(),
+  "odds": zod.number(),
+  "gameDate": zod.string(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void'])
+})),
+  "confidenceScore": zod.number().describe('1-10 confidence rating'),
+  "rationale": zod.string().nullish(),
+  "postGameReview": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
+}))
+})
+
+
+/**
  * @summary Get current bankroll state for a user
  */
 export const GetBankrollQueryParams = zod.object({

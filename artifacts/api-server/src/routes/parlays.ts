@@ -41,7 +41,7 @@ function formatLeg(leg: typeof parlayLegsTable.$inferSelect) {
   };
 }
 
-async function formatParlay(p: typeof parlaysTable.$inferSelect, userName: string) {
+export async function formatParlay(p: typeof parlaysTable.$inferSelect, userName: string) {
   const legs = await db.select().from(parlayLegsTable).where(eq(parlayLegsTable.parlayId, p.id));
   return {
     id: p.id,

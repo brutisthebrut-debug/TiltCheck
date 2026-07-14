@@ -23,7 +23,7 @@ function calcPayout(odds: number, stake: number): number {
   return stake * (odds / 100) + stake;
 }
 
-function formatBet(b: typeof betsTable.$inferSelect, userName: string) {
+export function formatBet(b: typeof betsTable.$inferSelect, userName: string) {
   return {
     id: b.id,
     userId: b.userId,

@@ -2,6 +2,7 @@ import * as React from "react"
 import { Link, useLocation } from "wouter"
 import { useUser } from "@/contexts/UserContext"
 import { useClerk } from "@clerk/react"
+import { useGetNeedsSettling, getGetNeedsSettlingQueryKey } from "@workspace/api-client-react"
 import {
   LayoutDashboard,
   ListOrdered,
@@ -24,10 +25,28 @@ const navItems = [
   { name: "Bankroll", href: "/bankroll", icon: Wallet },
 ]
 
+function NeedsSettlingBadge({ count, className = "" }: { count: number; className?: string }) {
+  if (count <= 0) return null
+  return (
+    <span
+      className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black leading-none ${className}`}
+      data-testid="badge-needs-settling"
+      aria-label={`${count} plays need settling`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  )
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const { activeUser } = useUser()
   const { signOut } = useClerk()
+
+  const { data: needsSettling } = useGetNeedsSettling(
+    { query: { enabled: !!activeUser, queryKey: getGetNeedsSettlingQueryKey() } }
+  )
+  const settleCount = needsSettling?.count ?? 0
 
   const handleSignOut = () => signOut({ redirectUrl: basePath || "/" })
 
@@ -73,7 +92,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   }`}
                 >
                   <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
-                  {item.name}
+                  <span className="flex-1">{item.name}</span>
+                  {item.href === "/" && <NeedsSettlingBadge count={settleCount} />}
                 </Link>
               )
             })}
@@ -163,7 +183,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   : "text-muted-foreground"
               }`}
             >
-              <item.icon className="h-5 w-5 shrink-0" />
+              <span className="relative">
+                <item.icon className="h-5 w-5 shrink-0" />
+                {item.href === "/" && (
+                  <NeedsSettlingBadge count={settleCount} className="absolute -top-1.5 -right-2.5" />
+                )}
+              </span>
               <span className="truncate">{item.name}</span>
             </Link>
           )

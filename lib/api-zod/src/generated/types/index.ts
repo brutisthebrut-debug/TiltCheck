@@ -41,6 +41,7 @@ export * from './listTransactionsParams';
 export * from './memberComparison';
 export * from './missReasonBreakdown';
 export * from './missReasonBreakdownReason';
+export * from './needsSettling';
 export * from './parlay';
 export * from './parlayInput';
 export * from './parlayLeg';

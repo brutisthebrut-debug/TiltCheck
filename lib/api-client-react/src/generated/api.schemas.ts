@@ -104,6 +104,91 @@ export interface Bet {
   missReason?: string | null;
 }
 
+export type ParlayStatus = typeof ParlayStatus[keyof typeof ParlayStatus];
+
+
+export const ParlayStatus = {
+  pending: 'pending',
+  won: 'won',
+  lost: 'lost',
+  push: 'push',
+  void: 'void',
+} as const;
+
+export type ParlayLegBetType = typeof ParlayLegBetType[keyof typeof ParlayLegBetType];
+
+
+export const ParlayLegBetType = {
+  moneyline: 'moneyline',
+  spread: 'spread',
+  total: 'total',
+  prop: 'prop',
+} as const;
+
+export type ParlayLegStatus = typeof ParlayLegStatus[keyof typeof ParlayLegStatus];
+
+
+export const ParlayLegStatus = {
+  pending: 'pending',
+  won: 'won',
+  lost: 'lost',
+  push: 'push',
+  void: 'void',
+} as const;
+
+export interface ParlayLeg {
+  id: number;
+  parlayId: number;
+  sport: string;
+  event: string;
+  betType: ParlayLegBetType;
+  pick: string;
+  odds: number;
+  gameDate: string;
+  status: ParlayLegStatus;
+}
+
+export interface Parlay {
+  id: number;
+  userId: number;
+  userName?: string;
+  name: string;
+  stake: number;
+  /** Combined American odds */
+  odds: number;
+  potentialPayout: number;
+  /** @nullable */
+  actualPayout?: number | null;
+  status: ParlayStatus;
+  legs: ParlayLeg[];
+  /** 1-10 confidence rating */
+  confidenceScore: number;
+  /** @nullable */
+  rationale?: string | null;
+  /** @nullable */
+  postGameReview?: string | null;
+  createdAt: string;
+  /** @nullable */
+  settledAt?: string | null;
+  /** @nullable */
+  sportsbook?: string | null;
+  /** @nullable */
+  promoNote?: string | null;
+  /** @nullable */
+  reasoningQuality?: string | null;
+  /** @nullable */
+  whatHappened?: string | null;
+  /** @nullable */
+  missReason?: string | null;
+}
+
+export interface NeedsSettling {
+  /** Total number of bets + parlays awaiting settlement */
+  count: number;
+  bets: Bet[];
+  parlays: Parlay[];
+}
+
 export type BetInputBetType = typeof BetInputBetType[keyof typeof BetInputBetType];
 
 
@@ -224,84 +309,6 @@ export interface BetSettlement {
   reasoningQuality?: BetSettlementReasoningQuality;
   whatHappened?: string;
   missReason?: BetSettlementMissReason;
-}
-
-export type ParlayStatus = typeof ParlayStatus[keyof typeof ParlayStatus];
-
-
-export const ParlayStatus = {
-  pending: 'pending',
-  won: 'won',
-  lost: 'lost',
-  push: 'push',
-  void: 'void',
-} as const;
-
-export type ParlayLegBetType = typeof ParlayLegBetType[keyof typeof ParlayLegBetType];
-
-
-export const ParlayLegBetType = {
-  moneyline: 'moneyline',
-  spread: 'spread',
-  total: 'total',
-  prop: 'prop',
-} as const;
-
-export type ParlayLegStatus = typeof ParlayLegStatus[keyof typeof ParlayLegStatus];
-
-
-export const ParlayLegStatus = {
-  pending: 'pending',
-  won: 'won',
-  lost: 'lost',
-  push: 'push',
-  void: 'void',
-} as const;
-
-export interface ParlayLeg {
-  id: number;
-  parlayId: number;
-  sport: string;
-  event: string;
-  betType: ParlayLegBetType;
-  pick: string;
-  odds: number;
-  gameDate: string;
-  status: ParlayLegStatus;
-}
-
-export interface Parlay {
-  id: number;
-  userId: number;
-  userName?: string;
-  name: string;
-  stake: number;
-  /** Combined American odds */
-  odds: number;
-  potentialPayout: number;
-  /** @nullable */
-  actualPayout?: number | null;
-  status: ParlayStatus;
-  legs: ParlayLeg[];
-  /** 1-10 confidence rating */
-  confidenceScore: number;
-  /** @nullable */
-  rationale?: string | null;
-  /** @nullable */
-  postGameReview?: string | null;
-  createdAt: string;
-  /** @nullable */
-  settledAt?: string | null;
-  /** @nullable */
-  sportsbook?: string | null;
-  /** @nullable */
-  promoNote?: string | null;
-  /** @nullable */
-  reasoningQuality?: string | null;
-  /** @nullable */
-  whatHappened?: string | null;
-  /** @nullable */
-  missReason?: string | null;
 }
 
 export type ParlayLegInputBetType = typeof ParlayLegInputBetType[keyof typeof ParlayLegInputBetType];

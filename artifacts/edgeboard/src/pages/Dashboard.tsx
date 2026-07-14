@@ -5,18 +5,21 @@ import {
   useGetBankroll,
   useListBets,
   useListParlays,
+  useGetNeedsSettling,
   getGetStatsSummaryQueryKey,
   getGetRecentActivityQueryKey,
   getGetBankrollQueryKey,
   getListBetsQueryKey,
   getListParlaysQueryKey,
+  getGetNeedsSettlingQueryKey,
 } from "@workspace/api-client-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
 import { Link } from "wouter"
-import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus } from "lucide-react"
+import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers } from "lucide-react"
+import { formatDate } from "@/lib/format"
 
 export default function Dashboard() {
   const { activeUser, isLoading: isUserLoading } = useUser();
@@ -44,6 +47,10 @@ export default function Dashboard() {
   const { data: pendingParlays = [] } = useListParlays(
     { userId: activeUser?.id, status: 'pending', limit: 200 },
     { query: { enabled: !!activeUser?.id, queryKey: [...getListParlaysQueryKey({ userId: activeUser?.id }), 'pending'] } }
+  );
+
+  const { data: needsSettling } = useGetNeedsSettling(
+    { query: { enabled: !!activeUser?.id, queryKey: getGetNeedsSettlingQueryKey() } }
   );
 
   const isLoading = isUserLoading || isStatsLoading || isActivityLoading || isBankrollLoading;
@@ -136,6 +143,60 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1">Welcome back, {activeUser.displayName}. Here's your edge today.</p>
       </div>
+
+      {/* Needs settling — overdue pending plays. Hidden when settled up. */}
+      {needsSettling && needsSettling.count > 0 && (
+        <Card className="border-amber-500/30 bg-amber-500/5" data-testid="card-needs-settling">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <AlarmClock className="h-5 w-5 text-amber-500" />
+              <CardTitle className="text-base">
+                {needsSettling.count} {needsSettling.count === 1 ? 'play needs' : 'plays need'} settling
+              </CardTitle>
+            </div>
+            <CardDescription>These games are over — grade them to keep your record honest.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {needsSettling.bets.map((bet) => (
+              <div
+                key={`bet-${bet.id}`}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-background/60 border border-border/50"
+                data-testid={`row-needs-settling-bet-${bet.id}`}
+              >
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm truncate">{bet.pick}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {bet.event} · {formatDate(bet.gameDate)} · {formatCurrency(bet.stake)} at stake
+                  </div>
+                </div>
+                <Button asChild size="sm" className="shrink-0" data-testid={`button-settle-bet-${bet.id}`}>
+                  <Link href={`/bets/${bet.id}`}>Settle</Link>
+                </Button>
+              </div>
+            ))}
+            {needsSettling.parlays.map((parlay) => (
+              <div
+                key={`parlay-${parlay.id}`}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-background/60 border border-border/50"
+                data-testid={`row-needs-settling-parlay-${parlay.id}`}
+              >
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm truncate flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    {parlay.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {parlay.legs?.length ?? 0} legs · {formatCurrency(parlay.stake)} at stake
+                  </div>
+                </div>
+                <Button asChild size="sm" className="shrink-0" data-testid={`button-settle-parlay-${parlay.id}`}>
+                  <Link href={`/parlays/${parlay.id}`}>Settle</Link>
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

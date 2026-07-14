@@ -486,6 +486,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/Parlay"
 
+  /settlement/needs-settling:
+    get:
+      operationId: getNeedsSettling
+      tags: [bets]
+      summary: List the signed-in user's pending bets and parlays whose games are already over
+      description: >
+        Returns pending straight bets whose game date is before today, and
+        pending parlays whose every leg's game date is before today, for the
+        signed-in user only. Used to nudge bettors to settle finished games.
+      responses:
+        "200":
+          description: Items awaiting settlement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NeedsSettling"
+        "401":
+          description: Not signed in
+        "403":
+          description: Signed in but no bettor profile linked yet
+
   # ── Bankroll ──────────────────────────────────────────────────────────────
   /bankroll:
     get:
@@ -722,6 +743,22 @@ components:
           minLength: 1
         avatarColor:
           type: string
+
+    NeedsSettling:
+      type: object
+      required: [count, bets, parlays]
+      properties:
+        count:
+          type: integer
+          description: Total number of bets + parlays awaiting settlement
+        bets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bet"
+        parlays:
+          type: array
+          items:
+            $ref: "#/components/schemas/Parlay"
 
     Bet:
       type: object

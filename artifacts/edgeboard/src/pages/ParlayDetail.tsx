@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter"
-import { useGetParlay, useSettleParlay, useUpdateParlayLeg, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey } from "@workspace/api-client-react"
+import { useGetParlay, useSettleParlay, useUpdateParlayLeg, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -127,6 +127,7 @@ export default function ParlayDetail() {
           queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
         }
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
+        queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
         resetModal()
       }
     })

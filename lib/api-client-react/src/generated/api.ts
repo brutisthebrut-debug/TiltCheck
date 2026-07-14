@@ -40,6 +40,7 @@ import type {
   ListParlaysParams,
   ListTransactionsParams,
   MemberComparison,
+  NeedsSettling,
   Parlay,
   ParlayInput,
   ParlayLegUpdate,
@@ -1499,6 +1500,84 @@ export const useSettleParlay = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getSettleParlayMutationOptions(options));
     }
+
+export const getGetNeedsSettlingUrl = () => {
+
+
+
+
+  return `/api/settlement/needs-settling`
+}
+
+/**
+ * Returns pending straight bets whose game date is before today, and pending parlays whose every leg's game date is before today, for the signed-in user only. Used to nudge bettors to settle finished games.
+ * @summary List the signed-in user's pending bets and parlays whose games are already over
+ */
+export const getNeedsSettling = async ( options?: RequestInit): Promise<NeedsSettling> => {
+
+  return customFetch<NeedsSettling>(getGetNeedsSettlingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNeedsSettlingQueryKey = () => {
+    return [
+    `/api/settlement/needs-settling`
+    ] as const;
+    }
+
+
+export const getGetNeedsSettlingQueryOptions = <TData = Awaited<ReturnType<typeof getNeedsSettling>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNeedsSettling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNeedsSettlingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNeedsSettling>>> = ({ signal }) => getNeedsSettling({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNeedsSettling>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNeedsSettlingQueryResult = NonNullable<Awaited<ReturnType<typeof getNeedsSettling>>>
+export type GetNeedsSettlingQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the signed-in user's pending bets and parlays whose games are already over
+ */
+
+export function useGetNeedsSettling<TData = Awaited<ReturnType<typeof getNeedsSettling>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNeedsSettling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNeedsSettlingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetBankrollUrl = (params?: GetBankrollParams,) => {
   const normalizedParams = new URLSearchParams();
