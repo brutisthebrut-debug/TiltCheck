@@ -17,6 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
+import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 
 type SettleStatus = 'won' | 'lost' | 'push' | 'void'
 
@@ -79,6 +80,7 @@ export default function BetDetail() {
   const [whatHappened, setWhatHappened] = useState('')
   const [missReason, setMissReason] = useState('')
   const [actualPayoutOverride, setActualPayoutOverride] = useState('')
+  const [moment, setMoment] = useState<SettleMomentData | null>(null)
 
   const resetModal = () => {
     setPendingStatus(null)
@@ -114,6 +116,13 @@ export default function BetDetail() {
         }
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
         queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
+        // The result is saved — this is just the moment. Skippable, never blocking.
+        if (pendingStatus === 'won') {
+          const payout = actualPayoutOverride ? Number(actualPayoutOverride) : bet.potentialPayout
+          setMoment({ kind: 'won', profit: Math.max(0, payout - bet.stake) })
+        } else if (pendingStatus === 'lost') {
+          setMoment({ kind: 'lost', lost: bet.stake })
+        }
         resetModal()
       }
     })
@@ -466,6 +475,8 @@ export default function BetDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SettleMoment moment={moment} onDone={() => setMoment(null)} />
     </div>
   )
 }

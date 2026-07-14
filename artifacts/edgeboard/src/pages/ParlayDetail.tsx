@@ -17,6 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
+import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 import type { LegResult } from "@workspace/api-client-react"
 
 type SettleStatus = 'won' | 'lost' | 'push' | 'void'
@@ -88,6 +89,7 @@ export default function ParlayDetail() {
   const [whatHappened, setWhatHappened] = useState('')
   const [missReason, setMissReason] = useState('')
   const [actualPayoutOverride, setActualPayoutOverride] = useState('')
+  const [moment, setMoment] = useState<SettleMomentData | null>(null)
 
   const resetModal = () => {
     setPendingStatus(null)
@@ -128,6 +130,13 @@ export default function ParlayDetail() {
         }
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
         queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
+        // The result is saved — this is just the moment. Skippable, never blocking.
+        if (pendingStatus === 'won') {
+          const payout = actualPayoutOverride ? Number(actualPayoutOverride) : parlay.potentialPayout
+          setMoment({ kind: 'won', profit: Math.max(0, payout - parlay.stake) })
+        } else if (pendingStatus === 'lost') {
+          setMoment({ kind: 'lost', lost: parlay.stake })
+        }
         resetModal()
       }
     })
@@ -560,6 +569,8 @@ export default function ParlayDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SettleMoment moment={moment} onDone={() => setMoment(null)} />
     </div>
   )
 }

@@ -29,7 +29,7 @@ import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react"
-import { SPORTSBOOKS, getDefaultSportsbook, getFavoriteSports } from "@/lib/preferences"
+import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 
 const legSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
@@ -61,8 +61,13 @@ export default function NewParlay() {
   const [, setLocation] = useLocation()
   const queryClient = useQueryClient()
   const createParlay = useCreateParlay()
-  const [customSportsbook, setCustomSportsbook] = useState("")
-  const [showPromo, setShowPromo] = useState(false)
+  // A remembered custom book (logged via "Other") is restored as
+  // "Other" + prefilled custom name.
+  const [lastBook] = useState(() => getLastSportsbook())
+  const lastBookIsCustom = lastBook !== null && !SPORTSBOOKS.includes(lastBook)
+  const [customSportsbook, setCustomSportsbook] = useState(lastBookIsCustom ? lastBook : "")
+  const [showMore, setShowMore] = useState(false)
+  const [stakePresets] = useState(() => getStakePresets())
 
   const defaultLeg = {
     sport: getFavoriteSports()[0] ?? "NFL",
@@ -80,7 +85,7 @@ export default function NewParlay() {
       stake: 50,
       confidenceScore: 3,
       rationale: "",
-      sportsbook: getDefaultSportsbook() ?? "",
+      sportsbook: lastBookIsCustom ? "Other" : (lastBook ?? ""),
       promoNote: "",
       legs: [defaultLeg, defaultLeg],
     },
@@ -123,6 +128,7 @@ export default function NewParlay() {
       }
     }, {
       onSuccess: () => {
+        rememberBetSlipDefaults({ sportsbook, stake: values.stake })
         queryClient.invalidateQueries({ queryKey: getListParlaysQueryKey() })
         queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
@@ -175,111 +181,138 @@ export default function NewParlay() {
                       <FormControl>
                         <Input type="number" step="0.01" min="0" {...field} />
                       </FormControl>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {stakePresets.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => form.setValue("stake", preset, { shouldValidate: true })}
+                            data-testid={`button-stake-preset-${preset}`}
+                            className={`rounded-full border px-3 py-1.5 font-mono text-xs font-medium transition-colors ${
+                              Number(field.value) === preset
+                                ? "border-primary bg-primary/15 text-primary"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                            }`}
+                          >
+                            ${preset}
+                          </button>
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
-              {/* Sportsbook */}
-              <FormField
-                control={form.control}
-                name="sportsbook"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sportsbook <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Where did you place this?" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {SPORTSBOOKS.map(sb => (
-                          <SelectItem key={sb} value={sb}>{sb}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {watchSportsbook === "Other" && (
-                <Input 
-                  placeholder="Book name" 
-                  value={customSportsbook} 
-                  onChange={e => setCustomSportsbook(e.target.value)} 
-                />
-              )}
-
-              {/* Promo toggle */}
-              <div>
+              {/* Everything below has a sensible default — tucked away so the
+                  fast path is just: name, stake, legs, log. */}
+              <div className="rounded-lg border border-dashed border-border">
                 <button
                   type="button"
-                  onClick={() => setShowPromo(!showPromo)}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowMore(!showMore)}
+                  data-testid="button-toggle-more"
+                  className="flex w-full items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showPromo ? 'rotate-180' : ''}`} />
-                  {showPromo ? 'Hide promo / boost note' : 'Add promo / profit-boost note'}
+                  <span>
+                    More details
+                    <span className="ml-2 text-xs text-muted-foreground/70">
+                      {watchSportsbook ? watchSportsbook : "book"} · confidence {form.watch("confidenceScore")}/10
+                      {form.watch("promoNote") ? " · promo" : ""}
+                    </span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showMore ? 'rotate-180' : ''}`} />
                 </button>
-                {showPromo && (
-                  <FormField
-                    control={form.control}
-                    name="promoNote"
-                    render={({ field }) => (
-                      <FormItem className="mt-3">
-                        <FormLabel>Promo / Boost Note</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. 25% parlay boost applied" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+
+                {showMore && (
+                  <div className="space-y-6 border-t border-dashed px-4 py-4">
+                    <FormField
+                      control={form.control}
+                      name="sportsbook"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sportsbook <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Where did you place this?" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {SPORTSBOOKS.map(sb => (
+                                <SelectItem key={sb} value={sb}>{sb}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {watchSportsbook === "Other" && (
+                      <Input 
+                        placeholder="Book name" 
+                        value={customSportsbook} 
+                        onChange={e => setCustomSportsbook(e.target.value)} 
+                      />
                     )}
-                  />
+
+                    <FormField
+                      control={form.control}
+                      name="promoNote"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Promo / Boost Note <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 25% parlay boost applied" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="confidenceScore"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex justify-between items-center">
+                            <FormLabel>Confidence Score</FormLabel>
+                            <span className="font-mono font-bold">{field.value} / 10</span>
+                          </div>
+                          <FormControl>
+                            <Slider
+                              min={1}
+                              max={10}
+                              step={1}
+                              value={[field.value]}
+                              onValueChange={(vals) => field.onChange(vals[0])}
+                              className="py-4"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="rationale"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rationale (Pre-game Notes)</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Why are you grouping these picks?" 
+                              className="h-20 resize-none"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 )}
               </div>
-
-              <FormField
-                control={form.control}
-                name="confidenceScore"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex justify-between items-center">
-                      <FormLabel>Confidence Score</FormLabel>
-                      <span className="font-mono font-bold">{field.value} / 10</span>
-                    </div>
-                    <FormControl>
-                      <Slider
-                        min={1}
-                        max={10}
-                        step={1}
-                        value={[field.value]}
-                        onValueChange={(vals) => field.onChange(vals[0])}
-                        className="py-4"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="rationale"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rationale (Pre-game Notes)</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Why are you grouping these picks?" 
-                        className="h-20 resize-none"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </CardContent>
           </Card>
 
