@@ -695,7 +695,27 @@ status?: ListBetsStatus;
  * @nullable
  */
 sport?: string | null;
+/**
+ * @nullable
+ */
+sportsbook?: string | null;
+/**
+ * Case-insensitive text search over event and pick
+ * @nullable
+ */
+q?: string | null;
+/**
+ * Earliest game date (inclusive, YYYY-MM-DD)
+ * @nullable
+ */
+dateFrom?: string | null;
+/**
+ * Latest game date (inclusive, YYYY-MM-DD)
+ * @nullable
+ */
+dateTo?: string | null;
 limit?: number;
+offset?: number;
 };
 
 export type ListBetsStatus = typeof ListBetsStatus[keyof typeof ListBetsStatus] | null;
@@ -718,6 +738,32 @@ userId?: number | null;
  * @nullable
  */
 status?: ListParlaysStatus;
+/**
+ * Match parlays with at least one leg in this sport
+ * @nullable
+ */
+sport?: string | null;
+/**
+ * @nullable
+ */
+sportsbook?: string | null;
+/**
+ * Case-insensitive text search over parlay name and leg event/pick
+ * @nullable
+ */
+q?: string | null;
+/**
+ * Earliest creation date (inclusive, YYYY-MM-DD)
+ * @nullable
+ */
+dateFrom?: string | null;
+/**
+ * Latest creation date (inclusive, YYYY-MM-DD)
+ * @nullable
+ */
+dateTo?: string | null;
+limit?: number;
+offset?: number;
 };
 
 export type ListParlaysStatus = typeof ListParlaysStatus[keyof typeof ListParlaysStatus] | null;

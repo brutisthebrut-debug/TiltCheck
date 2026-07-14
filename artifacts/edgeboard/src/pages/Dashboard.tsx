@@ -37,12 +37,12 @@ export default function Dashboard() {
   );
 
   const { data: pendingBets = [] } = useListBets(
-    { userId: activeUser?.id, status: 'pending' },
+    { userId: activeUser?.id, status: 'pending', limit: 200 },
     { query: { enabled: !!activeUser?.id, queryKey: [...getListBetsQueryKey({ userId: activeUser?.id }), 'pending'] } }
   );
 
   const { data: pendingParlays = [] } = useListParlays(
-    { userId: activeUser?.id, status: 'pending' },
+    { userId: activeUser?.id, status: 'pending', limit: 200 },
     { query: { enabled: !!activeUser?.id, queryKey: [...getListParlaysQueryKey({ userId: activeUser?.id }), 'pending'] } }
   );
 

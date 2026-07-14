@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, ilike, inArray, sql } from "drizzle-orm";
 import { db, parlaysTable, parlayLegsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListParlaysQueryParams,
   CreateParlayBody,
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
+import { likeContains, clampPageSize } from "../lib/search";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import {
   isValidAmericanOdds,
@@ -77,17 +78,50 @@ router.get("/parlays", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
-  const { userId, status } = query.data;
+  const { userId, status, sport, sportsbook, q, dateFrom, dateTo, limit, offset } = query.data;
   const conditions = [];
   if (userId != null) conditions.push(eq(parlaysTable.userId, userId));
   if (status != null) conditions.push(eq(parlaysTable.status, status));
+  if (sportsbook != null) conditions.push(eq(parlaysTable.sportsbook, sportsbook));
+  if (sport != null) {
+    // A parlay matches a sport filter when at least one leg is in that sport.
+    conditions.push(
+      inArray(
+        parlaysTable.id,
+        db
+          .select({ id: parlayLegsTable.parlayId })
+          .from(parlayLegsTable)
+          .where(eq(parlayLegsTable.sport, sport))
+      )
+    );
+  }
+  if (q != null && q.trim() !== "") {
+    const pattern = likeContains(q.trim());
+    conditions.push(
+      or(
+        ilike(parlaysTable.name, pattern),
+        inArray(
+          parlaysTable.id,
+          db
+            .select({ id: parlayLegsTable.parlayId })
+            .from(parlayLegsTable)
+            .where(or(ilike(parlayLegsTable.event, pattern), ilike(parlayLegsTable.pick, pattern)))
+        )
+      )!
+    );
+  }
+  // Date range compares the creation date (what the list displays).
+  if (dateFrom != null) conditions.push(sql`${parlaysTable.createdAt}::date >= ${dateFrom}::date`);
+  if (dateTo != null) conditions.push(sql`${parlaysTable.createdAt}::date <= ${dateTo}::date`);
 
   const rows = await db
     .select({ parlay: parlaysTable, user: usersTable })
     .from(parlaysTable)
     .leftJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(parlaysTable.createdAt));
+    .orderBy(desc(parlaysTable.createdAt), desc(parlaysTable.id))
+    .limit(clampPageSize(limit, 50))
+    .offset(Math.max(0, offset ?? 0));
 
   const results = await Promise.all(
     rows.map(({ parlay, user }) => formatParlay(parlay, user?.displayName ?? "Unknown"))

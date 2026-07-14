@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, ilike } from "drizzle-orm";
 import { db, betsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListBetsQueryParams,
@@ -14,6 +14,7 @@ import {
 import { requireProfile } from "../middlewares/auth";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import { isValidAmericanOdds, INVALID_ODDS_MESSAGE } from "../lib/odds";
+import { likeContains, clampPageSize } from "../lib/search";
 
 const router: IRouter = Router();
 
@@ -58,20 +59,28 @@ router.get("/bets", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
-  const { userId, status, sport, limit } = query.data;
+  const { userId, status, sport, sportsbook, q, dateFrom, dateTo, limit, offset } = query.data;
 
   const conditions = [];
   if (userId != null) conditions.push(eq(betsTable.userId, userId));
   if (status != null) conditions.push(eq(betsTable.status, status));
   if (sport != null) conditions.push(eq(betsTable.sport, sport));
+  if (sportsbook != null) conditions.push(eq(betsTable.sportsbook, sportsbook));
+  if (q != null && q.trim() !== "") {
+    const pattern = likeContains(q.trim());
+    conditions.push(or(ilike(betsTable.event, pattern), ilike(betsTable.pick, pattern))!);
+  }
+  if (dateFrom != null) conditions.push(gte(betsTable.gameDate, dateFrom));
+  if (dateTo != null) conditions.push(lte(betsTable.gameDate, dateTo));
 
   const rows = await db
     .select({ bet: betsTable, user: usersTable })
     .from(betsTable)
     .leftJoin(usersTable, eq(betsTable.userId, usersTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(betsTable.createdAt))
-    .limit(limit ?? 50);
+    .orderBy(desc(betsTable.createdAt), desc(betsTable.id))
+    .limit(clampPageSize(limit, 50))
+    .offset(Math.max(0, offset ?? 0));
 
   res.json(rows.map(({ bet, user }) => formatBet(bet, user?.displayName ?? "Unknown")));
 });

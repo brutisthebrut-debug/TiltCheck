@@ -155,11 +155,35 @@ paths:
           in: query
           schema:
             type: ["string", "null"]
+        - name: sportsbook
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: q
+          in: query
+          description: Case-insensitive text search over event and pick
+          schema:
+            type: ["string", "null"]
+        - name: dateFrom
+          in: query
+          description: Earliest game date (inclusive, YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          description: Latest game date (inclusive, YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
         - name: limit
           in: query
           schema:
             type: integer
             default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
       responses:
         "200":
           description: List of bets
@@ -285,6 +309,40 @@ paths:
           schema:
             type: ["string", "null"]
             enum: [pending, won, lost, push, void, null]
+        - name: sport
+          in: query
+          description: Match parlays with at least one leg in this sport
+          schema:
+            type: ["string", "null"]
+        - name: sportsbook
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: q
+          in: query
+          description: Case-insensitive text search over parlay name and leg event/pick
+          schema:
+            type: ["string", "null"]
+        - name: dateFrom
+          in: query
+          description: Earliest creation date (inclusive, YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          description: Latest creation date (inclusive, YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
       responses:
         "200":
           description: List of parlays

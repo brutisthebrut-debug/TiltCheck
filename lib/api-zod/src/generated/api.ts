@@ -110,12 +110,18 @@ export const UpdateUserResponse = zod.object({
  * @summary List straight bets
  */
 export const listBetsQueryLimitDefault = 50;
+export const listBetsQueryOffsetDefault = 0;
 
 export const ListBetsQueryParams = zod.object({
   "userId": zod.coerce.number().nullish(),
   "status": zod.union([zod.literal('pending'),zod.literal('won'),zod.literal('lost'),zod.literal('push'),zod.literal('void'),zod.literal(null)]).nullish(),
   "sport": zod.coerce.string().nullish(),
-  "limit": zod.coerce.number().default(listBetsQueryLimitDefault)
+  "sportsbook": zod.coerce.string().nullish(),
+  "q": zod.coerce.string().nullish().describe('Case-insensitive text search over event and pick'),
+  "dateFrom": zod.coerce.string().nullish().describe('Earliest game date (inclusive, YYYY-MM-DD)'),
+  "dateTo": zod.coerce.string().nullish().describe('Latest game date (inclusive, YYYY-MM-DD)'),
+  "limit": zod.coerce.number().default(listBetsQueryLimitDefault),
+  "offset": zod.coerce.number().default(listBetsQueryOffsetDefault)
 })
 
 export const ListBetsResponseItem = zod.object({
@@ -359,9 +365,19 @@ export const SettleBetResponse = zod.object({
 /**
  * @summary List parlays
  */
+export const listParlaysQueryLimitDefault = 50;
+export const listParlaysQueryOffsetDefault = 0;
+
 export const ListParlaysQueryParams = zod.object({
   "userId": zod.coerce.number().nullish(),
-  "status": zod.union([zod.literal('pending'),zod.literal('won'),zod.literal('lost'),zod.literal('push'),zod.literal('void'),zod.literal(null)]).nullish()
+  "status": zod.union([zod.literal('pending'),zod.literal('won'),zod.literal('lost'),zod.literal('push'),zod.literal('void'),zod.literal(null)]).nullish(),
+  "sport": zod.coerce.string().nullish().describe('Match parlays with at least one leg in this sport'),
+  "sportsbook": zod.coerce.string().nullish(),
+  "q": zod.coerce.string().nullish().describe('Case-insensitive text search over parlay name and leg event\/pick'),
+  "dateFrom": zod.coerce.string().nullish().describe('Earliest creation date (inclusive, YYYY-MM-DD)'),
+  "dateTo": zod.coerce.string().nullish().describe('Latest creation date (inclusive, YYYY-MM-DD)'),
+  "limit": zod.coerce.number().default(listParlaysQueryLimitDefault),
+  "offset": zod.coerce.number().default(listParlaysQueryOffsetDefault)
 })
 
 export const ListParlaysResponseItem = zod.object({

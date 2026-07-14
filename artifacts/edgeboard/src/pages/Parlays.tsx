@@ -1,9 +1,10 @@
 import { useUser } from "@/contexts/UserContext"
-import { useListParlays, getListParlaysQueryKey } from "@workspace/api-client-react"
-import { useState, useMemo } from "react"
+import { listParlays, getListParlaysQueryKey, type ListParlaysParams } from "@workspace/api-client-react"
+import { useInfiniteQuery } from "@tanstack/react-query"
+import { useMemo } from "react"
 import { Link } from "wouter"
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatDate } from "@/lib/format"
@@ -12,56 +13,44 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Layers } from "lucide-react"
+import { ListFilterBar } from "@/components/ListFilterBar"
+import { useUrlFilters, hasActiveFilters } from "@/hooks/use-url-filters"
 
-type StatusFilter = 'all' | 'pending' | 'won' | 'lost' | 'push' | 'void'
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-        active
-          ? 'bg-primary text-primary-foreground border-primary'
-          : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
+const PAGE_SIZE = 25
 
 export default function Parlays() {
   const { activeUser } = useUser()
   const [oddsFormat] = useOddsFormat()
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [myParlays, setMyParlays] = useState(false)
-  const [sportFilter, setSportFilter] = useState<string | null>(null)
-  
-  const { data: parlays = [], isLoading } = useListParlays(
-    {}, 
-    { query: { queryKey: getListParlaysQueryKey() } }
-  )
+  const { filters, update, clear } = useUrlFilters("/parlays")
+  const filtersActive = hasActiveFilters(filters)
 
-  const sports = useMemo(() => {
-    const set = new Set(parlays.flatMap(p => p.legs?.map(l => l.sport) ?? []))
-    return Array.from(set).sort()
-  }, [parlays])
+  const params = useMemo<ListParlaysParams>(() => ({
+    ...(filters.status !== "all" ? { status: filters.status as ListParlaysParams["status"] } : {}),
+    ...(filters.mine && activeUser ? { userId: activeUser.id } : {}),
+    ...(filters.sport ? { sport: filters.sport } : {}),
+    ...(filters.sportsbook ? { sportsbook: filters.sportsbook } : {}),
+    ...(filters.q ? { q: filters.q } : {}),
+    ...(filters.from ? { dateFrom: filters.from } : {}),
+    ...(filters.to ? { dateTo: filters.to } : {}),
+  }), [filters, activeUser])
 
-  const filteredParlays = useMemo(() => parlays.filter(parlay => {
-    if (myParlays && parlay.userId !== activeUser?.id) return false
-    if (statusFilter !== 'all' && parlay.status !== statusFilter) return false
-    if (sportFilter && !parlay.legs?.some(l => l.sport === sportFilter)) return false
-    return true
-  }), [parlays, myParlays, statusFilter, sportFilter, activeUser])
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: [...getListParlaysQueryKey(params), "infinite"],
+    queryFn: ({ pageParam }) => listParlays({ ...params, limit: PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === PAGE_SIZE
+        ? allPages.reduce((n, p) => n + p.length, 0)
+        : undefined,
+  })
 
-  const statusOptions: { value: StatusFilter; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'won', label: 'Won' },
-    { value: 'lost', label: 'Lost' },
-    { value: 'push', label: 'Push' },
-    { value: 'void', label: 'Void' },
-  ]
+  const parlays = useMemo(() => data?.pages.flat() ?? [], [data])
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
@@ -78,25 +67,15 @@ export default function Parlays() {
         </Button>
       </div>
 
-      {/* Filter chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {statusOptions.map(opt => (
-          <Chip key={opt.value} active={statusFilter === opt.value} onClick={() => setStatusFilter(opt.value)}>
-            {opt.label}
-          </Chip>
-        ))}
-        <div className="w-px bg-border shrink-0 mx-1" />
-        <Chip active={myParlays} onClick={() => setMyParlays(!myParlays)}>
-          My Parlays
-        </Chip>
-        {sports.map(sport => (
-          <Chip key={sport} active={sportFilter === sport} onClick={() => setSportFilter(sportFilter === sport ? null : sport)}>
-            {sport}
-          </Chip>
-        ))}
-      </div>
+      <ListFilterBar
+        filters={filters}
+        update={update}
+        clear={clear}
+        mineLabel="My Parlays"
+        searchPlaceholder="Search name, event, or pick…"
+      />
 
-      {!isLoading && parlays.length === 0 ? (
+      {!isLoading && parlays.length === 0 && !filtersActive ? (
         <Card className="border-dashed border-2 border-muted">
           <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
             <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
@@ -141,14 +120,15 @@ export default function Parlays() {
                       <TableCell></TableCell>
                     </TableRow>
                   ))
-                ) : filteredParlays.length === 0 ? (
+                ) : parlays.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="h-32 text-center">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <p>No parlays match the current filters.</p>
                         <button
-                          onClick={() => { setStatusFilter('all'); setMyParlays(false); setSportFilter(null) }}
+                          onClick={clear}
                           className="text-primary text-sm underline-offset-2 hover:underline"
+                          data-testid="button-clear-filters-empty"
                         >
                           Clear filters
                         </button>
@@ -156,7 +136,7 @@ export default function Parlays() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredParlays.map(parlay => (
+                  parlays.map(parlay => (
                     <TableRow key={parlay.id} className="group cursor-pointer hover:bg-muted/50" onClick={(e) => {
                       if (!(e.target as HTMLElement).closest('button')) {
                         window.location.href = `/parlays/${parlay.id}`
@@ -184,6 +164,25 @@ export default function Parlays() {
               </TableBody>
             </Table>
           </div>
+          {!isLoading && parlays.length > 0 && (
+            <div className="flex justify-center py-4 border-t border-border/50">
+              {hasNextPage ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  data-testid="button-load-more"
+                >
+                  {isFetchingNextPage ? "Loading…" : "Load more"}
+                </Button>
+              ) : (
+                (data?.pages.length ?? 0) > 1 && (
+                  <p className="text-xs text-muted-foreground">That's every parlay on the board.</p>
+                )
+              )}
+            </div>
+          )}
         </Card>
       )}
     </div>
