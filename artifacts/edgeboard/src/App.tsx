@@ -6,6 +6,7 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Layout } from './components/Layout';
 import { UserProvider, useUser } from './contexts/UserContext';
+import { useFirstRunSetupActive } from './hooks/use-first-run';
 
 import Landing from './pages/Landing';
 import ClaimProfile from './pages/ClaimProfile';
@@ -150,8 +151,11 @@ function AuthedApp() {
 
 function ProfileGate() {
   const { activeUser, isLoading, needsClaim } = useUser();
+  const firstRunSetupActive = useFirstRunSetupActive();
 
-  if (needsClaim) return <ClaimProfile />;
+  // Keep the claim/setup screen up while first-run setup is in progress,
+  // even if a background refetch already resolved the linked profile.
+  if (needsClaim || firstRunSetupActive) return <ClaimProfile />;
   if (isLoading || !activeUser) return <LoadingScreen />;
 
   return (

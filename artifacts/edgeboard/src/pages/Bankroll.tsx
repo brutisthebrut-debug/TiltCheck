@@ -1,5 +1,5 @@
 import { useUser } from "@/contexts/UserContext"
-import { useGetBankroll, useListTransactions, getGetBankrollQueryKey, getListTransactionsQueryKey, useCreateTransaction } from "@workspace/api-client-react"
+import { useGetBankroll, useListTransactions, getGetBankrollQueryKey, getListTransactionsQueryKey, useCreateTransaction, useUpdateUser } from "@workspace/api-client-react"
 import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -21,7 +21,6 @@ export default function Bankroll() {
   const [type, setType] = useState<"deposit" | "withdraw" | "adjustment">("deposit")
   const [note, setNote] = useState("")
   const [newStartingBankroll, setNewStartingBankroll] = useState("")
-  const [isSavingBankroll, setIsSavingBankroll] = useState(false)
 
   const { data: bankroll, isLoading: isBankrollLoading } = useGetBankroll(
     { userId: activeUser?.id },
@@ -34,6 +33,7 @@ export default function Bankroll() {
   )
 
   const createTx = useCreateTransaction()
+  const updateUser = useUpdateUser()
 
   const handleTransaction = (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,26 +58,20 @@ export default function Bankroll() {
     })
   }
 
-  const handleEditStartingBankroll = async (e: React.FormEvent) => {
+  const handleEditStartingBankroll = (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeUser || !newStartingBankroll || isNaN(Number(newStartingBankroll))) return
-    setIsSavingBankroll(true)
-    try {
-      const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, '') ?? ''
-      const response = await fetch(`${BASE_URL}/api/users/${activeUser.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startingBankroll: Number(newStartingBankroll) }),
-      })
-      if (response.ok) {
-        refreshUser()
-        queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
-        setIsEditBankrollOpen(false)
-        setNewStartingBankroll("")
-      }
-    } finally {
-      setIsSavingBankroll(false)
-    }
+    updateUser.mutate(
+      { id: activeUser.id, data: { startingBankroll: Number(newStartingBankroll) } },
+      {
+        onSuccess: () => {
+          refreshUser()
+          queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
+          setIsEditBankrollOpen(false)
+          setNewStartingBankroll("")
+        },
+      },
+    )
   }
 
   const isLoading = isBankrollLoading || isTxLoading
@@ -134,8 +128,8 @@ export default function Bankroll() {
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setIsEditBankrollOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={isSavingBankroll}>
-                    {isSavingBankroll ? "Saving..." : "Save"}
+                  <Button type="submit" disabled={updateUser.isPending}>
+                    {updateUser.isPending ? "Saving..." : "Save"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -261,8 +255,19 @@ export default function Bankroll() {
         </CardHeader>
         <CardContent>
           {transactions.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border border-dashed rounded-md">
-              No transactions yet. Add funds or settle bets to see activity.
+            <div className="flex flex-col items-center justify-center py-12 gap-4 text-center border-2 border-dashed rounded-md">
+              <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+                <Wallet className="h-7 w-7 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold">No money moves yet</h3>
+                <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+                  Deposits, withdrawals, and settled bets will show up here with a running balance.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setIsOpen(true)} data-testid="button-empty-add-funds">
+                Record a deposit
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">

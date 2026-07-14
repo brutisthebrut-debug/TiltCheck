@@ -27,6 +27,17 @@ export interface ClaimProfileInput {
   displayName?: string;
 }
 
+/**
+ * All fields optional; only provided fields are updated
+ */
+export interface UpdateUserInput {
+  /** @exclusiveMinimum 0 */
+  startingBankroll?: number;
+  /** @minLength 1 */
+  displayName?: string;
+  avatarColor?: string;
+}
+
 export type BetBetType = typeof BetBetType[keyof typeof BetBetType];
 
 

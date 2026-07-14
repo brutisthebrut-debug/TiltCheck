@@ -49,6 +49,7 @@ import type {
   StatsSummary,
   Transaction,
   TransactionInput,
+  UpdateUserInput,
   User,
   Workspace
 } from './api.schemas';
@@ -458,6 +459,78 @@ export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TErr
 
 
 
+
+export const getUpdateUserUrl = (id: number,) => {
+
+
+
+
+  return `/api/users/${id}`
+}
+
+/**
+ * @summary Update the signed-in user's own profile
+ */
+export const updateUser = async (id: number,
+    updateUserInput: UpdateUserInput, options?: RequestInit): Promise<User> => {
+
+  return customFetch<User>(getUpdateUserUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateUserInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateUserMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: number;data: BodyType<UpdateUserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: number;data: BodyType<UpdateUserInput>}, TContext> => {
+
+const mutationKey = ['updateUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUser>>, {id: number;data: BodyType<UpdateUserInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateUser(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateUserMutationResult = NonNullable<Awaited<ReturnType<typeof updateUser>>>
+    export type UpdateUserMutationBody = BodyType<UpdateUserInput>
+    export type UpdateUserMutationError = ErrorType<void>
+
+    /**
+ * @summary Update the signed-in user's own profile
+ */
+export const useUpdateUser = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: number;data: BodyType<UpdateUserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateUser>>,
+        TError,
+        {id: number;data: BodyType<UpdateUserInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateUserMutationOptions(options));
+    }
 
 export const getListBetsUrl = (params?: ListBetsParams,) => {
   const normalizedParams = new URLSearchParams();

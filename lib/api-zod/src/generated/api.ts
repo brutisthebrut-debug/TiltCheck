@@ -79,6 +79,34 @@ export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
 
 /**
+ * @summary Update the signed-in user's own profile
+ */
+export const UpdateUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateUserBodyStartingBankrollExclusiveMin = 0;
+
+
+
+
+export const UpdateUserBody = zod.object({
+  "startingBankroll": zod.number().gt(updateUserBodyStartingBankrollExclusiveMin).optional(),
+  "displayName": zod.string().min(1).optional(),
+  "avatarColor": zod.string().optional()
+}).describe('All fields optional; only provided fields are updated')
+
+export const UpdateUserResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "avatarColor": zod.string(),
+  "startingBankroll": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary List straight bets
  */
 export const listBetsQueryLimitDefault = 50;

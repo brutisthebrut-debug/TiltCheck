@@ -106,6 +106,35 @@ paths:
                 items:
                   $ref: "#/components/schemas/User"
 
+  /users/{id}:
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update the signed-in user's own profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserInput"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "403":
+          description: Cannot update another user's profile
+        "404":
+          description: Not found
+
   # ── Bets ──────────────────────────────────────────────────────────────────
   /bets:
     get:
@@ -622,6 +651,19 @@ components:
         displayName:
           type: string
           minLength: 1
+
+    UpdateUserInput:
+      type: object
+      description: All fields optional; only provided fields are updated
+      properties:
+        startingBankroll:
+          type: number
+          exclusiveMinimum: 0
+        displayName:
+          type: string
+          minLength: 1
+        avatarColor:
+          type: string
 
     Bet:
       type: object

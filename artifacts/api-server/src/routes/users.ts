@@ -8,16 +8,10 @@ import {
   GetCurrentUserResponse,
   ListUnclaimedUsersResponse,
   ListUsersResponse,
+  UpdateUserBody,
 } from "@workspace/api-zod";
-import * as z from "zod";
 
 const router: IRouter = Router();
-
-const UpdateUserBody = z.object({
-  startingBankroll: z.number().positive().optional(),
-  displayName: z.string().min(1).optional(),
-  avatarColor: z.string().optional(),
-});
 
 const AVATAR_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
 

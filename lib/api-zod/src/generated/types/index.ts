@@ -68,5 +68,6 @@ export * from './transactionInput';
 export * from './transactionInputType';
 export * from './transactionReferenceType';
 export * from './transactionType';
+export * from './updateUserInput';
 export * from './user';
 export * from './workspace';

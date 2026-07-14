@@ -23,10 +23,7 @@ import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, ChevronDown } from "lucide-react"
-
-const SPORTSBOOKS = [
-  "bet365", "DraftKings", "FanDuel", "BetMGM", "Caesars", "PointsBet", "Hard Rock Bet", "ESPN Bet", "Other"
-]
+import { SPORTSBOOKS, getDefaultSportsbook, getFavoriteSports } from "@/lib/preferences"
 
 const formSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
@@ -59,7 +56,7 @@ export default function NewBet() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      sport: "",
+      sport: getFavoriteSports()[0] ?? "",
       event: "",
       betType: "moneyline",
       pick: "",
@@ -68,7 +65,7 @@ export default function NewBet() {
       gameDate: new Date().toISOString().split('T')[0],
       confidenceScore: 5,
       rationale: "",
-      sportsbook: "",
+      sportsbook: getDefaultSportsbook() ?? "",
       promoNote: "",
     },
   })

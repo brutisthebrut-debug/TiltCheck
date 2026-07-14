@@ -29,10 +29,7 @@ import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react"
-
-const SPORTSBOOKS = [
-  "bet365", "DraftKings", "FanDuel", "BetMGM", "Caesars", "PointsBet", "Hard Rock Bet", "ESPN Bet", "Other"
-]
+import { SPORTSBOOKS, getDefaultSportsbook, getFavoriteSports } from "@/lib/preferences"
 
 const legSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
@@ -68,7 +65,7 @@ export default function NewParlay() {
   const [showPromo, setShowPromo] = useState(false)
 
   const defaultLeg = {
-    sport: "NFL",
+    sport: getFavoriteSports()[0] ?? "NFL",
     event: "",
     betType: "moneyline" as const,
     pick: "",
@@ -83,7 +80,7 @@ export default function NewParlay() {
       stake: 50,
       confidenceScore: 3,
       rationale: "",
-      sportsbook: "",
+      sportsbook: getDefaultSportsbook() ?? "",
       promoNote: "",
       legs: [defaultLeg, defaultLeg],
     },

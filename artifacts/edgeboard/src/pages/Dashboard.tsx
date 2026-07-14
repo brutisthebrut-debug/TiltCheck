@@ -86,24 +86,44 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-1">Welcome back, {activeUser.displayName}.</p>
         </div>
         <Card className="border-dashed border-2 border-primary/20 bg-primary/5">
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-6 text-center">
             <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
               <ClipboardList className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">No bets logged yet</h2>
+              <h2 className="text-xl font-semibold">Your board is empty — for now</h2>
               <p className="text-muted-foreground mt-1 max-w-sm">
-                Start tracking your plays to see your record, bankroll, and insights here.
+                Log your first play and this turns into your cockpit.
               </p>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
+              <div className="flex flex-col items-center gap-1.5 p-4 rounded-lg bg-background/60 border border-border/50">
+                <Target className="h-5 w-5 text-primary" />
+                <div className="text-sm font-medium">Your record</div>
+                <div className="text-xs text-muted-foreground">Wins, losses, and streaks as you grade bets</div>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 p-4 rounded-lg bg-background/60 border border-border/50">
+                <DollarSign className="h-5 w-5 text-primary" />
+                <div className="text-sm font-medium">Bankroll & ROI</div>
+                <div className="text-xs text-muted-foreground">Every result moves your running balance</div>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 p-4 rounded-lg bg-background/60 border border-border/50">
+                <Flame className="h-5 w-5 text-primary" />
+                <div className="text-sm font-medium">Honest insights</div>
+                <div className="text-xs text-muted-foreground">Where you win, where you leak money</div>
+              </div>
+            </div>
             <div className="flex gap-3 flex-wrap justify-center">
-              <Button asChild>
+              <Button asChild data-testid="button-empty-log-bet">
                 <Link href="/bets/new"><Plus className="h-4 w-4 mr-1" />Log First Bet</Link>
               </Button>
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" data-testid="button-empty-log-parlay">
                 <Link href="/parlays/new"><Plus className="h-4 w-4 mr-1" />Log First Parlay</Link>
               </Button>
             </div>
+            <Link href="/bankroll" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline" data-testid="link-empty-bankroll">
+              Set or adjust your starting bankroll first →
+            </Link>
           </CardContent>
         </Card>
       </div>
