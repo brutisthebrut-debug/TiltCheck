@@ -589,6 +589,153 @@ describe("PATCH /api/parlays/:id/settle", () => {
     expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
   });
 
+  it("rejects settling as won when a leg result says lost, writes nothing", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        legResults: [
+          { legId: parlay.legs[0].id, status: "won" },
+          { legId: parlay.legs[1].id, status: "lost" },
+        ],
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/lost leg/i);
+
+    // Parlay untouched: still pending, legs pending, no bankroll movement
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.status).toBe("pending");
+    expect(after.body.settledAt).toBeNull();
+    for (const leg of after.body.legs) {
+      expect(leg.status).toBe("pending");
+    }
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
+  });
+
+  it("rejects settling as won when even a partial legResults includes a lost leg", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        legResults: [{ legId: parlay.legs[0].id, status: "lost" }],
+      });
+    expect(res.status).toBe(400);
+
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.status).toBe("pending");
+  });
+
+  it("rejects settling as push or void when a leg result says lost", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    for (const status of ["push", "void"]) {
+      const res = await request(app)
+        .patch(`/api/parlays/${parlay.id}/settle`)
+        .send({
+          status,
+          legResults: [{ legId: parlay.legs[0].id, status: "lost" }],
+        });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/lost/i);
+    }
+
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.status).toBe("pending");
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
+  });
+
+  it("rejects settling as lost when every leg result says won", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "lost",
+        legResults: parlay.legs.map((l) => ({ legId: l.id, status: "won" })),
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/at least one leg must be lost/i);
+
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.status).toBe("pending");
+    for (const leg of after.body.legs) {
+      expect(leg.status).toBe("pending");
+    }
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
+  });
+
+  it("allows a partial legResults for a lost parlay (unlisted leg could be the loser)", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    // Only report the winning leg; the unlisted leg is the loser
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "lost",
+        legResults: [{ legId: parlay.legs[0].id, status: "won" }],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("lost");
+    const statuses = res.body.legs
+      .map((l: { status: string }) => l.status)
+      .sort();
+    expect(statuses).toEqual(["pending", "won"]);
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(950, 2);
+  });
+
+  it("allows won with legs marked push/void alongside won", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        actualPayoutOverride: 100, // pushed leg reduces the payout
+        legResults: [
+          { legId: parlay.legs[0].id, status: "won" },
+          { legId: parlay.legs[1].id, status: "push" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("won");
+    expect(res.body.actualPayout).toBeCloseTo(100, 2);
+  });
+
+  it("rejects duplicate legIds in legResults with 400", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "lost",
+        legResults: [
+          { legId: parlay.legs[0].id, status: "won" },
+          { legId: parlay.legs[0].id, status: "lost" },
+        ],
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/duplicate/i);
+
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.status).toBe("pending");
+  });
+
   it("rejects a repeat settle of a lost parlay with 409, bankroll unchanged", async () => {
     const user = await createUser(1000);
     const parlay = await createParlay(user.id, 50);

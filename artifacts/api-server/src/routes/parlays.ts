@@ -325,6 +325,39 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
       });
       return;
     }
+
+    // Reject duplicate legIds — two entries for the same leg are ambiguous.
+    const seenLegIds = new Set<number>();
+    for (const lr of legResults as Array<{ legId: number }>) {
+      if (seenLegIds.has(lr.legId)) {
+        res.status(400).json({
+          error: `legResults contains duplicate entries for leg ${lr.legId}`,
+        });
+        return;
+      }
+      seenLegIds.add(lr.legId);
+    }
+
+    // Cross-check the parlay status against the provided leg results so a
+    // parlay can never be recorded as "won" while its own legs say it lost
+    // (or vice versa). Partial legResults are intentionally allowed — legs
+    // not listed simply keep their current status — so the "lost" check only
+    // fires when every leg's result was provided (an unlisted leg could be
+    // the losing one).
+    const legStatuses = (legResults as Array<{ status: string }>).map((lr) => lr.status);
+    const hasLostLeg = legStatuses.includes("lost");
+    if ((status === "won" || status === "push" || status === "void") && hasLostLeg) {
+      res.status(400).json({
+        error: `Parlay cannot be settled as "${status}" when legResults marks a leg as lost. A lost leg means the parlay is lost.`,
+      });
+      return;
+    }
+    if (status === "lost" && legResults.length === ownLegIds.size && !hasLostLeg) {
+      res.status(400).json({
+        error: `Parlay cannot be settled as "lost" when every leg result is ${[...new Set(legStatuses)].map((s) => `"${s}"`).join("/")}. At least one leg must be lost.`,
+      });
+      return;
+    }
   }
 
   let actualPayout: number;
