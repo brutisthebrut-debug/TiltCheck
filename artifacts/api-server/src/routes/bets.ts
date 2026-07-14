@@ -249,51 +249,57 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
     actualPayout = 0;
   }
 
-  const [updated] = await db
-    .update(betsTable)
-    .set({
-      status,
-      actualPayout: String(actualPayout.toFixed(2)),
-      postGameReview: postGameReview ?? null,
-      reasoningQuality: reasoningQuality ?? null,
-      whatHappened: whatHappened ?? null,
-      missReason: missReason ?? null,
-      settledAt: new Date(),
-    })
-    .where(eq(betsTable.id, params.data.id))
-    .returning();
+  // Perform the bet update and the bankroll ledger insert atomically so a
+  // mid-settle crash can't leave the bet settled without the balance moving.
+  const updated = await db.transaction(async (tx) => {
+    const [updatedBet] = await tx
+      .update(betsTable)
+      .set({
+        status,
+        actualPayout: String(actualPayout.toFixed(2)),
+        postGameReview: postGameReview ?? null,
+        reasoningQuality: reasoningQuality ?? null,
+        whatHappened: whatHappened ?? null,
+        missReason: missReason ?? null,
+        settledAt: new Date(),
+      })
+      .where(eq(betsTable.id, params.data.id))
+      .returning();
 
-  // Get current balance for transaction
-  const txRows = await db
-    .select()
-    .from(transactionsTable)
-    .where(eq(transactionsTable.userId, existing.userId))
-    .orderBy(desc(transactionsTable.createdAt))
-    .limit(1);
-  const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(
-    (await db.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0
-  );
+    // Get current balance for transaction
+    const txRows = await tx
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, existing.userId))
+      .orderBy(desc(transactionsTable.createdAt))
+      .limit(1);
+    const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(
+      (await tx.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0
+    );
 
-  // profit: void/push = 0 (stake returned), won = payout - stake, lost = -stake
-  const profit = actualPayout - Number(existing.stake);
-  const newBalance = currentBalance + profit;
-  const txType = status === "won" ? "bet_win"
-    : status === "push" ? "bet_push"
-    : status === "void" ? "bet_void"
-    : "bet_loss";
-  const txNote = status === "won" ? `Won: ${existing.event}`
-    : status === "push" ? `Push: ${existing.event}`
-    : status === "void" ? `Void: ${existing.event}`
-    : `Lost: ${existing.event}`;
+    // profit: void/push = 0 (stake returned), won = payout - stake, lost = -stake
+    const profit = actualPayout - Number(existing.stake);
+    const newBalance = currentBalance + profit;
+    const txType = status === "won" ? "bet_win"
+      : status === "push" ? "bet_push"
+      : status === "void" ? "bet_void"
+      : "bet_loss";
+    const txNote = status === "won" ? `Won: ${existing.event}`
+      : status === "push" ? `Push: ${existing.event}`
+      : status === "void" ? `Void: ${existing.event}`
+      : `Lost: ${existing.event}`;
 
-  await db.insert(transactionsTable).values({
-    userId: existing.userId,
-    type: txType,
-    amount: String(profit.toFixed(2)),
-    balanceAfter: String(newBalance.toFixed(2)),
-    referenceId: existing.id,
-    referenceType: "bet",
-    note: txNote,
+    await tx.insert(transactionsTable).values({
+      userId: existing.userId,
+      type: txType,
+      amount: String(profit.toFixed(2)),
+      balanceAfter: String(newBalance.toFixed(2)),
+      referenceId: existing.id,
+      referenceType: "bet",
+      note: txNote,
+    });
+
+    return updatedBet;
   });
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));

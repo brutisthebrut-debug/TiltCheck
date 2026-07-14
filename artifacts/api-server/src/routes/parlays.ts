@@ -269,59 +269,64 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
     actualPayout = 0;
   }
 
-  const [updated] = await db
-    .update(parlaysTable)
-    .set({
-      status,
-      actualPayout: String(actualPayout.toFixed(2)),
-      postGameReview: postGameReview ?? null,
-      reasoningQuality: reasoningQuality ?? null,
-      whatHappened: whatHappened ?? null,
-      missReason: missReason ?? null,
-      settledAt: new Date(),
-    })
-    .where(eq(parlaysTable.id, params.data.id))
-    .returning();
+  // Perform the parlay update, leg updates, and the bankroll ledger insert
+  // atomically so a mid-settle crash can't leave the parlay settled without
+  // the balance moving.
+  const updated = await db.transaction(async (tx) => {
+    const [updatedParlay] = await tx
+      .update(parlaysTable)
+      .set({
+        status,
+        actualPayout: String(actualPayout.toFixed(2)),
+        postGameReview: postGameReview ?? null,
+        reasoningQuality: reasoningQuality ?? null,
+        whatHappened: whatHappened ?? null,
+        missReason: missReason ?? null,
+        settledAt: new Date(),
+      })
+      .where(eq(parlaysTable.id, params.data.id))
+      .returning();
 
-  // Update leg statuses if provided
-  if (legResults && legResults.length > 0) {
-    await Promise.all(
-      legResults.map((lr: { legId: number; status: string }) =>
-        db.update(parlayLegsTable).set({ status: lr.status }).where(eq(parlayLegsTable.id, lr.legId))
-      )
+    // Update leg statuses if provided
+    if (legResults && legResults.length > 0) {
+      for (const lr of legResults as Array<{ legId: number; status: string }>) {
+        await tx.update(parlayLegsTable).set({ status: lr.status }).where(eq(parlayLegsTable.id, lr.legId));
+      }
+    }
+
+    // Record transaction
+    const txRows = await tx
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, existing.userId))
+      .orderBy(desc(transactionsTable.createdAt))
+      .limit(1);
+    const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(
+      (await tx.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0
     );
-  }
 
-  // Record transaction
-  const txRows = await db
-    .select()
-    .from(transactionsTable)
-    .where(eq(transactionsTable.userId, existing.userId))
-    .orderBy(desc(transactionsTable.createdAt))
-    .limit(1);
-  const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(
-    (await db.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0
-  );
+    const profit = actualPayout - Number(existing.stake);
+    const newBalance = currentBalance + profit;
+    const txType = status === "won" ? "bet_win"
+      : status === "push" ? "bet_push"
+      : status === "void" ? "bet_void"
+      : "bet_loss";
+    const txNote = status === "won" ? `Won parlay: ${existing.name}`
+      : status === "push" ? `Push parlay: ${existing.name}`
+      : status === "void" ? `Void parlay: ${existing.name}`
+      : `Lost parlay: ${existing.name}`;
 
-  const profit = actualPayout - Number(existing.stake);
-  const newBalance = currentBalance + profit;
-  const txType = status === "won" ? "bet_win"
-    : status === "push" ? "bet_push"
-    : status === "void" ? "bet_void"
-    : "bet_loss";
-  const txNote = status === "won" ? `Won parlay: ${existing.name}`
-    : status === "push" ? `Push parlay: ${existing.name}`
-    : status === "void" ? `Void parlay: ${existing.name}`
-    : `Lost parlay: ${existing.name}`;
+    await tx.insert(transactionsTable).values({
+      userId: existing.userId,
+      type: txType,
+      amount: String(profit.toFixed(2)),
+      balanceAfter: String(newBalance.toFixed(2)),
+      referenceId: existing.id,
+      referenceType: "parlay",
+      note: txNote,
+    });
 
-  await db.insert(transactionsTable).values({
-    userId: existing.userId,
-    type: txType,
-    amount: String(profit.toFixed(2)),
-    balanceAfter: String(newBalance.toFixed(2)),
-    referenceId: existing.id,
-    referenceType: "parlay",
-    note: txNote,
+    return updatedParlay;
   });
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
