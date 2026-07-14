@@ -8,8 +8,15 @@ import {
   GetConfidenceAnalysisQueryParams,
   GetStatsInsightsQueryParams,
 } from "@workspace/api-zod";
+import { isValidAmericanOdds } from "../lib/odds";
 
 const router: IRouter = Router();
+
+// Rows saved before the dead-zone odds guard existed may carry American odds
+// between -99 and +99 — prices that don't exist. Their payout figures are
+// nonsense, so stats math must skip them entirely (they are surfaced for
+// re-entry by scripts/src/audit-dead-zone-odds.ts instead).
+const hasValidOdds = (row: { odds: number }) => isValidAmericanOdds(row.odds);
 
 // GET /stats/summary
 router.get("/stats/summary", async (req, res): Promise<void> => {
@@ -25,8 +32,10 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
     userId = u.id;
   }
 
-  const bets = await db.select().from(betsTable).where(eq(betsTable.userId, userId));
-  const parlays = await db.select().from(parlaysTable).where(eq(parlaysTable.userId, userId));
+  const allBets = await db.select().from(betsTable).where(eq(betsTable.userId, userId));
+  const allParlays = await db.select().from(parlaysTable).where(eq(parlaysTable.userId, userId));
+  const bets = allBets.filter(hasValidOdds);
+  const parlays = allParlays.filter(hasValidOdds);
 
   const settled = bets.filter((b) => ["won", "lost", "push"].includes(b.status));
   const wins = settled.filter((b) => b.status === "won").length;
@@ -118,9 +127,11 @@ router.get("/stats/by-sport", async (req, res): Promise<void> => {
     userId = u.id;
   }
 
-  const bets = await db.select().from(betsTable).where(
-    and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
-  );
+  const bets = (
+    await db.select().from(betsTable).where(
+      and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
+    )
+  ).filter(hasValidOdds);
 
   const sportMap: Record<string, { wins: number; losses: number; pushes: number; wagered: number; payout: number; confidence: number[] }> = {};
   for (const b of bets) {
@@ -224,9 +235,11 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
     userId = u.id;
   }
 
-  const bets = await db.select().from(betsTable).where(
-    and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
-  );
+  const bets = (
+    await db.select().from(betsTable).where(
+      and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
+    )
+  ).filter(hasValidOdds);
 
   const buckets = [
     { range: "1-3", min: 1, max: 3 },
