@@ -6,6 +6,7 @@ import {
   CreateParlayBody,
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
+import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import {
   GetParlayParams,
   UpdateParlayParams,
@@ -109,6 +110,13 @@ router.post("/parlays", requireProfile, async (req, res): Promise<void> => {
     return;
   }
   const d = parsed.data;
+  const badDateLeg = d.legs.find((l) => !isRealCalendarDate(l.gameDate));
+  if (badDateLeg) {
+    res.status(400).json({
+      error: `${INVALID_GAME_DATE_MESSAGE} (got "${badDateLeg.gameDate}" for ${badDateLeg.event})`,
+    });
+    return;
+  }
   const legOddsArr = d.legs.map((l) => l.odds);
   const combinedOdds = combineParlayOdds(legOddsArr);
   const combinedDecimal = legOddsArr.reduce((acc, o) => acc * americanToDecimal(o), 1);

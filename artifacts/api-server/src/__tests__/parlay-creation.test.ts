@@ -6,6 +6,8 @@
  *   1. A successful create persists both the parlay and all its legs.
  *   2. A failure while inserting legs (a DB constraint violation) rolls the
  *      whole transaction back, leaving no orphan zero-leg parlay row behind.
+ *   3. Malformed or impossible gameDate values are rejected with a 400
+ *      before touching the database.
  *
  * Each test creates its own isolated user; all rows are removed in afterAll.
  */
@@ -112,6 +114,11 @@ const validLegs = [
   },
 ];
 
+// Passes Zod validation (odds is just a number) but overflows the Postgres
+// `integer` column on the leg insert. Negative so the parlay's *combined*
+// odds stays tiny and the parlay row itself inserts without error.
+const OVERFLOW_ODDS = -2147483649;
+
 describe("POST /api/parlays", () => {
   it("creates the parlay with all its legs persisted and matching the request", async () => {
     const user = await createUser(1000);
@@ -152,22 +159,60 @@ describe("POST /api/parlays", () => {
   it("rolls back the parlay row when a leg insert fails mid-transaction", async () => {
     const user = await createUser(1000);
 
-    // gameDate is validated only as a string, so "not-a-date" passes request
-    // validation but violates the Postgres `date` column type. The parlay row
-    // is inserted first inside the transaction; the failing leg insert must
-    // roll it back.
+    // gameDate is now validated up front, so failure is injected via a leg
+    // odds value that passes request validation (any number) but overflows
+    // the Postgres `integer` column. The huge *negative* odds keeps the
+    // parlay's combined odds tiny, so the parlay row inserts fine inside the
+    // transaction; the failing leg insert must then roll it back.
     const res = await request(app).post("/api/parlays").send({
       name: "Doomed Parlay",
       stake: 50,
       confidenceScore: 6,
       legs: [
         validLegs[0],
-        { ...validLegs[1], gameDate: "not-a-date" },
+        { ...validLegs[1], odds: OVERFLOW_ODDS },
       ],
     });
     expect(res.status).toBeGreaterThanOrEqual(500);
 
     // No orphan parlay row may remain for this user
+    const parlays = await db
+      .select()
+      .from(parlaysTable)
+      .where(eq(parlaysTable.userId, user.id));
+    expect(parlays).toHaveLength(0);
+  });
+
+  it("rejects a malformed gameDate with a 400 and a clear message", async () => {
+    const user = await createUser(1000);
+
+    const res = await request(app).post("/api/parlays").send({
+      name: "Bad Date Parlay",
+      stake: 50,
+      confidenceScore: 6,
+      legs: [validLegs[0], { ...validLegs[1], gameDate: "not-a-date" }],
+    });
+    expect(res.status).toBe(400);
+
+    const parlays = await db
+      .select()
+      .from(parlaysTable)
+      .where(eq(parlaysTable.userId, user.id));
+    expect(parlays).toHaveLength(0);
+  });
+
+  it("rejects an impossible calendar date (2026-02-31) with a 400", async () => {
+    const user = await createUser(1000);
+
+    const res = await request(app).post("/api/parlays").send({
+      name: "Impossible Date Parlay",
+      stake: 50,
+      confidenceScore: 6,
+      legs: [validLegs[0], { ...validLegs[1], gameDate: "2026-02-31" }],
+    });
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toContain("gameDate");
+
     const parlays = await db
       .select()
       .from(parlaysTable)
@@ -187,7 +232,7 @@ describe("POST /api/parlays", () => {
       stake: 25,
       confidenceScore: 5,
       legs: [
-        { ...validLegs[0], gameDate: "not-a-date" },
+        { ...validLegs[0], odds: OVERFLOW_ODDS },
         validLegs[1],
       ],
     });

@@ -12,6 +12,7 @@ import {
   SettleBetBody,
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
+import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 
 const router: IRouter = Router();
 
@@ -82,6 +83,10 @@ router.post("/bets", requireProfile, async (req, res): Promise<void> => {
     return;
   }
   const d = parsed.data;
+  if (!isRealCalendarDate(d.gameDate)) {
+    res.status(400).json({ error: INVALID_GAME_DATE_MESSAGE });
+    return;
+  }
   const payout = calcPayout(d.odds, Number(d.stake));
 
   const [bet] = await db
@@ -142,6 +147,10 @@ router.patch("/bets/:id", requireProfile, async (req, res): Promise<void> => {
     return;
   }
   const d = parsed.data;
+  if (d.gameDate !== undefined && !isRealCalendarDate(d.gameDate)) {
+    res.status(400).json({ error: INVALID_GAME_DATE_MESSAGE });
+    return;
+  }
   const updateValues: Record<string, unknown> = {};
   if (d.sport !== undefined) updateValues.sport = d.sport;
   if (d.event !== undefined) updateValues.event = d.event;

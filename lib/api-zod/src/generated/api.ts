@@ -125,6 +125,7 @@ export const ListBetsResponse = zod.array(ListBetsResponseItem)
 
 
 
+export const createBetBodyGameDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createBetBodyConfidenceScoreMax = 10;
 
 
@@ -137,7 +138,7 @@ export const CreateBetBody = zod.object({
   "pick": zod.string().min(1),
   "odds": zod.number(),
   "stake": zod.number(),
-  "gameDate": zod.string(),
+  "gameDate": zod.string().regex(createBetBodyGameDateRegExp),
   "confidenceScore": zod.number().min(1).max(createBetBodyConfidenceScoreMax),
   "rationale": zod.string().optional(),
   "tags": zod.array(zod.string()).optional(),
@@ -215,6 +216,7 @@ export const UpdateBetParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateBetBodyGameDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const updateBetBodyConfidenceScoreMax = 10;
 
 
@@ -226,7 +228,7 @@ export const UpdateBetBody = zod.object({
   "pick": zod.string().optional(),
   "odds": zod.number().optional(),
   "stake": zod.number().optional(),
-  "gameDate": zod.string().optional(),
+  "gameDate": zod.string().regex(updateBetBodyGameDateRegExp).optional(),
   "confidenceScore": zod.number().min(1).max(updateBetBodyConfidenceScoreMax).optional(),
   "rationale": zod.string().optional(),
   "tags": zod.array(zod.string()).optional()
@@ -366,6 +368,7 @@ export const createParlayBodyConfidenceScoreMax = 10;
 
 
 
+export const createParlayBodyLegsItemGameDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 export const createParlayBodyLegsMin = 2;
 
 
@@ -382,7 +385,7 @@ export const CreateParlayBody = zod.object({
   "betType": zod.enum(['moneyline', 'spread', 'total', 'prop']),
   "pick": zod.string().min(1),
   "odds": zod.number(),
-  "gameDate": zod.string()
+  "gameDate": zod.string().regex(createParlayBodyLegsItemGameDateRegExp)
 })).min(createParlayBodyLegsMin),
   "sportsbook": zod.string().optional(),
   "promoNote": zod.string().optional()

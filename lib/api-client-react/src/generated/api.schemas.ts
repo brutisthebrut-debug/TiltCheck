@@ -115,6 +115,7 @@ export interface BetInput {
   pick: string;
   odds: number;
   stake: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   gameDate: string;
   /**
      * @minimum 1
@@ -145,6 +146,7 @@ export interface BetUpdate {
   pick?: string;
   odds?: number;
   stake?: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   gameDate?: string;
   /**
      * @minimum 1
@@ -292,6 +294,7 @@ export interface ParlayLegInput {
   /** @minLength 1 */
   pick: string;
   odds: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   gameDate: string;
 }
 
