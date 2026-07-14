@@ -758,6 +758,39 @@ paths:
                 items:
                   $ref: "#/components/schemas/MemberComparison"
 
+  /workspace/leaderboard:
+    get:
+      operationId: getWorkspaceLeaderboard
+      tags: [workspace]
+      summary: Rank crew members by settled results over a time window
+      description: >
+        Ranks every workspace member by net profit (ties broken by ROI, then
+        wins) using settled straight bets and parlays only — pending plays are
+        reported as an "in play" count and never move the ranking. Rows saved
+        with dead-zone odds are excluded the same way the stats endpoints
+        exclude them. The window filters on settledAt: week = last 7 days,
+        month = last 30 days, all = everything.
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, all]
+            default: all
+      responses:
+        "200":
+          description: Ranked leaderboard rows, best record first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+        "401":
+          description: Not signed in
+        "403":
+          description: Signed in but no bettor profile linked yet
+
 components:
   schemas:
     HealthStatus:
@@ -1466,3 +1499,48 @@ components:
         hotSport:
           type: ["string", "null"]
       required: [userId, userName, avatarColor, totalBets, wins, losses, winRate, roi, totalProfit, currentBankroll, avgConfidence]
+
+    LeaderboardEntry:
+      type: object
+      description: One crew member's ranked results over the requested window (settled plays only)
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        avatarColor:
+          type: string
+        wins:
+          type: integer
+        losses:
+          type: integer
+        pushes:
+          type: integer
+        settledCount:
+          type: integer
+          description: Settled bets + parlays inside the window
+        profit:
+          type: number
+          description: Net dollars won/lost on settled plays in the window
+        totalWagered:
+          type: number
+        roi:
+          type: number
+        inPlayCount:
+          type: integer
+          description: Pending bets + parlays right now (not window-filtered, never affects rank)
+        currentStreak:
+          type: integer
+          description: Length of the member's current all-time win or loss streak
+        currentStreakType:
+          type: string
+          enum: [win, loss, none]
+        bestSport:
+          type: ["string", "null"]
+          description: Sport with the most wins inside the window
+        favoriteMistake:
+          type: ["string", "null"]
+          description: Most common miss reason on losses inside the window (excludes "na")
+      required: [rank, userId, userName, avatarColor, wins, losses, pushes, settledCount, profit, totalWagered, roi, inPlayCount, currentStreak, currentStreakType]

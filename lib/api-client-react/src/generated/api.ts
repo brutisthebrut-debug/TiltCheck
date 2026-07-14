@@ -34,8 +34,10 @@ import type {
   GetStatsBySportParams,
   GetStatsInsightsParams,
   GetStatsSummaryParams,
+  GetWorkspaceLeaderboardParams,
   HealthStatus,
   InsightsResponse,
+  LeaderboardEntry,
   ListBetsParams,
   ListParlaysParams,
   ListTransactionsParams,
@@ -2614,6 +2616,91 @@ export function useCompareWorkspaceMembers<TData = Awaited<ReturnType<typeof com
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getCompareWorkspaceMembersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetWorkspaceLeaderboardUrl = (params?: GetWorkspaceLeaderboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/workspace/leaderboard?${stringifiedParams}` : `/api/workspace/leaderboard`
+}
+
+/**
+ * Ranks every workspace member by net profit (ties broken by ROI, then wins) using settled straight bets and parlays only — pending plays are reported as an "in play" count and never move the ranking. Rows saved with dead-zone odds are excluded the same way the stats endpoints exclude them. The window filters on settledAt: week = last 7 days, month = last 30 days, all = everything.
+ * @summary Rank crew members by settled results over a time window
+ */
+export const getWorkspaceLeaderboard = async (params?: GetWorkspaceLeaderboardParams, options?: RequestInit): Promise<LeaderboardEntry[]> => {
+
+  return customFetch<LeaderboardEntry[]>(getGetWorkspaceLeaderboardUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWorkspaceLeaderboardQueryKey = (params?: GetWorkspaceLeaderboardParams,) => {
+    return [
+    `/api/workspace/leaderboard`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetWorkspaceLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getWorkspaceLeaderboard>>, TError = ErrorType<void>>(params?: GetWorkspaceLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWorkspaceLeaderboardQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkspaceLeaderboard>>> = ({ signal }) => getWorkspaceLeaderboard(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWorkspaceLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkspaceLeaderboard>>>
+export type GetWorkspaceLeaderboardQueryError = ErrorType<void>
+
+
+/**
+ * @summary Rank crew members by settled results over a time window
+ */
+
+export function useGetWorkspaceLeaderboard<TData = Awaited<ReturnType<typeof getWorkspaceLeaderboard>>, TError = ErrorType<void>>(
+ params?: GetWorkspaceLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkspaceLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWorkspaceLeaderboardQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

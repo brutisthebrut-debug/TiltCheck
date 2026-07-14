@@ -1027,3 +1027,34 @@ export const CompareWorkspaceMembersResponseItem = zod.object({
 export const CompareWorkspaceMembersResponse = zod.array(CompareWorkspaceMembersResponseItem)
 
 
+/**
+ * Ranks every workspace member by net profit (ties broken by ROI, then wins) using settled straight bets and parlays only — pending plays are reported as an "in play" count and never move the ranking. Rows saved with dead-zone odds are excluded the same way the stats endpoints exclude them. The window filters on settledAt: week = last 7 days, month = last 30 days, all = everything.
+ * @summary Rank crew members by settled results over a time window
+ */
+export const getWorkspaceLeaderboardQueryPeriodDefault = `all`;
+
+export const GetWorkspaceLeaderboardQueryParams = zod.object({
+  "period": zod.enum(['week', 'month', 'all']).default(getWorkspaceLeaderboardQueryPeriodDefault)
+})
+
+export const GetWorkspaceLeaderboardResponseItem = zod.object({
+  "rank": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "avatarColor": zod.string(),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "pushes": zod.number(),
+  "settledCount": zod.number().describe('Settled bets + parlays inside the window'),
+  "profit": zod.number().describe('Net dollars won\/lost on settled plays in the window'),
+  "totalWagered": zod.number(),
+  "roi": zod.number(),
+  "inPlayCount": zod.number().describe('Pending bets + parlays right now (not window-filtered, never affects rank)'),
+  "currentStreak": zod.number().describe('Length of the member\'s current all-time win or loss streak'),
+  "currentStreakType": zod.enum(['win', 'loss', 'none']),
+  "bestSport": zod.string().nullish().describe('Sport with the most wins inside the window'),
+  "favoriteMistake": zod.string().nullish().describe('Most common miss reason on losses inside the window (excludes \"na\")')
+}).describe('One crew member\'s ranked results over the requested window (settled plays only)')
+export const GetWorkspaceLeaderboardResponse = zod.array(GetWorkspaceLeaderboardResponseItem)
+
+

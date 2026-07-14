@@ -689,6 +689,49 @@ export interface MemberComparison {
   hotSport?: string | null;
 }
 
+export type LeaderboardEntryCurrentStreakType = typeof LeaderboardEntryCurrentStreakType[keyof typeof LeaderboardEntryCurrentStreakType];
+
+
+export const LeaderboardEntryCurrentStreakType = {
+  win: 'win',
+  loss: 'loss',
+  none: 'none',
+} as const;
+
+/**
+ * One crew member's ranked results over the requested window (settled plays only)
+ */
+export interface LeaderboardEntry {
+  rank: number;
+  userId: number;
+  userName: string;
+  avatarColor: string;
+  wins: number;
+  losses: number;
+  pushes: number;
+  /** Settled bets + parlays inside the window */
+  settledCount: number;
+  /** Net dollars won/lost on settled plays in the window */
+  profit: number;
+  totalWagered: number;
+  roi: number;
+  /** Pending bets + parlays right now (not window-filtered, never affects rank) */
+  inPlayCount: number;
+  /** Length of the member's current all-time win or loss streak */
+  currentStreak: number;
+  currentStreakType: LeaderboardEntryCurrentStreakType;
+  /**
+     * Sport with the most wins inside the window
+     * @nullable
+     */
+  bestSport?: string | null;
+  /**
+     * Most common miss reason on losses inside the window (excludes "na")
+     * @nullable
+     */
+  favoriteMistake?: string | null;
+}
+
 export type ListBetsParams = {
 /**
  * @nullable
@@ -830,4 +873,17 @@ export type GetStatsInsightsParams = {
  */
 userId?: number | null;
 };
+
+export type GetWorkspaceLeaderboardParams = {
+period?: GetWorkspaceLeaderboardPeriod;
+};
+
+export type GetWorkspaceLeaderboardPeriod = typeof GetWorkspaceLeaderboardPeriod[keyof typeof GetWorkspaceLeaderboardPeriod];
+
+
+export const GetWorkspaceLeaderboardPeriod = {
+  week: 'week',
+  month: 'month',
+  all: 'all',
+} as const;
 

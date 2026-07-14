@@ -1,232 +1,319 @@
+import { useState } from "react"
 import { useUser } from "@/contexts/UserContext"
-import { useCompareWorkspaceMembers, getCompareWorkspaceMembersQueryKey } from "@workspace/api-client-react"
+import {
+  useGetWorkspaceLeaderboard,
+  getGetWorkspaceLeaderboardQueryKey,
+  useCompareWorkspaceMembers,
+  getCompareWorkspaceMembersQueryKey,
+  useListBets,
+  getListBetsQueryKey,
+  type LeaderboardEntry,
+} from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { formatCurrency } from "@/lib/format"
-import { Trophy, TrendingUp, TrendingDown, Swords, Users, Link as LinkIcon } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
+import { Trophy, Flame, Snowflake, Swords, Users, Crown, X } from "lucide-react"
+
+type Period = "week" | "month" | "all"
+
+const PERIODS: { value: Period; label: string }[] = [
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "all", label: "All Time" },
+]
+
+const MISS_REASON_LABELS: Record<string, string> = {
+  bad_read: "bad reads",
+  bad_price: "bad prices",
+  lineup_injury: "injury news",
+  emotional: "tilt bets",
+  misunderstood_market: "misread markets",
+  normal_variance: "plain variance",
+}
+
+/** One human line per row: streak, best sport, favorite mistake. */
+function flavorLine(e: LeaderboardEntry): string {
+  const bits: string[] = []
+  if (e.currentStreakType === "win" && e.currentStreak >= 2) bits.push(`${e.currentStreak}W heater`)
+  else if (e.currentStreakType === "loss" && e.currentStreak >= 2) bits.push(`${e.currentStreak}L skid`)
+  if (e.bestSport) bits.push(`best in ${e.bestSport}`)
+  if (e.favoriteMistake && MISS_REASON_LABELS[e.favoriteMistake])
+    bits.push(`weakness: ${MISS_REASON_LABELS[e.favoriteMistake]}`)
+  if (bits.length === 0) {
+    if (e.settledCount === 0) return e.inPlayCount > 0 ? "all in play — nothing graded yet" : "hasn't put anything on the record"
+    return "quietly grinding"
+  }
+  return bits.join(" · ")
+}
+
+function RankBadge({ rank }: { rank: number }) {
+  if (rank === 1)
+    return (
+      <span className="h-8 w-8 shrink-0 rounded-full bg-yellow-500/15 border border-yellow-500/40 flex items-center justify-center">
+        <Crown className="h-4 w-4 text-yellow-500" />
+      </span>
+    )
+  return (
+    <span className="h-8 w-8 shrink-0 rounded-full bg-muted/40 border border-border/60 flex items-center justify-center font-mono text-sm font-bold text-muted-foreground">
+      {rank}
+    </span>
+  )
+}
 
 export default function Workspace() {
   const { activeUser } = useUser()
+  const [period, setPeriod] = useState<Period>("all")
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
-  const { data: members = [], isLoading } = useCompareWorkspaceMembers(
-    { query: { queryKey: getCompareWorkspaceMembersQueryKey() } }
+  const { data: board = [], isLoading } = useGetWorkspaceLeaderboard(
+    { period },
+    { query: { queryKey: getGetWorkspaceLeaderboardQueryKey({ period }) } },
   )
+  const { data: comparisons = [] } = useCompareWorkspaceMembers(
+    { query: { queryKey: getCompareWorkspaceMembersQueryKey() } },
+  )
+  const { data: friendBets = [], isLoading: isFriendBetsLoading } = useListBets(
+    { userId: selectedId, limit: 5 },
+    { query: { enabled: selectedId != null, queryKey: [...getListBetsQueryKey({ userId: selectedId }), "recent5"] } },
+  )
+
+  const me = comparisons.find((c) => c.userId === activeUser?.id)
+  const them = comparisons.find((c) => c.userId === selectedId)
+  const selectedEntry = board.find((e) => e.userId === selectedId)
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">Workspace</h1>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="animate-pulse bg-muted/50 h-96" />
-          <Card className="animate-pulse bg-muted/50 h-96" />
-        </div>
+        <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
+        <Card className="animate-pulse bg-muted/50 h-96" />
       </div>
     )
   }
 
-  // Single-user or no data for second user
-  if (members.length < 2 || members.every(m => m.totalBets === 0) || 
-      (members.length >= 1 && members.slice(1).every(m => m.totalBets === 0))) {
-    const solo = members[0]
-    return (
-      <div className="space-y-8 animate-in fade-in-50 duration-500">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Workspace Head-to-Head</h1>
-          <p className="text-muted-foreground mt-1">Compare performance across the squad.</p>
-        </div>
-
-        {/* Solo player card */}
-        {solo && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <Card className={`relative overflow-hidden ${solo.userId === activeUser?.id ? 'border-primary ring-1 ring-primary' : ''}`}>
-              {solo.userId === activeUser?.id && (
-                <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] uppercase font-bold px-2 py-1 rounded-bl-lg">
-                  You
-                </div>
-              )}
-              <CardHeader className="text-center pb-2">
-                <div 
-                  className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center text-white text-xl font-bold border-4 border-background shadow-md"
-                  style={{ backgroundColor: solo.avatarColor }}
-                >
-                  {solo.userName.substring(0, 2).toUpperCase()}
-                </div>
-                <CardTitle className="text-2xl">{solo.userName}</CardTitle>
-                <CardDescription>{solo.totalBets} Total Plays</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                <div className="space-y-1 text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Net Profit</div>
-                  <div className={`text-3xl font-bold font-mono ${solo.totalProfit > 0 ? 'text-green-500' : solo.totalProfit < 0 ? 'text-red-500' : ''}`}>
-                    {solo.totalProfit > 0 ? '+' : ''}{formatCurrency(solo.totalProfit, true)}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 bg-muted/20 rounded-lg text-center">
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Win Rate</div>
-                    <div className="text-xl font-bold font-mono">{solo.winRate.toFixed(1)}%</div>
-                  </div>
-                  <div className="p-3 bg-muted/20 rounded-lg text-center">
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">ROI</div>
-                    <div className={`text-xl font-bold font-mono ${solo.roi > 0 ? 'text-green-500' : solo.roi < 0 ? 'text-red-500' : ''}`}>
-                      {solo.roi > 0 ? '+' : ''}{solo.roi.toFixed(1)}%
-                    </div>
-                  </div>
-                </div>
-                <div className="pt-4 border-t space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Record</span>
-                    <span className="font-mono font-medium">{solo.wins}-{solo.losses}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Hot Sport</span>
-                    <span className="font-medium">{solo.hotSport || 'N/A'}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Waiting for second user */}
-            <Card className="lg:col-span-2 border-dashed border-2 border-muted bg-muted/10">
-              <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                  <Users className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div className="max-w-sm">
-                  <h2 className="text-lg font-semibold">Waiting for your co-bettor</h2>
-                  <p className="text-muted-foreground text-sm mt-2 leading-relaxed">
-                    Workspace shows a side-by-side stats comparison once your co-bettor logs their first bet. 
-                    Share the app link and have them pick a username to get started.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground px-4 py-2 rounded-full border border-dashed border-muted-foreground/30 bg-background/50">
-                  <LinkIcon className="h-3 w-3" />
-                  <span>Share the link → they pick a username → comparison unlocks</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {!solo && (
-          <Card className="border-dashed border-2 border-muted">
-            <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-              <Users className="h-10 w-10 text-muted-foreground" />
-              <div>
-                <h2 className="text-lg font-semibold">No players yet</h2>
-                <p className="text-muted-foreground text-sm mt-1">Log some bets first, then come back to compare.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    )
-  }
-
-  const p1 = members[0]
-  const p2 = members[1]
-
-  const getWinner = (val1: number, val2: number) => {
-    if (val1 === val2) return null
-    return val1 > val2 ? p1.userId : p2.userId
-  }
-
-  const winners = {
-    profit: getWinner(p1.totalProfit, p2.totalProfit),
-    roi: getWinner(p1.roi, p2.roi),
-    winRate: getWinner(p1.winRate, p2.winRate),
-    bankroll: getWinner(p1.currentBankroll, p2.currentBankroll),
-  }
-
-  function MemberCard({ member, isYou }: { member: typeof members[0]; isYou: boolean }) {
-    return (
-      <Card className={`relative overflow-hidden ${isYou ? 'border-primary ring-1 ring-primary' : ''}`}>
-        {isYou && (
-          <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] uppercase font-bold px-2 py-1 rounded-bl-lg">
-            You
-          </div>
-        )}
-        <CardHeader className="text-center pb-2">
-          <div 
-            className="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center text-white text-xl font-bold border-4 border-background shadow-md"
-            style={{ backgroundColor: member.avatarColor }}
-          >
-            {member.userName.substring(0, 2).toUpperCase()}
-          </div>
-          <CardTitle className="text-2xl">{member.userName}</CardTitle>
-          <CardDescription>{member.totalBets} Total Plays</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-4">
-          <div className="space-y-1 text-center p-3 bg-muted/30 rounded-lg">
-            <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Net Profit</div>
-            <div className={`text-3xl font-bold font-mono ${winners.profit === member.userId ? 'text-green-500' : ''}`}>
-              {member.totalProfit > 0 ? '+' : ''}{formatCurrency(member.totalProfit, true)}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-3 bg-muted/20 rounded-lg text-center">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Win Rate</div>
-              <div className={`text-xl font-bold font-mono ${winners.winRate === member.userId ? 'text-primary' : ''}`}>
-                {member.winRate.toFixed(1)}%
-              </div>
-            </div>
-            <div className="p-3 bg-muted/20 rounded-lg text-center">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">ROI</div>
-              <div className={`text-xl font-bold font-mono ${winners.roi === member.userId ? 'text-primary' : ''}`}>
-                {member.roi > 0 ? '+' : ''}{member.roi.toFixed(1)}%
-              </div>
-            </div>
-          </div>
-          <div className="pt-4 border-t space-y-3">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Bankroll</span>
-              <span className={`font-mono font-medium ${winners.bankroll === member.userId ? 'text-primary font-bold' : ''}`}>
-                {formatCurrency(member.currentBankroll, true)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Record</span>
-              <span className="font-mono font-medium">{member.wins}-{member.losses}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Hot Sport</span>
-              <span className="font-medium">{member.hotSport || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Avg Confidence</span>
-              <span className="font-mono font-medium">{member.avgConfidence.toFixed(1)} / 10</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+  const hasAnyData = board.some((e) => e.settledCount > 0 || e.inPlayCount > 0)
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Workspace Head-to-Head</h1>
-        <p className="text-muted-foreground mt-1">Compare performance across the squad.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
+          <p className="text-muted-foreground mt-1">Who's up, who's down, who should stop betting parlays.</p>
+        </div>
+        <div className="flex rounded-lg border border-border/60 bg-card p-1" role="tablist" aria-label="Time period">
+          {PERIODS.map((p) => (
+            <button
+              key={p.value}
+              role="tab"
+              aria-selected={period === p.value}
+              onClick={() => setPeriod(p.value)}
+              data-testid={`tab-period-${p.value}`}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                period === p.value
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
-        <MemberCard member={p1} isYou={p1.userId === activeUser?.id} />
+      {!hasAnyData ? (
+        <Card className="border-dashed border-2 border-muted">
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+            <Users className="h-10 w-10 text-muted-foreground" />
+            <div>
+              <h2 className="text-lg font-semibold">Nothing on the board yet</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Once the crew logs and settles bets, the bragging rights get handed out here.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Crew Rankings</CardTitle>
+            </div>
+            <CardDescription>
+              Settled results only — pending plays count as "in play", not rank. Tap a friend for the head-to-head.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {board.map((e) => {
+              const isYou = e.userId === activeUser?.id
+              const isSelected = e.userId === selectedId
+              const clickable = !isYou
+              return (
+                <button
+                  key={e.userId}
+                  type="button"
+                  disabled={!clickable}
+                  onClick={() => clickable && setSelectedId(isSelected ? null : e.userId)}
+                  data-testid={`row-leaderboard-${e.userId}`}
+                  className={`w-full text-left flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors ${
+                    isSelected
+                      ? "border-primary bg-primary/5"
+                      : "border-border/60 bg-background/60"
+                  } ${clickable ? "hover:border-primary/50 cursor-pointer" : "cursor-default"} ${
+                    isYou ? "ring-1 ring-primary/30" : ""
+                  }`}
+                >
+                  <RankBadge rank={e.rank} />
+                  <span
+                    className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                    style={{ backgroundColor: e.avatarColor }}
+                  >
+                    {e.userName.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm truncate">{e.userName}</span>
+                      {isYou && (
+                        <Badge className="text-[9px] px-1.5 py-0 uppercase" variant="outline">You</Badge>
+                      )}
+                      {e.currentStreakType === "win" && e.currentStreak >= 2 && (
+                        <Flame className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                      )}
+                      {e.currentStreakType === "loss" && e.currentStreak >= 2 && (
+                        <Snowflake className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{flavorLine(e)}</p>
+                  </div>
+                  <div className="hidden sm:block text-right shrink-0">
+                    <div className="font-mono text-sm font-bold">
+                      {e.wins}-{e.losses}{e.pushes > 0 ? `-${e.pushes}` : ""}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Record</div>
+                  </div>
+                  <div className="text-right shrink-0 w-20">
+                    <div
+                      className={`font-mono text-sm font-bold ${
+                        e.profit > 0 ? "text-green-500" : e.profit < 0 ? "text-red-500" : ""
+                      }`}
+                    >
+                      {e.profit > 0 ? "+" : ""}{formatCurrency(e.profit, false)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                      {e.roi > 0 ? "+" : ""}{e.roi.toFixed(1)}% ROI
+                    </div>
+                  </div>
+                  <div className="hidden md:block text-right shrink-0 w-16">
+                    <div className="font-mono text-sm">{e.inPlayCount}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">In Play</div>
+                  </div>
+                </button>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
-        <div className="flex flex-col items-center justify-center py-4 lg:py-0 hidden lg:flex">
-          <div className="h-16 w-px bg-border mb-4"></div>
-          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center border-4 border-background z-10 shadow-sm text-muted-foreground">
-            <Swords className="h-6 w-6" />
+      {/* Head-to-head drill-in */}
+      {selectedEntry && them && (
+        <div className="space-y-4" data-testid="section-head-to-head">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Swords className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold tracking-tight">You vs. {them.userName}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="button-close-head-to-head"
+              aria-label="Close head-to-head"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <div className="h-16 w-px bg-border mt-4"></div>
-        </div>
-        
-        <div className="flex items-center justify-center lg:hidden -my-2 relative z-10">
-          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center border-4 border-background shadow-sm text-muted-foreground">
-            <span className="font-bold text-xs italic">VS</span>
-          </div>
-        </div>
 
-        <MemberCard member={p2} isYou={p2.userId === activeUser?.id} />
-      </div>
+          {me ? (
+            <Card>
+              <CardContent className="p-4">
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center mb-4">
+                  {[me, them].map((m, i) => (
+                    <div key={m.userId} className={`flex items-center gap-2 min-w-0 ${i === 1 ? "flex-row-reverse" : ""}`}>
+                      <span
+                        className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                        style={{ backgroundColor: m.avatarColor }}
+                      >
+                        {m.userName.charAt(0).toUpperCase()}
+                      </span>
+                      <span className="font-bold text-sm truncate">{i === 0 ? "You" : m.userName}</span>
+                    </div>
+                  )).flatMap((el, i) =>
+                    i === 0
+                      ? [el, <span key="vs" className="text-xs font-bold italic text-muted-foreground px-2">VS</span>]
+                      : [el],
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: "Net Profit", a: me.totalProfit, b: them.totalProfit, fmt: (v: number) => `${v > 0 ? "+" : ""}${formatCurrency(v, false)}` },
+                    { label: "ROI", a: me.roi, b: them.roi, fmt: (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%` },
+                    { label: "Win Rate", a: me.winRate, b: them.winRate, fmt: (v: number) => `${v.toFixed(1)}%` },
+                    { label: "Bankroll", a: me.currentBankroll, b: them.currentBankroll, fmt: (v: number) => formatCurrency(v, false) },
+                  ].map((row) => (
+                    <div key={row.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md bg-muted/20 px-3 py-2">
+                      <span className={`font-mono text-sm font-bold ${row.a > row.b ? "text-primary" : ""}`}>{row.fmt(row.a)}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider text-center w-24">{row.label}</span>
+                      <span className={`font-mono text-sm font-bold text-right ${row.b > row.a ? "text-primary" : ""}`}>{row.fmt(row.b)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                Log a bet yourself to unlock the side-by-side.
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{them.userName}'s Recent Bets</CardTitle>
+              <CardDescription>The last five plays they put on the record.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {isFriendBetsLoading ? (
+                <div className="animate-pulse h-24 rounded-md bg-muted/50" />
+              ) : friendBets.length === 0 ? (
+                <div className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-md">
+                  No straight bets logged yet.
+                </div>
+              ) : (
+                friendBets.map((bet) => (
+                  <div
+                    key={bet.id}
+                    className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5"
+                    data-testid={`row-friend-bet-${bet.id}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{bet.pick}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {bet.event} · {formatDate(bet.gameDate)} · {formatOdds(bet.odds)} · {formatCurrency(Number(bet.stake), false)}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={bet.status === "won" ? "default" : bet.status === "lost" ? "destructive" : "secondary"}
+                      className="shrink-0 text-[10px] uppercase"
+                    >
+                      {bet.status === "pending" ? "in play" : bet.status}
+                    </Badge>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
