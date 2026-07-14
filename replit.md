@@ -26,7 +26,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Transactions ledger is append-only: `balanceAfter` is a point-in-time snapshot, never rewritten. Deleting a settled bet/parlay appends a compensating `adjustment` row, so `balanceAfter[n] = balanceAfter[n-1] + amount[n]` holds for rows ordered by `(createdAt, id)`, and summing `amount` always agrees with the latest `balanceAfter`. Balance-over-time displays can use `balanceAfter` row by row. (Documented on the `transactions` schema.)
 
 ## Product
 

@@ -253,6 +253,12 @@ router.delete("/parlays/:id", requireProfile, async (req, res): Promise<void> =>
   }
   // Delete the parlay (and its legs) and reverse any bankroll impact
   // atomically so a deleted settled parlay can't leave ghost money in the ledger.
+  //
+  // Ledger convention (see transactionsTable schema): the ledger is
+  // append-only and `balanceAfter` is a point-in-time snapshot. Rows recorded
+  // between the original settle and this deletion keep their snapshots; the
+  // appended "adjustment" row preserves the chain invariant
+  // balanceAfter[n] = balanceAfter[n-1] + amount[n] for every row.
   const deleted = await db.transaction(async (tx) => {
     await tx.delete(parlayLegsTable).where(eq(parlayLegsTable.parlayId, params.data.id));
     const [deletedParlay] = await tx.delete(parlaysTable).where(eq(parlaysTable.id, params.data.id)).returning();
@@ -276,7 +282,7 @@ router.delete("/parlays/:id", requireProfile, async (req, res): Promise<void> =>
         .select()
         .from(transactionsTable)
         .where(eq(transactionsTable.userId, deletedParlay.userId))
-        .orderBy(desc(transactionsTable.createdAt))
+        .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
         .limit(1);
       const currentBalance = lastTx.length > 0 ? Number(lastTx[0].balanceAfter) : Number(
         (await tx.select().from(usersTable).where(eq(usersTable.id, deletedParlay.userId)))[0]?.startingBankroll ?? 0
@@ -433,7 +439,7 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
       .select()
       .from(transactionsTable)
       .where(eq(transactionsTable.userId, existing.userId))
-      .orderBy(desc(transactionsTable.createdAt))
+      .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
       .limit(1);
     const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(
       (await tx.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0

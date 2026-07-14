@@ -48,7 +48,7 @@ router.get("/workspace/compare", async (_req, res): Promise<void> => {
         .select()
         .from(transactionsTable)
         .where(eq(transactionsTable.userId, user.id))
-        .orderBy(desc(transactionsTable.createdAt))
+        .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
         .limit(1);
       const currentBankroll = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(user.startingBankroll);
 

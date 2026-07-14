@@ -211,6 +211,13 @@ router.delete("/bets/:id", requireProfile, async (req, res): Promise<void> => {
   }
   // Delete the bet and reverse any bankroll impact atomically so a deleted
   // settled bet can't leave ghost money in the ledger.
+  //
+  // Ledger convention (see transactionsTable schema): the ledger is
+  // append-only and `balanceAfter` is a point-in-time snapshot. We never
+  // rewrite `balanceAfter` on rows recorded between the original settle and
+  // this deletion — those snapshots were correct when written. Instead we
+  // append a compensating "adjustment" row, which preserves the chain
+  // invariant balanceAfter[n] = balanceAfter[n-1] + amount[n] for every row.
   const deleted = await db.transaction(async (tx) => {
     const [deletedBet] = await tx.delete(betsTable).where(eq(betsTable.id, params.data.id)).returning();
     if (!deletedBet) return null;
@@ -233,7 +240,7 @@ router.delete("/bets/:id", requireProfile, async (req, res): Promise<void> => {
         .select()
         .from(transactionsTable)
         .where(eq(transactionsTable.userId, deletedBet.userId))
-        .orderBy(desc(transactionsTable.createdAt))
+        .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
         .limit(1);
       const currentBalance = lastTx.length > 0 ? Number(lastTx[0].balanceAfter) : Number(
         (await tx.select().from(usersTable).where(eq(usersTable.id, deletedBet.userId)))[0]?.startingBankroll ?? 0
@@ -321,7 +328,7 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
       .select()
       .from(transactionsTable)
       .where(eq(transactionsTable.userId, existing.userId))
-      .orderBy(desc(transactionsTable.createdAt))
+      .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
       .limit(1);
     const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(
       (await tx.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0

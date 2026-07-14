@@ -20,7 +20,7 @@ async function getUserBankroll(userId: number) {
     .select()
     .from(transactionsTable)
     .where(eq(transactionsTable.userId, userId))
-    .orderBy(desc(transactionsTable.createdAt))
+    .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
     .limit(1);
 
   const currentBalance = txRows.length > 0 ? Number(txRows[0].balanceAfter) : startingBalance;
@@ -106,7 +106,7 @@ router.get("/bankroll/transactions", requireProfile, async (req, res): Promise<v
     .select()
     .from(transactionsTable)
     .where(eq(transactionsTable.userId, self))
-    .orderBy(desc(transactionsTable.createdAt))
+    .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
     .limit(limit ?? 20);
 
   res.json(rows.map((t) => ({

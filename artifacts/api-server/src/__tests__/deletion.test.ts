@@ -204,6 +204,111 @@ describe("DELETE /api/bets/:id", () => {
   });
 });
 
+describe("ledger consistency after deletion (append-only convention)", () => {
+  /**
+   * Convention under test (documented on transactionsTable.balanceAfter):
+   * the ledger is append-only — `balanceAfter` is a point-in-time snapshot
+   * that is never rewritten, even when a bet referenced by an earlier row is
+   * later deleted. Deletion appends a compensating "adjustment" row, so for
+   * rows ordered by (createdAt, id) the chain invariant always holds:
+   *   balanceAfter[n] = balanceAfter[n-1] + amount[n]
+   * and summing amounts always agrees with the latest balanceAfter.
+   */
+  function expectChainConsistent(
+    startingBankroll: number,
+    txs: Array<{ amount: string; balanceAfter: string }>,
+  ) {
+    let running = startingBankroll;
+    for (const t of txs) {
+      running += Number(t.amount);
+      expect(Number(t.balanceAfter)).toBeCloseTo(running, 2);
+    }
+    return running;
+  }
+
+  it("keeps the chain invariant when transactions occur between settle and delete (bet)", async () => {
+    const user = await createUser(1000);
+    const bet = await createBet({ odds: 150, stake: 100 }); // won profit = 150
+
+    const settle = await request(app).patch(`/api/bets/${bet.id}/settle`).send({ status: "won" });
+    expect(settle.status).toBe(200);
+
+    // Intervening transactions between settle and delete
+    const dep = await request(app)
+      .post("/api/bankroll/transactions")
+      .send({ type: "deposit", amount: 200, note: "mid deposit" });
+    expect(dep.status).toBe(201);
+    const wd = await request(app)
+      .post("/api/bankroll/transactions")
+      .send({ type: "withdraw", amount: 50, note: "mid withdraw" });
+    expect(wd.status).toBe(201);
+
+    const del = await request(app).delete(`/api/bets/${bet.id}`);
+    expect(del.status).toBe(204);
+
+    const txs = await db
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, user.id))
+      .orderBy(transactionsTable.createdAt, transactionsTable.id);
+    expect(txs.length).toBe(4); // win, deposit, withdraw, reversal adjustment
+
+    // Every row satisfies balanceAfter[n] = balanceAfter[n-1] + amount[n]
+    const finalBalance = expectChainConsistent(1000, txs);
+
+    // Intermediate rows keep their point-in-time snapshots (they still
+    // include the deleted bet's money — that was the balance at the time).
+    expect(Number(txs[0].balanceAfter)).toBeCloseTo(1150, 2); // win
+    expect(Number(txs[1].balanceAfter)).toBeCloseTo(1350, 2); // deposit
+    expect(Number(txs[2].balanceAfter)).toBeCloseTo(1300, 2); // withdraw
+    expect(Number(txs[3].balanceAfter)).toBeCloseTo(1150, 2); // reversal (-150)
+
+    // Summing amounts agrees with the latest balanceAfter and with /bankroll
+    const summed = 1000 + txs.reduce((s, t) => s + Number(t.amount), 0);
+    expect(summed).toBeCloseTo(finalBalance, 2);
+    expect((await getBankroll(user.id)).currentBalance).toBeCloseTo(finalBalance, 2);
+
+    // The transactions endpoint (what the web app renders row by row)
+    // returns the same chain-consistent balanceAfter values.
+    const listRes = await request(app).get("/api/bankroll/transactions");
+    expect(listRes.status).toBe(200);
+    const listed = (listRes.body as Array<{ id: number; amount: number; balanceAfter: number }>)
+      .slice()
+      .sort((a, b) => a.id - b.id);
+    expectChainConsistent(
+      1000,
+      listed.map((t) => ({ amount: String(t.amount), balanceAfter: String(t.balanceAfter) })),
+    );
+  });
+
+  it("keeps the chain invariant when a deposit lands between settle and delete (parlay)", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(50); // won profit = 150
+
+    const settle = await request(app).patch(`/api/parlays/${parlay.id}/settle`).send({ status: "won" });
+    expect(settle.status).toBe(200);
+
+    const dep = await request(app)
+      .post("/api/bankroll/transactions")
+      .send({ type: "deposit", amount: 100 });
+    expect(dep.status).toBe(201);
+
+    const del = await request(app).delete(`/api/parlays/${parlay.id}`);
+    expect(del.status).toBe(204);
+
+    const txs = await db
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, user.id))
+      .orderBy(transactionsTable.createdAt, transactionsTable.id);
+    expect(txs.length).toBe(3); // win, deposit, reversal
+
+    const finalBalance = expectChainConsistent(1000, txs);
+    expect(finalBalance).toBeCloseTo(1100, 2); // 1000 + 100 deposit, parlay fully reversed
+    expect((await getBankroll(user.id)).currentBalance).toBeCloseTo(1100, 2);
+  });
+});
+
 describe("DELETE /api/parlays/:id", () => {
   it("deleting a won parlay reverses the win and removes its legs", async () => {
     const user = await createUser(1000);
