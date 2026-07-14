@@ -5,6 +5,7 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { BadgeRef } from './badgeRef';
 import type { LeaderboardEntryCurrentStreakType } from './leaderboardEntryCurrentStreakType';
 
 /**
@@ -39,4 +40,6 @@ export interface LeaderboardEntry {
      * @nullable
      */
   favoriteMistake?: string | null;
+  /** The member's most recently earned badges (up to 3, newest first) */
+  badges: BadgeRef[];
 }

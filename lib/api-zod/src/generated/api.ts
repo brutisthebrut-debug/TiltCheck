@@ -107,6 +107,24 @@ export const UpdateUserResponse = zod.object({
 
 
 /**
+ * Returns every badge the app defines, with earnedAt set for the ones this bettor has earned. Visiting this endpoint also awards any newly qualified badges (badges are never revoked).
+ * @summary List all badge definitions with the user's earned status
+ */
+export const GetUserBadgesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetUserBadgesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "emoji": zod.string(),
+  "earnedAt": zod.string().nullable().describe('ISO timestamp when earned, null when not yet earned')
+}).describe('A badge definition plus whether\/when this bettor earned it')
+export const GetUserBadgesResponse = zod.array(GetUserBadgesResponseItem)
+
+
+/**
  * @summary List straight bets
  */
 export const listBetsQueryLimitDefault = 50;
@@ -989,6 +1007,22 @@ export const GetStatsInsightsResponse = zod.object({
 
 
 /**
+ * @summary Logging streak and settle streak for a bettor
+ */
+export const GetStreaksQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish()
+})
+
+export const GetStreaksResponse = zod.object({
+  "userId": zod.number(),
+  "loggingStreakDays": zod.number().describe('Consecutive days with at least one play logged, ending today or yesterday'),
+  "longestLoggingStreakDays": zod.number(),
+  "settleStreakDays": zod.number().describe('Consecutive days (ending today) with no finished game left ungraded'),
+  "overdueCount": zod.number().describe('Pending plays whose games are already over, right now')
+}).describe('Habit streaks computed from logged plays (UTC calendar days)')
+
+
+/**
  * @summary Get workspace info and members
  */
 export const GetWorkspaceResponse = zod.object({
@@ -1053,7 +1087,12 @@ export const GetWorkspaceLeaderboardResponseItem = zod.object({
   "currentStreak": zod.number().describe('Length of the member\'s current all-time win or loss streak'),
   "currentStreakType": zod.enum(['win', 'loss', 'none']),
   "bestSport": zod.string().nullish().describe('Sport with the most wins inside the window'),
-  "favoriteMistake": zod.string().nullish().describe('Most common miss reason on losses inside the window (excludes \"na\")')
+  "favoriteMistake": zod.string().nullish().describe('Most common miss reason on losses inside the window (excludes \"na\")'),
+  "badges": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "emoji": zod.string()
+}).describe('Compact badge reference for showing chips beside a bettor\'s name')).describe('The member\'s most recently earned badges (up to 3, newest first)')
 }).describe('One crew member\'s ranked results over the requested window (settled plays only)')
 export const GetWorkspaceLeaderboardResponse = zod.array(GetWorkspaceLeaderboardResponseItem)
 

@@ -21,6 +21,7 @@ import type {
 
 import type {
   ActivityItem,
+  BadgeStatus,
   Bankroll,
   Bet,
   BetInput,
@@ -34,6 +35,7 @@ import type {
   GetStatsBySportParams,
   GetStatsInsightsParams,
   GetStatsSummaryParams,
+  GetStreaksParams,
   GetWorkspaceLeaderboardParams,
   HealthStatus,
   InsightsResponse,
@@ -50,6 +52,7 @@ import type {
   ParlayUpdate,
   SportStats,
   StatsSummary,
+  StreaksSummary,
   Transaction,
   TransactionInput,
   UpdateUserInput,
@@ -534,6 +537,84 @@ export const useUpdateUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateUserMutationOptions(options));
     }
+
+export const getGetUserBadgesUrl = (id: number,) => {
+
+
+
+
+  return `/api/users/${id}/badges`
+}
+
+/**
+ * Returns every badge the app defines, with earnedAt set for the ones this bettor has earned. Visiting this endpoint also awards any newly qualified badges (badges are never revoked).
+ * @summary List all badge definitions with the user's earned status
+ */
+export const getUserBadges = async (id: number, options?: RequestInit): Promise<BadgeStatus[]> => {
+
+  return customFetch<BadgeStatus[]>(getGetUserBadgesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserBadgesQueryKey = (id: number,) => {
+    return [
+    `/api/users/${id}/badges`
+    ] as const;
+    }
+
+
+export const getGetUserBadgesQueryOptions = <TData = Awaited<ReturnType<typeof getUserBadges>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserBadges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserBadgesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserBadges>>> = ({ signal }) => getUserBadges(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserBadges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserBadgesQueryResult = NonNullable<Awaited<ReturnType<typeof getUserBadges>>>
+export type GetUserBadgesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List all badge definitions with the user's earned status
+ */
+
+export function useGetUserBadges<TData = Awaited<ReturnType<typeof getUserBadges>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserBadges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserBadgesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListBetsUrl = (params?: ListBetsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2462,6 +2543,90 @@ export function useGetStatsInsights<TData = Awaited<ReturnType<typeof getStatsIn
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStatsInsightsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetStreaksUrl = (params?: GetStreaksParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stats/streaks?${stringifiedParams}` : `/api/stats/streaks`
+}
+
+/**
+ * @summary Logging streak and settle streak for a bettor
+ */
+export const getStreaks = async (params?: GetStreaksParams, options?: RequestInit): Promise<StreaksSummary> => {
+
+  return customFetch<StreaksSummary>(getGetStreaksUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreaksQueryKey = (params?: GetStreaksParams,) => {
+    return [
+    `/api/stats/streaks`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStreaksQueryOptions = <TData = Awaited<ReturnType<typeof getStreaks>>, TError = ErrorType<unknown>>(params?: GetStreaksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreaks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreaksQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreaks>>> = ({ signal }) => getStreaks(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreaks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStreaksQueryResult = NonNullable<Awaited<ReturnType<typeof getStreaks>>>
+export type GetStreaksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Logging streak and settle streak for a bettor
+ */
+
+export function useGetStreaks<TData = Awaited<ReturnType<typeof getStreaks>>, TError = ErrorType<unknown>>(
+ params?: GetStreaksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreaks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStreaksQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

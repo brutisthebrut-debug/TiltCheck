@@ -7,6 +7,7 @@ import settlementRouter from "./settlement";
 import exportRouter from "./export";
 import bankrollRouter from "./bankroll";
 import statsRouter from "./stats";
+import badgesRouter from "./badges";
 import workspaceRouter from "./workspace";
 import { requireAuth } from "../middlewares/auth";
 
@@ -24,6 +25,7 @@ router.use(settlementRouter);
 router.use(exportRouter);
 router.use(bankrollRouter);
 router.use(statsRouter);
+router.use(badgesRouter);
 router.use(workspaceRouter);
 
 export default router;

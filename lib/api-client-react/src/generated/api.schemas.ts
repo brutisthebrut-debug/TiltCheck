@@ -699,6 +699,15 @@ export const LeaderboardEntryCurrentStreakType = {
 } as const;
 
 /**
+ * Compact badge reference for showing chips beside a bettor's name
+ */
+export interface BadgeRef {
+  id: string;
+  name: string;
+  emoji: string;
+}
+
+/**
  * One crew member's ranked results over the requested window (settled plays only)
  */
 export interface LeaderboardEntry {
@@ -730,6 +739,37 @@ export interface LeaderboardEntry {
      * @nullable
      */
   favoriteMistake?: string | null;
+  /** The member's most recently earned badges (up to 3, newest first) */
+  badges: BadgeRef[];
+}
+
+/**
+ * A badge definition plus whether/when this bettor earned it
+ */
+export interface BadgeStatus {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  /**
+     * ISO timestamp when earned, null when not yet earned
+     * @nullable
+     */
+  earnedAt: string | null;
+}
+
+/**
+ * Habit streaks computed from logged plays (UTC calendar days)
+ */
+export interface StreaksSummary {
+  userId: number;
+  /** Consecutive days with at least one play logged, ending today or yesterday */
+  loggingStreakDays: number;
+  longestLoggingStreakDays: number;
+  /** Consecutive days (ending today) with no finished game left ungraded */
+  settleStreakDays: number;
+  /** Pending plays whose games are already over, right now */
+  overdueCount: number;
 }
 
 export type ListBetsParams = {
@@ -868,6 +908,13 @@ userId?: number | null;
 };
 
 export type GetStatsInsightsParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+};
+
+export type GetStreaksParams = {
 /**
  * @nullable
  */

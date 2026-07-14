@@ -135,6 +135,33 @@ paths:
         "404":
           description: Not found
 
+  /users/{id}/badges:
+    get:
+      operationId: getUserBadges
+      tags: [users]
+      summary: List all badge definitions with the user's earned status
+      description: >
+        Returns every badge the app defines, with earnedAt set for the ones
+        this bettor has earned. Visiting this endpoint also awards any newly
+        qualified badges (badges are never revoked).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Badge case
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BadgeStatus"
+        "404":
+          description: User not found
+
   # ── Bets ──────────────────────────────────────────────────────────────────
   /bets:
     get:
@@ -728,6 +755,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InsightsResponse"
+
+  /stats/streaks:
+    get:
+      operationId: getStreaks
+      tags: [stats]
+      summary: Logging streak and settle streak for a bettor
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Streaks summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreaksSummary"
 
   # ── Workspace ─────────────────────────────────────────────────────────────
   /workspace:
@@ -1543,4 +1588,57 @@ components:
         favoriteMistake:
           type: ["string", "null"]
           description: Most common miss reason on losses inside the window (excludes "na")
-      required: [rank, userId, userName, avatarColor, wins, losses, pushes, settledCount, profit, totalWagered, roi, inPlayCount, currentStreak, currentStreakType]
+        badges:
+          type: array
+          description: The member's most recently earned badges (up to 3, newest first)
+          items:
+            $ref: "#/components/schemas/BadgeRef"
+      required: [rank, userId, userName, avatarColor, wins, losses, pushes, settledCount, profit, totalWagered, roi, inPlayCount, currentStreak, currentStreakType, badges]
+
+    BadgeRef:
+      type: object
+      description: Compact badge reference for showing chips beside a bettor's name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        emoji:
+          type: string
+      required: [id, name, emoji]
+
+    BadgeStatus:
+      type: object
+      description: A badge definition plus whether/when this bettor earned it
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        emoji:
+          type: string
+        earnedAt:
+          type: ["string", "null"]
+          description: ISO timestamp when earned, null when not yet earned
+      required: [id, name, description, emoji, earnedAt]
+
+    StreaksSummary:
+      type: object
+      description: Habit streaks computed from logged plays (UTC calendar days)
+      properties:
+        userId:
+          type: integer
+        loggingStreakDays:
+          type: integer
+          description: Consecutive days with at least one play logged, ending today or yesterday
+        longestLoggingStreakDays:
+          type: integer
+        settleStreakDays:
+          type: integer
+          description: Consecutive days (ending today) with no finished game left ungraded
+        overdueCount:
+          type: integer
+          description: Pending plays whose games are already over, right now
+      required: [userId, loggingStreakDays, longestLoggingStreakDays, settleStreakDays, overdueCount]

@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, inArray, sum } from "drizzle-orm";
-import { db, usersTable, betsTable, parlaysTable, transactionsTable } from "@workspace/db";
+import { db, usersTable, betsTable, parlaysTable, transactionsTable, userBadgesTable } from "@workspace/db";
 import { GetWorkspaceLeaderboardQueryParams } from "@workspace/api-zod";
 import { isValidAmericanOdds } from "../lib/odds";
+import { BADGE_DEFINITIONS } from "../lib/badges";
 import { requireProfile } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -105,6 +106,21 @@ router.get("/workspace/leaderboard", requireProfile, async (req, res): Promise<v
   const allBets = (await db.select().from(betsTable)).filter((b) => isValidAmericanOdds(b.odds));
   const allParlays = (await db.select().from(parlaysTable)).filter((p) => isValidAmericanOdds(p.odds));
 
+  // Badge chips: up to 3 most recently earned per member (persisted awards
+  // only — awarding itself happens on the badge-case endpoint).
+  const defById = new Map(BADGE_DEFINITIONS.map((d) => [d.id, d]));
+  const allBadges = await db.select().from(userBadgesTable);
+  const badgesByUser = new Map<number, { id: string; name: string; emoji: string }[]>();
+  for (const b of [...allBadges].sort((a, z) => z.earnedAt.getTime() - a.earnedAt.getTime())) {
+    const def = defById.get(b.badgeId);
+    if (!def) continue; // a retired badge id — skip rather than crash
+    const list = badgesByUser.get(b.userId) ?? [];
+    if (list.length < 3) {
+      list.push({ id: def.id, name: def.name, emoji: def.emoji });
+      badgesByUser.set(b.userId, list);
+    }
+  }
+
   const SETTLED = ["won", "lost", "push"];
   const inWindow = (settledAt: Date | null) =>
     windowStart == null || (settledAt != null && settledAt >= windowStart);
@@ -186,6 +202,7 @@ router.get("/workspace/leaderboard", requireProfile, async (req, res): Promise<v
       currentStreakType,
       bestSport,
       favoriteMistake,
+      badges: badgesByUser.get(user.id) ?? [],
     };
   });
 

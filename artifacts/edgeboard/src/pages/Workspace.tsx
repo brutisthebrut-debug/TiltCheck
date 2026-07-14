@@ -181,6 +181,13 @@ export default function Workspace() {
                       {e.currentStreakType === "loss" && e.currentStreak >= 2 && (
                         <Snowflake className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                       )}
+                      {e.badges.length > 0 && (
+                        <span className="flex shrink-0 items-center gap-0.5 text-sm leading-none" data-testid={`badges-user-${e.userId}`}>
+                          {e.badges.map((b) => (
+                            <span key={b.id} title={b.name} aria-label={b.name}>{b.emoji}</span>
+                          ))}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{flavorLine(e)}</p>
                   </div>

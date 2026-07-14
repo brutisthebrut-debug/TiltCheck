@@ -6,6 +6,10 @@ import {
   useListBets,
   useListParlays,
   useGetNeedsSettling,
+  useGetStreaks,
+  useGetUserBadges,
+  getGetStreaksQueryKey,
+  getGetUserBadgesQueryKey,
   getGetStatsSummaryQueryKey,
   getGetRecentActivityQueryKey,
   getGetBankrollQueryKey,
@@ -19,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
 import { Link } from "wouter"
-import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers } from "lucide-react"
+import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy } from "lucide-react"
 import { formatDate } from "@/lib/format"
 
 export default function Dashboard() {
@@ -53,6 +57,17 @@ export default function Dashboard() {
   const { data: needsSettling } = useGetNeedsSettling(
     { query: { enabled: !!activeUser?.id, queryKey: getGetNeedsSettlingQueryKey() } }
   );
+
+  const { data: streaks } = useGetStreaks(
+    { userId: activeUser?.id },
+    { query: { enabled: !!activeUser?.id, queryKey: getGetStreaksQueryKey({ userId: activeUser?.id }) } }
+  );
+
+  const { data: badges = [] } = useGetUserBadges(
+    activeUser?.id ?? 0,
+    { query: { enabled: !!activeUser?.id, queryKey: getGetUserBadgesQueryKey(activeUser?.id ?? 0) } }
+  );
+  const earnedBadges = badges.filter(b => b.earnedAt != null);
 
   const isLoading = isUserLoading || isStatsLoading || isActivityLoading || isBankrollLoading;
 
@@ -145,6 +160,40 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1">Welcome back, {activeUser.displayName}. Here's your edge today.</p>
       </div>
+
+      {/* Habit streaks — showing up and grading honestly, gamified */}
+      {streaks && (
+        <div className="grid grid-cols-2 gap-3" data-testid="streak-strip">
+          <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-4 py-3">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${streaks.loggingStreakDays > 0 ? 'bg-orange-500/15' : 'bg-muted'}`}>
+              <Flame className={`h-5 w-5 ${streaks.loggingStreakDays > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-mono text-lg font-bold leading-tight" data-testid="text-logging-streak">
+                {streaks.loggingStreakDays} {streaks.loggingStreakDays === 1 ? 'day' : 'days'}
+              </div>
+              <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
+                Logging streak{streaks.longestLoggingStreakDays > streaks.loggingStreakDays ? ` · best ${streaks.longestLoggingStreakDays}` : ''}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-4 py-3">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${streaks.overdueCount === 0 ? 'bg-primary/15' : 'bg-amber-500/15'}`}>
+              <NotebookPen className={`h-5 w-5 ${streaks.overdueCount === 0 ? 'text-primary' : 'text-amber-500'}`} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-mono text-lg font-bold leading-tight" data-testid="text-settle-streak">
+                {streaks.overdueCount > 0
+                  ? `${streaks.overdueCount} overdue`
+                  : `${streaks.settleStreakDays} ${streaks.settleStreakDays === 1 ? 'day' : 'days'}`}
+              </div>
+              <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
+                {streaks.overdueCount > 0 ? 'Grade them to restart the streak' : 'Everything graded'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Needs settling — overdue pending plays. Hidden when settled up. */}
       {needsSettling && needsSettling.count > 0 && (
@@ -386,6 +435,45 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Badge case — earned bright, the rest as goals to chase */}
+      {badges.length > 0 && (
+        <Card data-testid="card-badge-case">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Badge Case</CardTitle>
+            </div>
+            <CardDescription>
+              {earnedBadges.length} of {badges.length} earned — all from plays you already log.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {badges.map((b) => (
+                <div
+                  key={b.id}
+                  data-testid={`badge-${b.id}`}
+                  title={b.description}
+                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 ${
+                    b.earnedAt
+                      ? 'border-primary/30 bg-primary/5'
+                      : 'border-border/50 bg-background/40 opacity-45 grayscale'
+                  }`}
+                >
+                  <span className="text-xl leading-none">{b.emoji}</span>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold">{b.name}</div>
+                    <div className="truncate text-[10px] text-muted-foreground">
+                      {b.earnedAt ? formatDate(b.earnedAt) : 'Locked'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <InviteCard />
     </div>

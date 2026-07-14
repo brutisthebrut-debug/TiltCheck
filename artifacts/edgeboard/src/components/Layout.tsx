@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { Button } from "./ui/button"
+import { BadgeWatcher } from "./BadgeWatcher"
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
@@ -194,6 +195,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           )
         })}
       </nav>
+
+      {/* Pops the reveal for newly earned badges anywhere in the app */}
+      <BadgeWatcher />
     </div>
   )
 }

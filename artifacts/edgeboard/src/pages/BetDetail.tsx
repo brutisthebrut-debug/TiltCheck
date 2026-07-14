@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter"
-import { useGetBet, useSettleBet, useUpdateBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey } from "@workspace/api-client-react"
+import { useGetBet, useSettleBet, useUpdateBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -113,6 +113,8 @@ export default function BetDetail() {
         if (activeUser) {
           queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
           queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
+          queryClient.invalidateQueries({ queryKey: getGetUserBadgesQueryKey(activeUser.id) })
+          queryClient.invalidateQueries({ queryKey: getGetStreaksQueryKey({ userId: activeUser.id }) })
         }
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
         queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
