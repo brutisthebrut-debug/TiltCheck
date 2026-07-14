@@ -206,6 +206,20 @@ describe("signed in without a linked profile", () => {
     }
   });
 
+  it("lets anyone claim when no seat limit is configured (default unlimited)", async () => {
+    delete process.env.BETA_SEAT_LIMIT;
+    try {
+      await createLinkedUser();
+      await createLinkedUser(); // several linked accounts already exist
+      currentClerkUserId = uniqueClerkId();
+      const res = await request(app).post("/api/users/claim").send({ displayName: "Walk Right In" });
+      expect(res.status).toBe(200);
+      createdUserIds.push(res.body.id);
+    } finally {
+      process.env.BETA_SEAT_LIMIT = "0";
+    }
+  });
+
   it("rejects new claims with 403 beta_full when all seats are taken", async () => {
     await createLinkedUser(); // ensure at least one linked account exists
     process.env.BETA_SEAT_LIMIT = "1";

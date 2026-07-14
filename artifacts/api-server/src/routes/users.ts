@@ -15,12 +15,13 @@ const router: IRouter = Router();
 
 const AVATAR_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
 
-// Seats in the private beta = accounts linked to a sign-in. Raise (or set to
-// 0 for unlimited) via the BETA_SEAT_LIMIT env var when opening the beta up.
+// Seats = accounts linked to a sign-in. Unlimited by default — anyone with the
+// link can join the crew. The owner can still set a ceiling via the
+// BETA_SEAT_LIMIT env var (any positive number); 0/unset means no cap.
 // Read at request time so config changes apply without a rebuild.
 type Dbish = Pick<typeof db, "select">;
 async function betaIsFull(dbx: Dbish = db): Promise<boolean> {
-  const limit = Number(process.env.BETA_SEAT_LIMIT ?? 5);
+  const limit = Number(process.env.BETA_SEAT_LIMIT ?? 0);
   if (!Number.isFinite(limit) || limit <= 0) return false;
   const [{ linked }] = await dbx
     .select({ linked: count() })

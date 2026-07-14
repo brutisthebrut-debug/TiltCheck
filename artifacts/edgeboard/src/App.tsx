@@ -206,8 +206,8 @@ function ClerkProviderWithRoutes() {
         },
         signUp: {
           start: {
-            title: 'Claim your seat',
-            subtitle: 'Private beta — decision tracking for sharps',
+            title: 'Get on the board',
+            subtitle: 'Your crew\u2019s private book — decision tracking for sharps',
           },
         },
       }}

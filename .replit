@@ -25,4 +25,3 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.production]
-BETA_SEAT_LIMIT = "5"

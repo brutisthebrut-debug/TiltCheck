@@ -61,7 +61,7 @@ export default function ClaimProfile() {
   const onError = (e: unknown) => {
     const status = (e as { status?: number })?.status
     if (status === 403) {
-      setError("The beta is full right now — all seats are taken. Ping the pilot to open more.")
+      setError("The board's at capacity right now. Ask whoever runs it to open more seats.")
     } else if (status === 409) {
       setError("That profile was just claimed. Pick another or start fresh.")
       queryClient.invalidateQueries({ queryKey: getListUnclaimedUsersQueryKey() })

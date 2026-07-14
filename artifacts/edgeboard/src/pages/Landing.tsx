@@ -151,7 +151,7 @@ export default function Landing() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
-            Private beta &mdash; five seats
+            Your crew&apos;s private book
           </div>
 
           <h1 className="max-w-3xl text-4xl md:text-6xl font-bold leading-tight tracking-tight">
@@ -168,7 +168,7 @@ export default function Landing() {
 
           <Button asChild size="lg" className="mt-10 gap-2 text-base px-8" data-testid="button-hero-cta">
             <Link href="/sign-in">
-              Grab a seat
+              Get on the board
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
@@ -216,7 +216,7 @@ export default function Landing() {
         {/* Final CTA */}
         <section className="flex flex-col items-center px-6 py-16 text-center">
           <h2 className="max-w-xl text-2xl md:text-3xl font-bold leading-snug tracking-tight">
-            Five seats. Your crew, one board, every excuse on the record.
+            Your crew, one board, every excuse on the record.
           </h2>
           <Button asChild size="lg" className="mt-8 gap-2 text-base px-8" data-testid="button-footer-cta">
             <Link href="/sign-in">

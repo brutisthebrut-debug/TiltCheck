@@ -14,6 +14,7 @@ import {
   getGetNeedsSettlingQueryKey,
 } from "@workspace/api-client-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { InviteCard } from "@/components/InviteCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
@@ -133,6 +134,7 @@ export default function Dashboard() {
             </Link>
           </CardContent>
         </Card>
+        <InviteCard />
       </div>
     );
   }
@@ -384,6 +386,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <InviteCard />
     </div>
   )
 }

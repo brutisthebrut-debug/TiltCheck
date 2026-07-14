@@ -32,14 +32,14 @@ Private-beta sports bet tracker for a small crew: log the reasoning behind every
 ## Architecture decisions
 
 - Transactions ledger is append-only: `balanceAfter` is a point-in-time snapshot, never rewritten. Deleting a settled bet/parlay appends a compensating `adjustment` row, so `balanceAfter[n] = balanceAfter[n-1] + amount[n]` holds for rows ordered by `(createdAt, id)`, and summing `amount` always agrees with the latest `balanceAfter`. Balance-over-time displays can use `balanceAfter` row by row. (Documented on the `transactions` schema.)
-- Beta seat cap: `POST /users/claim` counts linked profiles under a Postgres advisory lock; the cap is read at request time from `BETA_SEAT_LIMIT` (default 5, `0` = unlimited), so raising it needs no rebuild — just update the env var and (in production) re-publish is NOT required beyond the env change taking effect on next instance start.
+- Seat cap: `POST /users/claim` counts linked profiles under a Postgres advisory lock; the cap is read at request time from `BETA_SEAT_LIMIT` (default `0` = unlimited since V2 opened the board to everyone with the link). Set any positive number to reinstate a ceiling — no rebuild needed.
 - CSV exports (`/api/export/*.csv`) treat header column order as a contract — append new columns, never reorder.
 
 ## Production configuration
 
 - Published at `https://betting-insights-danielleemarlin.replit.app` (autoscale, public).
 - Auth: Replit-managed Clerk. Dev uses `pk_test`/`sk_test` keys (dev-key console warnings in the workspace are expected); Replit swaps to live `pk_live`/`sk_live` keys automatically on publish — never hand-edit the Clerk secrets.
-- `BETA_SEAT_LIMIT=5` is set in the **production** environment (deliberate for V1). To open the beta up, raise it or set `0` for unlimited.
+- `BETA_SEAT_LIMIT` is **unset** everywhere (V2: unlimited seats — anyone with the link can join). Set a positive number in the production environment to reinstate a cap.
 - Production DB schema is migrated by the Publish flow (dev→prod diff); never write manual prod migrations.
 
 ## Product
@@ -48,7 +48,7 @@ Private-beta sports bet tracker for a small crew: log the reasoning behind every
 - Bankroll ledger (deposits/withdrawals/adjustments) with running balance
 - Stats: ROI, record, confidence-vs-results, leak detection; shared workspace board across the crew
 - Needs-settling nudges on the dashboard; CSV export of bets, parlays (one row per leg), and bankroll
-- Private beta: 5 seats, claim-a-profile flow on first sign-in
+- Private crew space: unlimited seats, claim-a-profile flow on first sign-in, invite-link card on the dashboard
 
 ## User preferences
 
