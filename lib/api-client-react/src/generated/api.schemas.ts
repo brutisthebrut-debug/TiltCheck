@@ -342,6 +342,15 @@ export interface ParlayInput {
   promoNote?: string;
 }
 
+export interface ParlayLegUpdate {
+  /**
+     * Corrected American odds (e.g. -110, +150). Magnitude must be at least 100 — values between -99 and +99 are not valid American odds.
+     * @minimum -100000
+     * @maximum 100000
+     */
+  odds: number;
+}
+
 export interface ParlayUpdate {
   name?: string;
   /**

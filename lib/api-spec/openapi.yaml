@@ -340,6 +340,40 @@ paths:
         "204":
           description: Deleted
 
+  /parlays/{id}/legs/{legId}:
+    patch:
+      operationId: updateParlayLeg
+      tags: [parlays]
+      summary: Correct a pending parlay leg's odds and recompute the parlay's combined odds and payout
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: legId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParlayLegUpdate"
+      responses:
+        "200":
+          description: Parlay with the corrected leg and recomputed combined odds/payout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parlay"
+        "404":
+          description: Parlay or leg not found
+        "409":
+          description: Parlay is already settled — its payout is part of the bankroll ledger and legs cannot be edited
+
   /parlays/{id}/settle:
     patch:
       operationId: settleParlay
@@ -878,6 +912,16 @@ components:
           type: string
           pattern: '^\d{4}-\d{2}-\d{2}$'
       required: [sport, event, betType, pick, odds, gameDate]
+
+    ParlayLegUpdate:
+      type: object
+      properties:
+        odds:
+          type: integer
+          minimum: -100000
+          maximum: 100000
+          description: Corrected American odds (e.g. -110, +150). Magnitude must be at least 100 — values between -99 and +99 are not valid American odds.
+      required: [odds]
 
     ParlayUpdate:
       type: object

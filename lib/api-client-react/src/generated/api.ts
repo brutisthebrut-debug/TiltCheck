@@ -42,6 +42,7 @@ import type {
   MemberComparison,
   Parlay,
   ParlayInput,
+  ParlayLegUpdate,
   ParlaySettlement,
   ParlayUpdate,
   SportStats,
@@ -1278,6 +1279,80 @@ export const useDeleteParlay = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteParlayMutationOptions(options));
+    }
+
+export const getUpdateParlayLegUrl = (id: number,
+    legId: number,) => {
+
+
+
+
+  return `/api/parlays/${id}/legs/${legId}`
+}
+
+/**
+ * @summary Correct a pending parlay leg's odds and recompute the parlay's combined odds and payout
+ */
+export const updateParlayLeg = async (id: number,
+    legId: number,
+    parlayLegUpdate: ParlayLegUpdate, options?: RequestInit): Promise<Parlay> => {
+
+  return customFetch<Parlay>(getUpdateParlayLegUrl(id,legId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(parlayLegUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateParlayLegMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateParlayLeg>>, TError,{id: number;legId: number;data: BodyType<ParlayLegUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateParlayLeg>>, TError,{id: number;legId: number;data: BodyType<ParlayLegUpdate>}, TContext> => {
+
+const mutationKey = ['updateParlayLeg'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateParlayLeg>>, {id: number;legId: number;data: BodyType<ParlayLegUpdate>}> = (props) => {
+          const {id,legId,data} = props ?? {};
+
+          return  updateParlayLeg(id,legId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateParlayLegMutationResult = NonNullable<Awaited<ReturnType<typeof updateParlayLeg>>>
+    export type UpdateParlayLegMutationBody = BodyType<ParlayLegUpdate>
+    export type UpdateParlayLegMutationError = ErrorType<void>
+
+    /**
+ * @summary Correct a pending parlay leg's odds and recompute the parlay's combined odds and payout
+ */
+export const useUpdateParlayLeg = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateParlayLeg>>, TError,{id: number;legId: number;data: BodyType<ParlayLegUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateParlayLeg>>,
+        TError,
+        {id: number;legId: number;data: BodyType<ParlayLegUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateParlayLegMutationOptions(options));
     }
 
 export const getSettleParlayUrl = (id: number,) => {

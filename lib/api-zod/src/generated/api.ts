@@ -550,6 +550,57 @@ export const DeleteParlayResponse = zod.void()
 
 
 /**
+ * @summary Correct a pending parlay leg's odds and recompute the parlay's combined odds and payout
+ */
+export const UpdateParlayLegParams = zod.object({
+  "id": zod.coerce.number(),
+  "legId": zod.coerce.number()
+})
+
+export const updateParlayLegBodyOddsMin = -100000;
+export const updateParlayLegBodyOddsMax = 100000;
+
+
+
+export const UpdateParlayLegBody = zod.object({
+  "odds": zod.number().min(updateParlayLegBodyOddsMin).max(updateParlayLegBodyOddsMax).describe('Corrected American odds (e.g. -110, +150). Magnitude must be at least 100 — values between -99 and +99 are not valid American odds.')
+})
+
+export const UpdateParlayLegResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().optional(),
+  "name": zod.string(),
+  "stake": zod.number(),
+  "odds": zod.number().describe('Combined American odds'),
+  "potentialPayout": zod.number(),
+  "actualPayout": zod.number().nullish(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void']),
+  "legs": zod.array(zod.object({
+  "id": zod.number(),
+  "parlayId": zod.number(),
+  "sport": zod.string(),
+  "event": zod.string(),
+  "betType": zod.enum(['moneyline', 'spread', 'total', 'prop']),
+  "pick": zod.string(),
+  "odds": zod.number(),
+  "gameDate": zod.string(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void'])
+})),
+  "confidenceScore": zod.number().describe('1-10 confidence rating'),
+  "rationale": zod.string().nullish(),
+  "postGameReview": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
+})
+
+
+/**
  * @summary Settle a parlay result and add review
  */
 export const SettleParlayParams = zod.object({

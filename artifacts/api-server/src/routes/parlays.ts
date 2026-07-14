@@ -15,6 +15,8 @@ import {
   DeleteParlayParams,
   SettleParlayParams,
   SettleParlayBody,
+  UpdateParlayLegParams,
+  UpdateParlayLegBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -238,6 +240,105 @@ router.patch("/parlays/:id", requireProfile, async (req, res): Promise<void> => 
     res.status(404).json({ error: "Parlay not found" });
     return;
   }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
+  res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
+});
+
+// PATCH /parlays/:id/legs/:legId — correct a pending parlay leg's odds.
+//
+// Rows saved before the dead-zone guard existed can carry impossible American
+// odds (abs(odds) < 100). Only the owner knows the real price, so this lets
+// them fix a single leg without rebuilding the whole parlay. The parlay's
+// combined odds and potential payout are recomputed from ALL legs (math
+// mirrors POST /parlays and scripts/src/audit-dead-zone-odds.ts).
+//
+// Settled parlays are intentionally rejected with 409: their actual payout is
+// already part of the bankroll ledger, so rewriting leg odds after settlement
+// would desync the recorded payout from the money that moved.
+router.patch("/parlays/:id/legs/:legId", requireProfile, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const rawLegId = Array.isArray(req.params.legId) ? req.params.legId[0] : req.params.legId;
+  const params = UpdateParlayLegParams.safeParse({
+    id: parseInt(rawId, 10),
+    legId: parseInt(rawLegId, 10),
+  });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const parsed = UpdateParlayLegBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const newOdds = parsed.data.odds;
+  if (!isValidAmericanOdds(newOdds)) {
+    res.status(400).json({ error: `${INVALID_ODDS_MESSAGE} (got ${newOdds})` });
+    return;
+  }
+
+  const [parlay] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
+  if (!parlay) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  if (parlay.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only edit your own parlays" });
+    return;
+  }
+  if (parlay.status !== "pending" || parlay.settledAt != null) {
+    res.status(409).json({
+      error:
+        "This parlay is already settled, so its legs can't be edited — the recorded payout is part of the bankroll ledger.",
+    });
+    return;
+  }
+
+  const legs = await db
+    .select()
+    .from(parlayLegsTable)
+    .where(eq(parlayLegsTable.parlayId, params.data.id));
+  const targetLeg = legs.find((l) => l.id === params.data.legId);
+  if (!targetLeg) {
+    res.status(404).json({ error: "Leg not found on this parlay" });
+    return;
+  }
+
+  // Recompute combined odds and payout from all legs with the corrected price.
+  const legOddsArr = legs.map((l) => (l.id === targetLeg.id ? newOdds : l.odds));
+  const combinedOdds = combineParlayOdds(legOddsArr);
+  const combinedDecimal = legOddsArr.reduce((acc, o) => acc * americanToDecimal(o), 1);
+  const payout = calcParlayPayout(combinedDecimal, Number(parlay.stake));
+
+  // Same storage bounds as POST /parlays (int4 odds, numeric(12,2) payout).
+  const INT4_MAX = 2147483647;
+  const MAX_PAYOUT = 9_999_999_999.99;
+  if (!Number.isFinite(combinedOdds) || Math.abs(combinedOdds) > INT4_MAX || payout > MAX_PAYOUT) {
+    res.status(400).json({
+      error:
+        "With these odds the combined parlay odds become too large to store. Double-check the corrected price.",
+    });
+    return;
+  }
+
+  // Update the leg and the parlay's derived numbers atomically so a crash
+  // can't leave the combined odds out of sync with the legs.
+  const updated = await db.transaction(async (tx) => {
+    await tx
+      .update(parlayLegsTable)
+      .set({ odds: newOdds })
+      .where(and(eq(parlayLegsTable.id, targetLeg.id), eq(parlayLegsTable.parlayId, params.data.id)));
+    const [updatedParlay] = await tx
+      .update(parlaysTable)
+      .set({
+        odds: combinedOdds,
+        potentialPayout: String(payout.toFixed(2)),
+      })
+      .where(eq(parlaysTable.id, params.data.id))
+      .returning();
+    return updatedParlay;
+  });
+
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
   res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
 });

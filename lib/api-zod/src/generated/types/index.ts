@@ -48,6 +48,7 @@ export * from './parlayLegBetType';
 export * from './parlayLegInput';
 export * from './parlayLegInputBetType';
 export * from './parlayLegStatus';
+export * from './parlayLegUpdate';
 export * from './parlaySettlement';
 export * from './parlaySettlementMissReason';
 export * from './parlaySettlementReasoningQuality';

@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter"
-import { useGetParlay, useSettleParlay, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey } from "@workspace/api-client-react"
+import { useGetParlay, useSettleParlay, useUpdateParlayLeg, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -41,7 +41,43 @@ export default function ParlayDetail() {
   })
   
   const settleParlay = useSettleParlay()
+  const updateParlayLeg = useUpdateParlayLeg()
   const [legResults, setLegResults] = useState<Record<number, 'won' | 'lost' | 'push' | 'void'>>({})
+
+  // Leg odds re-entry (dead-zone repair) state
+  const [fixLegId, setFixLegId] = useState<number | null>(null)
+  const [newOdds, setNewOdds] = useState('')
+  const [fixError, setFixError] = useState<string | null>(null)
+
+  const openFixDialog = (legId: number) => {
+    setFixError(null)
+    setNewOdds('')
+    setFixLegId(legId)
+  }
+
+  const handleFixLegOdds = () => {
+    if (fixLegId == null) return
+    const parsed = Number(newOdds)
+    if (!Number.isInteger(parsed) || isDeadZoneOdds(parsed)) {
+      setFixError('Enter valid American odds: -100 or lower, or +100 or higher.')
+      return
+    }
+    setFixError(null)
+    updateParlayLeg.mutate({ id: parlayId, legId: fixLegId, data: { odds: parsed } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetParlayQueryKey(parlayId) })
+        queryClient.invalidateQueries({ queryKey: getListParlaysQueryKey() })
+        if (activeUser) {
+          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
+        }
+        setFixLegId(null)
+        setNewOdds('')
+      },
+      onError: (err: any) => {
+        setFixError(err?.message ?? 'Could not update the odds. Please try again.')
+      },
+    })
+  }
 
   // Modal state
   const [pendingStatus, setPendingStatus] = useState<SettleStatus | null>(null)
@@ -145,7 +181,11 @@ export default function ParlayDetail() {
             </p>
             <p className="mt-2 text-xs">
               {isOwner
-                ? 'Only you know the real prices. Re-entering leg odds in-app isn\'t available yet — re-create the parlay with the correct odds, or ask an admin to repair it.'
+                ? isPending
+                  ? deadZoneLegs.length > 0
+                    ? 'Only you know the real prices. Click "Re-enter odds" on a flagged leg below to correct it — the combined odds and payout recalculate automatically.'
+                    : 'Only you know the real prices. The legs look valid, so ask an admin to recompute the combined odds from them.'
+                  : 'This parlay is already settled, so its recorded payout is part of your bankroll history and the odds can no longer be edited.'
                 : `Only ${parlay.userName} knows the real prices, so only they can correct this parlay.`}
             </p>
           </AlertDescription>
@@ -177,13 +217,24 @@ export default function ParlayDetail() {
                         <Badge variant="outline" className="text-xs">{leg.sport}</Badge>
                         <Badge variant="outline" className="text-xs">{leg.betType}</Badge>
                         {isDeadZoneOdds(leg.odds) && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] border-amber-500/40 bg-amber-500/10 text-amber-500 gap-1"
-                            title="These odds aren't a real American price — they need to be re-entered."
-                          >
-                            <AlertTriangle className="h-3 w-3" /> Re-enter odds
-                          </Badge>
+                          isOwner && isPending ? (
+                            <button
+                              type="button"
+                              onClick={() => openFixDialog(leg.id)}
+                              title="These odds aren't a real American price — click to re-enter them."
+                              className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-500 transition-colors hover:bg-amber-500/25 hover:border-amber-500/70"
+                            >
+                              <AlertTriangle className="h-3 w-3" /> Re-enter odds
+                            </button>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] border-amber-500/40 bg-amber-500/10 text-amber-500 gap-1"
+                              title="These odds aren't a real American price — they need to be re-entered."
+                            >
+                              <AlertTriangle className="h-3 w-3" /> Re-enter odds
+                            </Badge>
+                          )
                         )}
                       </div>
                       <Badge variant={leg.status as any} className="text-xs shrink-0">{leg.status.toUpperCase()}</Badge>
@@ -362,6 +413,44 @@ export default function ParlayDetail() {
           )}
         </div>
       </div>
+
+      {/* Leg odds re-entry (dead-zone repair) modal */}
+      <Dialog open={fixLegId !== null} onOpenChange={(open) => { if (!open) setFixLegId(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Re-enter the real odds</DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const leg = parlay.legs.find(l => l.id === fixLegId)
+                return leg
+                  ? <>Leg: <span className="font-medium text-foreground">{leg.pick}</span> — {leg.event}. The stored odds ({formatOdds(leg.odds)}) aren't a real American price. Enter the correct odds; the parlay's combined odds and potential payout will recalculate from all legs.</>
+                  : 'Enter the correct American odds for this leg.'
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="fix-leg-odds">Correct American odds</Label>
+            <Input
+              id="fix-leg-odds"
+              type="number"
+              step="1"
+              placeholder="e.g. -110 or +150"
+              value={newOdds}
+              onChange={e => setNewOdds(e.target.value)}
+              className="bg-background"
+              autoFocus
+            />
+            {fixError && <p className="text-xs text-destructive">{fixError}</p>}
+            <p className="text-xs text-muted-foreground">American odds are -100 or lower, or +100 or higher.</p>
+          </div>
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setFixLegId(null)} className="sm:w-auto w-full">Cancel</Button>
+            <Button onClick={handleFixLegOdds} disabled={updateParlayLeg.isPending || newOdds.trim() === ''} className="sm:w-auto w-full">
+              {updateParlayLeg.isPending ? 'Saving...' : 'Save corrected odds'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Post-result review modal */}
       <Dialog open={pendingStatus !== null} onOpenChange={(open) => { if (!open) resetModal() }}>
