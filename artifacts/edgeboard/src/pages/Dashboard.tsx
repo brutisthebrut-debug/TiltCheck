@@ -19,6 +19,7 @@ import {
 } from "@workspace/api-client-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InviteCard } from "@/components/InviteCard"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
@@ -30,17 +31,17 @@ import { isRecapUnseen } from "@/lib/recapTeaser"
 export default function Dashboard() {
   const { activeUser, isLoading: isUserLoading } = useUser();
 
-  const { data: stats, isLoading: isStatsLoading } = useGetStatsSummary(
+  const { data: stats, isLoading: isStatsLoading, isError: isStatsError, refetch: refetchStats, isRefetching: isStatsRefetching } = useGetStatsSummary(
     { userId: activeUser?.id }, 
     { query: { enabled: !!activeUser?.id, queryKey: getGetStatsSummaryQueryKey({ userId: activeUser?.id }) } }
   );
 
-  const { data: activity = [], isLoading: isActivityLoading } = useGetRecentActivity(
+  const { data: activity = [], isLoading: isActivityLoading, isError: isActivityError, refetch: refetchActivity, isRefetching: isActivityRefetching } = useGetRecentActivity(
     { limit: 5 },
     { query: { enabled: !!activeUser?.id, queryKey: getGetRecentActivityQueryKey({ limit: 5 }) } }
   );
 
-  const { data: bankroll, isLoading: isBankrollLoading } = useGetBankroll(
+  const { data: bankroll, isLoading: isBankrollLoading, isError: isBankrollError, refetch: refetchBankroll, isRefetching: isBankrollRefetching } = useGetBankroll(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetBankrollQueryKey({ userId: activeUser?.id }) } }
   );
@@ -71,6 +72,13 @@ export default function Dashboard() {
   const earnedBadges = badges.filter(b => b.earnedAt != null);
 
   const isLoading = isUserLoading || isStatsLoading || isActivityLoading || isBankrollLoading;
+  const isError = isStatsError || isActivityError || isBankrollError;
+  const isRetrying = isStatsRefetching || isActivityRefetching || isBankrollRefetching;
+  const retry = () => {
+    if (isStatsError) refetchStats();
+    if (isActivityError) refetchActivity();
+    if (isBankrollError) refetchBankroll();
+  };
 
   const today = new Date().toISOString().split('T')[0];
   const allPending = [
@@ -89,6 +97,21 @@ export default function Dashboard() {
 
   // Weekly recap teaser — shows once per week until the recap is opened
   const recapUnseen = !!activeUser && isRecapUnseen(activeUser.id);
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <QueryErrorCard
+          title="The dashboard didn't load."
+          message="Not a bad beat — just a connection problem. Your numbers are safe."
+          onRetry={retry}
+          isRetrying={isRetrying}
+          testId="card-dashboard-error"
+        />
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

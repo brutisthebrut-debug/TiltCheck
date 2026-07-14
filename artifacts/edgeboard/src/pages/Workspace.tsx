@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
 import { Trophy, Flame, Snowflake, Swords, Users, Crown, X } from "lucide-react"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 
 type Period = "week" | "month" | "all"
 
@@ -65,7 +66,7 @@ export default function Workspace() {
   const [period, setPeriod] = useState<Period>("all")
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
-  const { data: board = [], isLoading } = useGetWorkspaceLeaderboard(
+  const { data: board = [], isLoading, isError, refetch, isRefetching } = useGetWorkspaceLeaderboard(
     { period },
     { query: { queryKey: getGetWorkspaceLeaderboardQueryKey({ period }) } },
   )
@@ -80,6 +81,21 @@ export default function Workspace() {
   const me = comparisons.find((c) => c.userId === activeUser?.id)
   const them = comparisons.find((c) => c.userId === selectedId)
   const selectedEntry = board.find((e) => e.userId === selectedId)
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
+        <QueryErrorCard
+          title="The leaderboard didn't load."
+          message="Not a bad beat — just a connection problem. Everyone's rank is safe, for better or worse."
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+          testId="card-leaderboard-error"
+        />
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

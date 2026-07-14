@@ -16,6 +16,7 @@ import { Plus, Layers } from "lucide-react"
 import { ListFilterBar } from "@/components/ListFilterBar"
 import { ExportCsvButton } from "@/components/ExportCsvButton"
 import { useUrlFilters, hasActiveFilters } from "@/hooks/use-url-filters"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 
 const PAGE_SIZE = 25
 
@@ -38,6 +39,9 @@ export default function Parlays() {
   const {
     data,
     isLoading,
+    isError,
+    refetch,
+    isRefetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -79,7 +83,15 @@ export default function Parlays() {
         searchPlaceholder="Search name, event, or pick…"
       />
 
-      {!isLoading && parlays.length === 0 && !filtersActive ? (
+      {isError ? (
+        <QueryErrorCard
+          title="Your parlays didn't load."
+          message="Not a bad beat — just a connection problem. Every leg is still on the record."
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+          testId="card-parlays-error"
+        />
+      ) : !isLoading && parlays.length === 0 && !filtersActive ? (
         <Card className="border-dashed border-2 border-muted">
           <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
             <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">

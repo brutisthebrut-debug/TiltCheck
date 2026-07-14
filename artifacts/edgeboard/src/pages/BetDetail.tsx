@@ -18,6 +18,7 @@ import { isDeadZoneOdds } from "@/lib/odds"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 
 type SettleStatus = 'won' | 'lost' | 'push' | 'void'
 
@@ -39,7 +40,7 @@ export default function BetDetail() {
   const { activeUser } = useUser()
   const queryClient = useQueryClient()
   
-  const { data: bet, isLoading } = useGetBet(betId, { 
+  const { data: bet, isLoading, isError, refetch, isRefetching } = useGetBet(betId, { 
     query: { enabled: !!betId, queryKey: getGetBetQueryKey(betId) } 
   })
   
@@ -128,6 +129,26 @@ export default function BetDetail() {
         resetModal()
       }
     })
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/bets")} className="rounded-full">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold tracking-tight">Bet Detail</h1>
+        </div>
+        <QueryErrorCard
+          title="This bet didn't load."
+          message="Not a bad beat — just a connection problem. The play is still on the record."
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+          testId="card-bet-detail-error"
+        />
+      </div>
+    )
   }
 
   if (isLoading) {

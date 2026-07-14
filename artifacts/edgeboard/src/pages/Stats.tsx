@@ -3,6 +3,7 @@ import { useGetStatsSummary, useGetStatsBySport, useGetConfidenceAnalysis, useGe
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
@@ -21,17 +22,17 @@ const MISS_REASON_LABELS: Record<string, string> = {
 export default function Stats() {
   const { activeUser } = useUser()
 
-  const { data: summary, isLoading: isSummaryLoading } = useGetStatsSummary(
+  const { data: summary, isLoading: isSummaryLoading, isError: isSummaryError, refetch: refetchSummary, isRefetching: isSummaryRefetching } = useGetStatsSummary(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetStatsSummaryQueryKey({ userId: activeUser?.id }) } }
   )
 
-  const { data: sportStats = [], isLoading: isSportLoading } = useGetStatsBySport(
+  const { data: sportStats = [], isLoading: isSportLoading, isError: isSportError, refetch: refetchSport, isRefetching: isSportRefetching } = useGetStatsBySport(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetStatsBySportQueryKey({ userId: activeUser?.id }) } }
   )
 
-  const { data: confidenceData = [], isLoading: isConfidenceLoading } = useGetConfidenceAnalysis(
+  const { data: confidenceData = [], isLoading: isConfidenceLoading, isError: isConfidenceError, refetch: refetchConfidence, isRefetching: isConfidenceRefetching } = useGetConfidenceAnalysis(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetConfidenceAnalysisQueryKey({ userId: activeUser?.id }) } }
   )
@@ -42,6 +43,28 @@ export default function Stats() {
   )
 
   const isLoading = isSummaryLoading || isSportLoading || isConfidenceLoading
+  const isError = isSummaryError || isSportError || isConfidenceError
+  const isRetrying = isSummaryRefetching || isSportRefetching || isConfidenceRefetching
+  const retry = () => {
+    if (isSummaryError) refetchSummary()
+    if (isSportError) refetchSport()
+    if (isConfidenceError) refetchConfidence()
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+        <QueryErrorCard
+          title="Your analytics didn't load."
+          message="Not a bad beat — just a connection problem. The numbers haven't gone anywhere."
+          onRetry={retry}
+          isRetrying={isRetrying}
+          testId="card-stats-error"
+        />
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

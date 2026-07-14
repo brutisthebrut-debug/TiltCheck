@@ -18,6 +18,7 @@ import { isDeadZoneOdds } from "@/lib/odds"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 import type { LegResult } from "@workspace/api-client-react"
 
 type SettleStatus = 'won' | 'lost' | 'push' | 'void'
@@ -40,7 +41,7 @@ export default function ParlayDetail() {
   const { activeUser } = useUser()
   const queryClient = useQueryClient()
   
-  const { data: parlay, isLoading } = useGetParlay(parlayId, { 
+  const { data: parlay, isLoading, isError, refetch, isRefetching } = useGetParlay(parlayId, { 
     query: { enabled: !!parlayId, queryKey: getGetParlayQueryKey(parlayId) } 
   })
   
@@ -146,6 +147,26 @@ export default function ParlayDetail() {
 
   const handleLegResult = (legId: number, status: 'won' | 'lost' | 'push' | 'void') => {
     setLegResults(prev => ({ ...prev, [legId]: status }))
+  }
+
+  if (isError) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/parlays")} className="rounded-full">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold tracking-tight">Parlay Detail</h1>
+        </div>
+        <QueryErrorCard
+          title="This parlay didn't load."
+          message="Not a bad beat — just a connection problem. Every leg is still on the record."
+          onRetry={() => refetch()}
+          isRetrying={isRefetching}
+          testId="card-parlay-detail-error"
+        />
+      </div>
+    )
   }
 
   if (isLoading) {

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Wallet, ArrowUpRight, ArrowDownRight, Activity, Pencil } from "lucide-react"
 import { ExportCsvButton } from "@/components/ExportCsvButton"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 
 export default function Bankroll() {
   const { activeUser, refreshUser } = useUser()
@@ -23,12 +24,12 @@ export default function Bankroll() {
   const [note, setNote] = useState("")
   const [newStartingBankroll, setNewStartingBankroll] = useState("")
 
-  const { data: bankroll, isLoading: isBankrollLoading } = useGetBankroll(
+  const { data: bankroll, isLoading: isBankrollLoading, isError: isBankrollError, refetch: refetchBankroll, isRefetching: isBankrollRefetching } = useGetBankroll(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetBankrollQueryKey({ userId: activeUser?.id }) } }
   )
 
-  const { data: transactions = [], isLoading: isTxLoading } = useListTransactions(
+  const { data: transactions = [], isLoading: isTxLoading, isError: isTxError, refetch: refetchTx, isRefetching: isTxRefetching } = useListTransactions(
     { userId: activeUser?.id, limit: 20 },
     { query: { enabled: !!activeUser?.id, queryKey: getListTransactionsQueryKey({ userId: activeUser?.id, limit: 20 }) } }
   )
@@ -76,6 +77,27 @@ export default function Bankroll() {
   }
 
   const isLoading = isBankrollLoading || isTxLoading
+  const isError = isBankrollError || isTxError
+  const isRetrying = isBankrollRefetching || isTxRefetching
+  const retry = () => {
+    if (isBankrollError) refetchBankroll()
+    if (isTxError) refetchTx()
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">Bankroll</h1>
+        <QueryErrorCard
+          title="Your bankroll didn't load."
+          message="Not a bad beat — just a connection problem. Your money is exactly where you left it."
+          onRetry={retry}
+          isRetrying={isRetrying}
+          testId="card-bankroll-error"
+        />
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
