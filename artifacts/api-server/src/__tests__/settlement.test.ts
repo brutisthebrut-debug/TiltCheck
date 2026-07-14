@@ -330,6 +330,8 @@ describe("PATCH /api/parlays/:id/settle", () => {
     const bankroll = await getBankroll(user.id);
     expect(bankroll.currentBalance).toBeCloseTo(1150, 2);
     expect(bankroll.netProfitLoss).toBeCloseTo(150, 2);
+    // Parlay-only user: 150 profit / 50 wagered
+    expect(bankroll.roi).toBeCloseTo(300, 2);
   });
 
   it("won with actualPayoutOverride: uses the override", async () => {
@@ -368,6 +370,8 @@ describe("PATCH /api/parlays/:id/settle", () => {
     const bankroll = await getBankroll(user.id);
     expect(bankroll.currentBalance).toBeCloseTo(950, 2);
     expect(bankroll.netProfitLoss).toBeCloseTo(-50, 2);
+    // Parlay-only user: -50 / 50 wagered
+    expect(bankroll.roi).toBeCloseTo(-100, 2);
   });
 
   it("push: stake returned, bankroll unchanged", async () => {
@@ -383,6 +387,8 @@ describe("PATCH /api/parlays/:id/settle", () => {
     const bankroll = await getBankroll(user.id);
     expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
     expect(bankroll.netProfitLoss).toBeCloseTo(0, 2);
+    // Pushed parlay still counts as wagered; 0 profit / 50 wagered
+    expect(bankroll.roi).toBeCloseTo(0, 2);
   });
 
   it("void: stake returned, bankroll unchanged", async () => {
@@ -398,6 +404,22 @@ describe("PATCH /api/parlays/:id/settle", () => {
     const bankroll = await getBankroll(user.id);
     expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
     expect(bankroll.netProfitLoss).toBeCloseTo(0, 2);
+    // Void parlays are excluded from total wagered
+    expect(bankroll.roi).toBeCloseTo(0, 2);
+  });
+
+  it("mixed straight bet + parlay: ROI divides by both stakes", async () => {
+    const user = await createUser(1000);
+    const bet = await createBet(user.id, { odds: 100, stake: 100 }); // +100 on win
+    const parlay = await createParlay(user.id, 50); // -50 on loss
+
+    await request(app).patch(`/api/bets/${bet.id}/settle`).send({ status: "won" });
+    await request(app).patch(`/api/parlays/${parlay.id}/settle`).send({ status: "lost" });
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.netProfitLoss).toBeCloseTo(50, 2);
+    // 50 profit / (100 + 50) wagered
+    expect(bankroll.roi).toBeCloseTo(33.33, 2);
   });
 
   it("rejects an invalid status with 400 and writes nothing", async () => {

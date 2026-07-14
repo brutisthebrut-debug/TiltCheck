@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, sum, and, inArray } from "drizzle-orm";
-import { db, transactionsTable, usersTable, betsTable } from "@workspace/db";
+import { db, transactionsTable, usersTable, betsTable, parlaysTable } from "@workspace/db";
 import {
   GetBankrollQueryParams,
   ListTransactionsQueryParams,
@@ -53,11 +53,17 @@ async function getUserBankroll(userId: number) {
 }
 
 async function getTotalWagered(userId: number): Promise<number> {
-  const rows = await db
+  const betRows = await db
     .select({ total: sum(betsTable.stake) })
     .from(betsTable)
     .where(and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"])));
-  return Number(rows[0]?.total ?? 0);
+  const parlayRows = await db
+    .select({ total: sum(parlaysTable.stake) })
+    .from(parlaysTable)
+    .where(
+      and(eq(parlaysTable.userId, userId), inArray(parlaysTable.status, ["won", "lost", "push"])),
+    );
+  return Number(betRows[0]?.total ?? 0) + Number(parlayRows[0]?.total ?? 0);
 }
 
 // GET /bankroll
