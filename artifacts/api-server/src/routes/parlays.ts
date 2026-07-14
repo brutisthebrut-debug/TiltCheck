@@ -230,6 +230,10 @@ router.patch("/parlays/:id/settle", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Parlay not found" });
     return;
   }
+  if (existing.status !== "pending" || existing.settledAt != null) {
+    res.status(409).json({ error: `Parlay is already settled (status: ${existing.status})` });
+    return;
+  }
 
   let actualPayout: number;
   if (status === "won") {

@@ -213,6 +213,10 @@ router.patch("/bets/:id/settle", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Bet not found" });
     return;
   }
+  if (existing.status !== "pending" || existing.settledAt != null) {
+    res.status(409).json({ error: `Bet is already settled (status: ${existing.status})` });
+    return;
+  }
 
   // Calculate actual payout:
   // - won: use override if provided, else potentialPayout

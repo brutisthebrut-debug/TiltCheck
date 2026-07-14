@@ -251,6 +251,60 @@ describe("PATCH /api/bets/:id/settle", () => {
       .send({ status: "won" });
     expect(res.status).toBe(404);
   });
+
+  it("rejects a repeat settle with 409 and leaves the bankroll unchanged", async () => {
+    const user = await createUser(1000);
+    const bet = await createBet(user.id, { odds: 150, stake: 100 }); // +150 on win
+
+    const first = await request(app)
+      .patch(`/api/bets/${bet.id}/settle`)
+      .send({ status: "won" });
+    expect(first.status).toBe(200);
+
+    const bankrollAfterFirst = await getBankroll(user.id);
+    expect(bankrollAfterFirst.currentBalance).toBeCloseTo(1150, 2);
+
+    // Retry (double-click / timeout retry) must not write a second transaction
+    const second = await request(app)
+      .patch(`/api/bets/${bet.id}/settle`)
+      .send({ status: "won" });
+    expect(second.status).toBe(409);
+
+    // Even settling with a different status must be rejected
+    const flipped = await request(app)
+      .patch(`/api/bets/${bet.id}/settle`)
+      .send({ status: "lost" });
+    expect(flipped.status).toBe(409);
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1150, 2);
+    expect(bankroll.netProfitLoss).toBeCloseTo(150, 2);
+
+    const txs = await db
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, user.id));
+    expect(txs.length).toBe(1);
+  });
+
+  it("rejects a repeat settle of a lost bet with 409, bankroll unchanged", async () => {
+    const user = await createUser(1000);
+    const bet = await createBet(user.id, { odds: -110, stake: 110 });
+
+    const first = await request(app)
+      .patch(`/api/bets/${bet.id}/settle`)
+      .send({ status: "lost" });
+    expect(first.status).toBe(200);
+
+    const second = await request(app)
+      .patch(`/api/bets/${bet.id}/settle`)
+      .send({ status: "lost" });
+    expect(second.status).toBe(409);
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(890, 2);
+    expect(bankroll.netProfitLoss).toBeCloseTo(-110, 2);
+  });
 });
 
 describe("PATCH /api/parlays/:id/settle", () => {
@@ -364,6 +418,62 @@ describe("PATCH /api/parlays/:id/settle", () => {
       .patch(`/api/parlays/99999999/settle`)
       .send({ status: "lost" });
     expect(res.status).toBe(404);
+  });
+
+  it("rejects a repeat settle with 409 and leaves the bankroll unchanged", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50); // payout 200 on win
+
+    const first = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        legResults: parlay.legs.map((l) => ({ legId: l.id, status: "won" })),
+      });
+    expect(first.status).toBe(200);
+
+    const bankrollAfterFirst = await getBankroll(user.id);
+    expect(bankrollAfterFirst.currentBalance).toBeCloseTo(1150, 2);
+
+    const second = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({ status: "won" });
+    expect(second.status).toBe(409);
+
+    // Even settling with a different status must be rejected
+    const flipped = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({ status: "lost" });
+    expect(flipped.status).toBe(409);
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1150, 2);
+    expect(bankroll.netProfitLoss).toBeCloseTo(150, 2);
+
+    const txs = await db
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, user.id));
+    expect(txs.length).toBe(1);
+  });
+
+  it("rejects a repeat settle of a lost parlay with 409, bankroll unchanged", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const first = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({ status: "lost" });
+    expect(first.status).toBe(200);
+
+    const second = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({ status: "lost" });
+    expect(second.status).toBe(409);
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(950, 2);
+    expect(bankroll.netProfitLoss).toBeCloseTo(-50, 2);
   });
 });
 
