@@ -24,6 +24,7 @@ import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
+import { dayOf } from "@workspace/weeks"
 
 const formSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
@@ -67,7 +68,7 @@ export default function NewBet() {
       pick: "",
       odds: -110,
       stake: 100,
-      gameDate: new Date().toISOString().split('T')[0],
+      gameDate: dayOf(new Date()),
       confidenceScore: 5,
       rationale: "",
       sportsbook: lastBookIsCustom ? "Other" : (lastBook ?? ""),

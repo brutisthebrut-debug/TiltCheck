@@ -27,6 +27,7 @@ import { Link } from "wouter"
 import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy, Newspaper, ArrowRight } from "lucide-react"
 import { formatDate } from "@/lib/format"
 import { isRecapUnseen } from "@/lib/recapTeaser"
+import { dayOf } from "@workspace/weeks"
 
 export default function Dashboard() {
   const { activeUser, isLoading: isUserLoading } = useUser();
@@ -80,7 +81,7 @@ export default function Dashboard() {
     if (isBankrollError) refetchBankroll();
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = dayOf(new Date());
   const allPending = [
     ...pendingBets.map(b => ({ ...b, _type: 'bet' as const })),
     ...pendingParlays.map(p => ({ ...p, _type: 'parlay' as const, pick: p.name, event: p.legs?.[0]?.event ?? p.name })),

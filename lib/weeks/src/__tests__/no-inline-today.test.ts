@@ -5,23 +5,56 @@ import { fileURLToPath } from "node:url";
 
 /**
  * Guard: all "today as YYYY-MM-DD" math must go through `dayOf` from
- * `@workspace/weeks`. An inline `new Date().toISOString().slice(0, 10)`
- * copy would silently drift if the shared timezone rules ever change,
- * so this test greps the workspace source and fails on any new copy.
+ * `@workspace/weeks`. Any inline copy — `toISOString().slice(0, 10)`,
+ * `toISOString().split("T")[0]`, a date library's
+ * `format(new Date(), "yyyy-MM-dd")`, or the `en-CA`/`sv-SE` locale trick —
+ * would silently drift if the shared timezone rules ever change, so this
+ * test greps the workspace source and fails on any new copy.
  */
 
 // lib/weeks/src/__tests__ -> repo root is four levels up.
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 
-// Only these locations may contain the pattern:
-//  - lib/weeks/src: the shared helper itself (`dayOf`)
+// Only these locations may contain the patterns:
+//  - lib/weeks/src: the shared helper itself (`dayOf`) and this guard's
+//    own regression fixtures below
 //  - artifacts/api-server/src/lib/dates.ts: intentional round-trip
 //    validation of a submitted date string, not a "today" calculation
 const ALLOWED = [join("lib", "weeks", "src"), join("artifacts", "api-server", "src", "lib", "dates.ts")];
 
-// Catches `.slice(0, 10)` / `.substring(0, 10)` chained onto toISOString(),
-// with or without whitespace.
-const INLINE_TODAY = /toISOString\s*\(\s*\)\s*\.\s*(?:slice|substring|substr)\s*\(\s*0\s*,\s*10\s*\)/;
+// Each entry is one idiom that yields a date-only string and therefore a
+// second, driftable definition of "today" when used outside @workspace/weeks.
+const INLINE_TODAY_PATTERNS: ReadonlyArray<{ name: string; regex: RegExp }> = [
+  {
+    // .toISOString().slice(0, 10) / .substring(0, 10) / .substr(0, 10)
+    name: "toISOString().slice(0, 10)",
+    regex: /toISOString\s*\(\s*\)\s*\.\s*(?:slice|substring|substr)\s*\(\s*0\s*,\s*10\s*\)/,
+  },
+  {
+    // .toISOString().split("T")[0] — any quote style
+    name: 'toISOString().split("T")[0]',
+    regex: /toISOString\s*\(\s*\)\s*\.\s*split\s*\(\s*["'`]T["'`]\s*\)\s*\[\s*0\s*\]/,
+  },
+  {
+    // date-fns style: format(new Date(), "yyyy-MM-dd")
+    // Only a no-argument `new Date()` (i.e. "now") counts — formatting an
+    // existing date value for display is fine.
+    name: 'format(new Date(), "yyyy-MM-dd")',
+    regex: /\bformat\s*\(\s*new\s+Date\s*\(\s*\)\s*,\s*["'`](?:yyyy-MM-dd|YYYY-MM-DD)["'`]/,
+  },
+  {
+    // dayjs()/moment() with a date-only format token
+    name: 'dayjs()/moment().format("YYYY-MM-DD")',
+    regex: /\b(?:dayjs|moment)\s*\(\s*\)\s*\.\s*format\s*\(\s*["'`](?:YYYY-MM-DD|yyyy-MM-dd)["'`]/,
+  },
+  {
+    // Locale trick: en-CA and sv-SE default date formats are YYYY-MM-DD, so
+    // `new Date().toLocaleDateString("en-CA")` or
+    // `new Intl.DateTimeFormat("sv-SE").format(...)` are hidden `dayOf` copies.
+    name: 'toLocaleDateString/Intl.DateTimeFormat with "en-CA"/"sv-SE"',
+    regex: /(?:toLocaleDateString|Intl\s*\.\s*DateTimeFormat)\s*\(\s*["'`](?:en-CA|sv-SE)["'`]/,
+  },
+];
 
 const SOURCE_DIRS = ["lib", "artifacts", "scripts"];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".git"]);
@@ -49,32 +82,78 @@ function isAllowed(relPath: string): boolean {
 }
 
 describe("no inline 'today' date math outside @workspace/weeks", () => {
-  it("finds no toISOString().slice(0, 10) copies outside the allowed files", () => {
+  it("finds no date-only 'today' formatting outside the allowed files", () => {
     const offenders: string[] = [];
     for (const sourceDir of SOURCE_DIRS) {
       for (const file of walk(join(REPO_ROOT, sourceDir))) {
         const relPath = relative(REPO_ROOT, file);
         if (isAllowed(relPath)) continue;
         const content = readFileSync(file, "utf8");
-        if (INLINE_TODAY.test(content)) offenders.push(relPath);
+        for (const { name, regex } of INLINE_TODAY_PATTERNS) {
+          if (regex.test(content)) offenders.push(`${relPath} (${name})`);
+        }
       }
     }
     expect(
       offenders,
       `Inline "today" date math found in: ${offenders.join(", ")}. ` +
-        `Use dayOf() from @workspace/weeks instead of toISOString().slice(0, 10) ` +
-        `so all "today" calculations share one timezone rule.`,
+        `Use dayOf() from @workspace/weeks instead of formatting new Date() ` +
+        `to YYYY-MM-DD inline, so all "today" calculations share one timezone rule.`,
     ).toEqual([]);
   });
 
   it("still sees the shared helper and the allowed round-trip validation (sanity check)", () => {
     // If these files stop containing the pattern, the allowlist is stale and
     // should be cleaned up — and the guard above is proven to actually match.
+    const isoSlice = INLINE_TODAY_PATTERNS[0].regex;
     for (const allowedFile of [
       join(REPO_ROOT, "lib", "weeks", "src", "index.ts"),
       join(REPO_ROOT, "artifacts", "api-server", "src", "lib", "dates.ts"),
     ]) {
-      expect(INLINE_TODAY.test(readFileSync(allowedFile, "utf8")), allowedFile).toBe(true);
+      expect(isoSlice.test(readFileSync(allowedFile, "utf8")), allowedFile).toBe(true);
+    }
+  });
+
+  // Regression fixtures: each pattern must catch the idiom it targets and
+  // must NOT flag legitimate display formatting of an existing date value.
+  const shouldMatch: Array<[string, string]> = [
+    ["toISOString().slice(0, 10)", "const t = new Date().toISOString().slice(0, 10);"],
+    ["toISOString().slice(0, 10)", "const t = now.toISOString().substring(0, 10);"],
+    ['toISOString().split("T")[0]', "const t = new Date().toISOString().split('T')[0];"],
+    ['toISOString().split("T")[0]', 'const t = new Date().toISOString().split("T")[0];'],
+    ['format(new Date(), "yyyy-MM-dd")', "const t = format(new Date(), 'yyyy-MM-dd');"],
+    ['dayjs()/moment().format("YYYY-MM-DD")', "const t = dayjs().format('YYYY-MM-DD');"],
+    ['dayjs()/moment().format("YYYY-MM-DD")', "const t = moment().format('YYYY-MM-DD');"],
+    [
+      'toLocaleDateString/Intl.DateTimeFormat with "en-CA"/"sv-SE"',
+      "const t = new Date().toLocaleDateString('en-CA');",
+    ],
+    [
+      'toLocaleDateString/Intl.DateTimeFormat with "en-CA"/"sv-SE"',
+      "const t = new Intl.DateTimeFormat('sv-SE').format(new Date());",
+    ],
+  ];
+
+  const shouldNotMatch: string[] = [
+    // Display formatting of an existing date value, not a "today" calculation:
+    "return format(new Date(dateString), 'MMM d, yyyy');",
+    "return format(new Date(dateString), 'MMM d, h:mm a');",
+    // Locale display formatting that doesn't produce YYYY-MM-DD:
+    "d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });",
+    // Full ISO timestamp kept intact:
+    "const ts = new Date().toISOString();",
+    // Splitting something other than the ISO timestamp:
+    "const parts = header.split('T')[0];",
+  ];
+
+  it.each(shouldMatch)("pattern %s catches: %s", (name, snippet) => {
+    const pattern = INLINE_TODAY_PATTERNS.find((p) => p.name === name)!;
+    expect(pattern.regex.test(snippet)).toBe(true);
+  });
+
+  it.each(shouldNotMatch)("no pattern falsely flags: %s", (snippet) => {
+    for (const { name, regex } of INLINE_TODAY_PATTERNS) {
+      expect(regex.test(snippet), `${name} should not match: ${snippet}`).toBe(false);
     }
   });
 });

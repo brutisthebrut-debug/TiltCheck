@@ -30,6 +30,7 @@ import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
+import { dayOf } from "@workspace/weeks"
 
 const legSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
@@ -75,7 +76,7 @@ export default function NewParlay() {
     betType: "moneyline" as const,
     pick: "",
     odds: -110,
-    gameDate: new Date().toISOString().split('T')[0],
+    gameDate: dayOf(new Date()),
   }
 
   const form = useForm<z.infer<typeof formSchema>>({
