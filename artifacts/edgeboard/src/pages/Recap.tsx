@@ -4,7 +4,7 @@ import { useGetWeeklyRecap, getGetWeeklyRecapQueryKey } from "@workspace/api-cli
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
-import { ChevronLeft, ChevronRight, Trophy, Skull, Droplets, Users, Sparkles, Crown, Rocket, CloudRain } from "lucide-react"
+import { ChevronLeft, ChevronRight, Trophy, Skull, Droplets, Users, Sparkles, Crown, Rocket, CloudRain, WifiOff, RotateCw } from "lucide-react"
 
 const MISS_REASON_PHRASES: Record<string, string> = {
   bad_read: "bad reads",
@@ -46,7 +46,7 @@ export default function Recap() {
     if (activeUser?.id) localStorage.setItem(RECAP_SEEN_KEY(activeUser.id), latest)
   }, [activeUser?.id, latest])
 
-  const { data: recap, isLoading } = useGetWeeklyRecap(
+  const { data: recap, isLoading, isError, refetch, isRefetching } = useGetWeeklyRecap(
     { userId: activeUser?.id, weekStart },
     { query: { enabled: !!activeUser?.id, queryKey: getGetWeeklyRecapQueryKey({ userId: activeUser?.id, weekStart }) } }
   )
@@ -91,7 +91,28 @@ export default function Recap() {
         </div>
       </div>
 
-      {isLoading || !recap ? (
+      {isError ? (
+        <Card className="border-dashed border-2 border-muted" data-testid="card-recap-error">
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+            <WifiOff className="h-8 w-8 text-muted-foreground" />
+            <div>
+              <h2 className="text-lg font-semibold">The recap didn't load.</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Not a bad beat — just a connection problem. Try again, or flip to another week.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              data-testid="button-recap-retry"
+              disabled={isRefetching}
+              onClick={() => refetch()}
+            >
+              <RotateCw className={`h-4 w-4 mr-2 ${isRefetching ? "animate-spin" : ""}`} />
+              {isRefetching ? "Retrying…" : "Retry"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : isLoading || !recap ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse bg-muted/50 h-32" />)}
         </div>
