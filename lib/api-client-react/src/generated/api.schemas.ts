@@ -16,6 +16,11 @@ export interface User {
   avatarColor: string;
   startingBankroll: number;
   createdAt: string;
+  /**
+     * Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never
+     * @nullable
+     */
+  recapSeenWeek?: string | null;
 }
 
 /**

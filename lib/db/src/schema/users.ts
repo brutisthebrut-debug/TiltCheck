@@ -10,6 +10,8 @@ export const usersTable = pgTable("users", {
   displayName: text("display_name").notNull(),
   avatarColor: text("avatar_color").notNull().default("#6366f1"),
   startingBankroll: numeric("starting_bankroll", { precision: 12, scale: 2 }).notNull().default("1000"),
+  // Monday (YYYY-MM-DD, UTC) of the last recap week this user opened; null = never
+  recapSeenWeek: text("recap_seen_week"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

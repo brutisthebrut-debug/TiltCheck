@@ -243,6 +243,78 @@ export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUs
 
 
 
+export const getMarkRecapSeenUrl = () => {
+
+
+
+
+  return `/api/users/me/recap-seen`
+}
+
+/**
+ * Stores the Monday of the most recently completed week (computed server-side, UTC) as the user's seen recap week, so the dashboard teaser stays hidden on every device once the recap is opened.
+ * @summary Record that the signed-in user has seen the current week's recap
+ */
+export const markRecapSeen = async ( options?: RequestInit): Promise<User> => {
+
+  return customFetch<User>(getMarkRecapSeenUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkRecapSeenMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markRecapSeen>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markRecapSeen>>, TError,void, TContext> => {
+
+const mutationKey = ['markRecapSeen'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markRecapSeen>>, void> = () => {
+
+
+          return  markRecapSeen(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkRecapSeenMutationResult = NonNullable<Awaited<ReturnType<typeof markRecapSeen>>>
+
+    export type MarkRecapSeenMutationError = ErrorType<void>
+
+    /**
+ * @summary Record that the signed-in user has seen the current week's recap
+ */
+export const useMarkRecapSeen = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markRecapSeen>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markRecapSeen>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMarkRecapSeenMutationOptions(options));
+    }
+
 export const getListUnclaimedUsersUrl = () => {
 
 

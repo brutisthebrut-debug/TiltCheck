@@ -1,6 +1,8 @@
 // ── Weekly recap teaser gating ───────────────────────────────────────────────
 // Week math (UTC, Monday-start) — mirrors the server's recap.ts.
 // The dashboard teaser shows once per week until the recap is opened.
+// The seen week lives server-side (users.recapSeenWeek), so the teaser stays
+// hidden across devices once the recap is opened anywhere.
 
 export function addDays(day: string, delta: number): string {
   const d = new Date(`${day}T00:00:00Z`)
@@ -18,24 +20,12 @@ export function latestRecapWeekStart(today: string = new Date().toISOString().sl
   return addDays(mondayOf(today), -7)
 }
 
-export const RECAP_SEEN_KEY = (userId: number) => `edgeboard-recap-seen-${userId}`
-
-type SeenStore = Pick<Storage, "getItem" | "setItem">
-
-/** True when this user hasn't opened the current week's recap yet. */
-export function isRecapUnseen(
-  userId: number,
-  today?: string,
-  store: SeenStore = localStorage,
-): boolean {
-  return store.getItem(RECAP_SEEN_KEY(userId)) !== latestRecapWeekStart(today)
-}
-
-/** Opening any recap counts as having seen this week's — kills the teaser. */
-export function markRecapSeen(
-  userId: number,
-  today?: string,
-  store: SeenStore = localStorage,
-): void {
-  store.setItem(RECAP_SEEN_KEY(userId), latestRecapWeekStart(today))
+/**
+ * True when this user hasn't opened the current week's recap yet.
+ * `seenWeek` is the server-stored week (users.recapSeenWeek); null/undefined
+ * (never opened, or the flag couldn't be fetched) counts as unseen, so the
+ * teaser falls back to showing.
+ */
+export function isRecapUnseen(seenWeek: string | null | undefined, today?: string): boolean {
+  return seenWeek !== latestRecapWeekStart(today)
 }

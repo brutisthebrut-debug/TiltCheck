@@ -55,6 +55,27 @@ paths:
         "404":
           description: Signed in but no bettor profile linked yet
 
+  /users/me/recap-seen:
+    post:
+      operationId: markRecapSeen
+      tags: [users]
+      summary: Record that the signed-in user has seen the current week's recap
+      description: >
+        Stores the Monday of the most recently completed week (computed
+        server-side, UTC) as the user's seen recap week, so the dashboard
+        teaser stays hidden on every device once the recap is opened.
+      responses:
+        "200":
+          description: Updated user with the seen week recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not signed in
+        "404":
+          description: Signed in but no bettor profile linked yet
+
   /users/unclaimed:
     get:
       operationId: listUnclaimedUsers
@@ -895,6 +916,9 @@ components:
           type: number
         createdAt:
           type: string
+        recapSeenWeek:
+          type: ["string", "null"]
+          description: Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never
       required: [id, username, displayName, avatarColor, startingBankroll, createdAt]
 
     ClaimProfileInput:

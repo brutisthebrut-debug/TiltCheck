@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useUser } from "@/contexts/UserContext"
-import { useGetWeeklyRecap, getGetWeeklyRecapQueryKey } from "@workspace/api-client-react"
+import { useGetWeeklyRecap, getGetWeeklyRecapQueryKey, useMarkRecapSeen, getGetCurrentUserQueryKey } from "@workspace/api-client-react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
 import { ChevronLeft, ChevronRight, Trophy, Skull, Droplets, Users, Sparkles, Crown, Rocket, CloudRain, WifiOff, RotateCw } from "lucide-react"
-import { addDays, latestRecapWeekStart, markRecapSeen } from "@/lib/recapTeaser"
+import { addDays, latestRecapWeekStart, isRecapUnseen } from "@/lib/recapTeaser"
 
 const MISS_REASON_PHRASES: Record<string, string> = {
   bad_read: "bad reads",
@@ -27,9 +28,23 @@ export default function Recap() {
   const [weekStart, setWeekStart] = useState(latest)
 
   // Reading any recap counts as having seen this week's — kills the teaser.
+  // Recorded server-side so it holds on every device. Best-effort: if the
+  // write fails, the teaser just shows again.
+  const queryClient = useQueryClient()
+  const markSeen = useMarkRecapSeen({
+    mutation: {
+      onSuccess: (updatedUser) => {
+        queryClient.setQueryData(getGetCurrentUserQueryKey(), updatedUser)
+      },
+    },
+  })
+  const markedRef = useRef(false)
   useEffect(() => {
-    if (activeUser?.id) markRecapSeen(activeUser.id)
-  }, [activeUser?.id, latest])
+    if (!activeUser?.id || markedRef.current) return
+    if (!isRecapUnseen(activeUser.recapSeenWeek)) return
+    markedRef.current = true
+    markSeen.mutate()
+  }, [activeUser?.id, activeUser?.recapSeenWeek, markSeen])
 
   const { data: recap, isLoading, isError, refetch, isRefetching } = useGetWeeklyRecap(
     { userId: activeUser?.id, weekStart },

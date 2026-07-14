@@ -1,20 +1,5 @@
 import { describe, it, expect } from "vitest"
-import {
-  addDays,
-  mondayOf,
-  latestRecapWeekStart,
-  RECAP_SEEN_KEY,
-  isRecapUnseen,
-  markRecapSeen,
-} from "../recapTeaser"
-
-function fakeStore(): Pick<Storage, "getItem" | "setItem"> {
-  const map = new Map<string, string>()
-  return {
-    getItem: (k: string) => map.get(k) ?? null,
-    setItem: (k: string, v: string) => void map.set(k, v),
-  }
-}
+import { addDays, mondayOf, latestRecapWeekStart, isRecapUnseen } from "../recapTeaser"
 
 describe("week math (mirrors the server)", () => {
   it("snaps any date to its Monday (UTC)", () => {
@@ -30,37 +15,31 @@ describe("week math (mirrors the server)", () => {
   })
 })
 
-describe("dashboard teaser lifecycle", () => {
-  const USER = 1
-
-  it("shows for a new week, hides once the recap is opened, reappears the following week", () => {
-    const store = fakeStore()
+describe("dashboard teaser lifecycle (server-stored seen week)", () => {
+  it("shows for a new week, hides once seen, reappears the following week", () => {
     const week1 = "2026-07-14" // Tuesday — recap week is 2026-07-06
 
-    // New week, never opened → teaser shows
-    expect(isRecapUnseen(USER, week1, store)).toBe(true)
+    // Never opened → teaser shows
+    expect(isRecapUnseen(null, week1)).toBe(true)
+    expect(isRecapUnseen(undefined, week1)).toBe(true)
 
-    // Opening the recap marks this week's as seen → teaser hides
-    markRecapSeen(USER, week1, store)
-    expect(isRecapUnseen(USER, week1, store)).toBe(false)
+    // Server recorded this week's recap as seen → teaser hides
+    const seen = latestRecapWeekStart(week1)
+    expect(isRecapUnseen(seen, week1)).toBe(false)
 
     // Still hidden for the rest of that week
-    expect(isRecapUnseen(USER, "2026-07-19", store)).toBe(false) // Sunday, same week
+    expect(isRecapUnseen(seen, "2026-07-19")).toBe(false) // Sunday, same week
 
     // Next Monday a fresh recap week exists → teaser reappears
     const week2 = "2026-07-20"
-    expect(isRecapUnseen(USER, week2, store)).toBe(true)
+    expect(isRecapUnseen(seen, week2)).toBe(true)
 
-    // ...until that one is opened too
-    markRecapSeen(USER, week2, store)
-    expect(isRecapUnseen(USER, week2, store)).toBe(false)
+    // ...until that one is recorded seen too
+    expect(isRecapUnseen(latestRecapWeekStart(week2), week2)).toBe(false)
   })
 
-  it("tracks seen state per user", () => {
-    const store = fakeStore()
-    markRecapSeen(1, "2026-07-14", store)
-    expect(isRecapUnseen(1, "2026-07-14", store)).toBe(false)
-    expect(isRecapUnseen(2, "2026-07-14", store)).toBe(true)
-    expect(RECAP_SEEN_KEY(1)).not.toBe(RECAP_SEEN_KEY(2))
+  it("stale or malformed stored weeks count as unseen (teaser falls back to showing)", () => {
+    expect(isRecapUnseen("2020-01-06", "2026-07-14")).toBe(true)
+    expect(isRecapUnseen("not-a-date", "2026-07-14")).toBe(true)
   })
 })

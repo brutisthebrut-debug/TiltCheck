@@ -25,7 +25,23 @@ export const GetCurrentUserResponse = zod.object({
   "displayName": zod.string(),
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
+})
+
+
+/**
+ * Stores the Monday of the most recently completed week (computed server-side, UTC) as the user's seen recap week, so the dashboard teaser stays hidden on every device once the recap is opened.
+ * @summary Record that the signed-in user has seen the current week's recap
+ */
+export const MarkRecapSeenResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "avatarColor": zod.string(),
+  "startingBankroll": zod.number(),
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
 })
 
 
@@ -38,7 +54,8 @@ export const ListUnclaimedUsersResponseItem = zod.object({
   "displayName": zod.string(),
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
 })
 export const ListUnclaimedUsersResponse = zod.array(ListUnclaimedUsersResponseItem)
 
@@ -60,7 +77,8 @@ export const ClaimProfileResponse = zod.object({
   "displayName": zod.string(),
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
 })
 
 
@@ -73,7 +91,8 @@ export const ListUsersResponseItem = zod.object({
   "displayName": zod.string(),
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
@@ -102,7 +121,8 @@ export const UpdateUserResponse = zod.object({
   "displayName": zod.string(),
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
 })
 
 
@@ -1126,7 +1146,8 @@ export const GetWorkspaceResponse = zod.object({
   "displayName": zod.string(),
   "avatarColor": zod.string(),
   "startingBankroll": zod.number(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never')
 })),
   "totalBets": zod.number(),
   "createdAt": zod.string()

@@ -95,8 +95,9 @@ export default function Dashboard() {
   const totalBets = (stats?.wins ?? 0) + (stats?.losses ?? 0) + (stats?.pushes ?? 0) + (stats?.pending ?? 0);
   const hasData = totalBets > 0;
 
-  // Weekly recap teaser — shows once per week until the recap is opened
-  const recapUnseen = !!activeUser && isRecapUnseen(activeUser.id);
+  // Weekly recap teaser — shows once per week until the recap is opened.
+  // Seen state comes from the server (per user), so it holds across devices.
+  const recapUnseen = !!activeUser && isRecapUnseen(activeUser.recapSeenWeek);
 
   if (isError) {
     return (

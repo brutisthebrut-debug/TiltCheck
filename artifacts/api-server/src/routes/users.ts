@@ -2,7 +2,9 @@ import { Router, type IRouter } from "express";
 import { and, eq, isNull, isNotNull, asc, count, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
 import { db, usersTable } from "@workspace/db";
+import { dayOf, lastCompletedWeekStart } from "../lib/recap";
 import {
+  MarkRecapSeenResponse,
   ClaimProfileBody,
   ClaimProfileResponse,
   GetCurrentUserResponse,
@@ -58,6 +60,27 @@ router.get("/users/me", async (req, res): Promise<void> => {
     return;
   }
   res.json(GetCurrentUserResponse.parse(formatUser(req.currentUser)));
+});
+
+// POST /users/me/recap-seen — record that this user opened the current week's
+// recap. The week is computed server-side (UTC, Monday-start) so clients can't
+// write arbitrary values and every device agrees on which week was seen.
+router.post("/users/me/recap-seen", async (req, res): Promise<void> => {
+  if (!req.currentUser) {
+    res.status(404).json({ error: "No bettor profile linked to this account" });
+    return;
+  }
+  const seenWeek = lastCompletedWeekStart(dayOf(new Date()));
+  const [updated] = await db
+    .update(usersTable)
+    .set({ recapSeenWeek: seenWeek })
+    .where(eq(usersTable.id, req.currentUser.id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json(MarkRecapSeenResponse.parse(formatUser(updated)));
 });
 
 // GET /users/unclaimed — profiles not yet linked to a sign-in account
@@ -242,6 +265,7 @@ function formatUser(u: typeof usersTable.$inferSelect) {
     avatarColor: u.avatarColor,
     startingBankroll: Number(u.startingBankroll),
     createdAt: u.createdAt.toISOString(),
+    recapSeenWeek: u.recapSeenWeek,
   };
 }
 
