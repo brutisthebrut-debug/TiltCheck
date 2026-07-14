@@ -16,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { calculatePotentialPayout, formatCurrency } from "@/lib/format"
+import { getApiErrorMessage } from "@/lib/api-error"
+import { createParlayBodyLegsItemOddsMin, createParlayBodyLegsItemOddsMax } from "@workspace/api-zod"
 import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react"
 
 const SPORTSBOOKS = [
@@ -27,7 +29,11 @@ const legSchema = z.object({
   event: z.string().min(1, "Event is required"),
   betType: z.enum(["moneyline", "spread", "total", "prop"]),
   pick: z.string().min(1, "Pick is required"),
-  odds: z.coerce.number().int("Odds must be an integer"),
+  odds: z.coerce
+    .number()
+    .int("Odds must be a whole number")
+    .min(createParlayBodyLegsItemOddsMin, `Odds must be between ${createParlayBodyLegsItemOddsMin.toLocaleString()} and +${createParlayBodyLegsItemOddsMax.toLocaleString()}`)
+    .max(createParlayBodyLegsItemOddsMax, `Odds must be between ${createParlayBodyLegsItemOddsMin.toLocaleString()} and +${createParlayBodyLegsItemOddsMax.toLocaleString()}`),
   gameDate: z.string().min(1, "Game date is required"),
 })
 
@@ -426,6 +432,11 @@ export default function NewParlay() {
 
           <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <Card className="border-primary bg-card shadow-lg">
+              {createParlay.isError && (
+                <div className="mx-4 mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+                  {getApiErrorMessage(createParlay.error, "Couldn't log this parlay. Please check the form and try again.")}
+                </div>
+              )}
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="grid grid-cols-2 gap-8">
                   <div>

@@ -16,6 +16,8 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { calculatePotentialPayout, formatCurrency } from "@/lib/format"
+import { getApiErrorMessage } from "@/lib/api-error"
+import { createBetBodyOddsMin, createBetBodyOddsMax } from "@workspace/api-zod"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 
 const SPORTSBOOKS = [
@@ -27,7 +29,11 @@ const formSchema = z.object({
   event: z.string().min(1, "Event is required"),
   betType: z.enum(["moneyline", "spread", "total", "prop", "futures"]),
   pick: z.string().min(1, "Pick is required"),
-  odds: z.coerce.number().int("Odds must be an integer"),
+  odds: z.coerce
+    .number()
+    .int("Odds must be a whole number")
+    .min(createBetBodyOddsMin, `Odds must be between ${createBetBodyOddsMin.toLocaleString()} and +${createBetBodyOddsMax.toLocaleString()}`)
+    .max(createBetBodyOddsMax, `Odds must be between ${createBetBodyOddsMin.toLocaleString()} and +${createBetBodyOddsMax.toLocaleString()}`),
   stake: z.coerce.number().positive("Stake must be greater than 0"),
   gameDate: z.string().min(1, "Game date is required"),
   confidenceScore: z.number().min(1).max(10),
@@ -347,7 +353,12 @@ export default function NewBet() {
                 )}
               />
             </CardContent>
-            <CardFooter className="border-t bg-muted/20 px-6 py-4">
+            <CardFooter className="flex flex-col gap-3 border-t bg-muted/20 px-6 py-4">
+              {createBet.isError && (
+                <div className="w-full rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+                  {getApiErrorMessage(createBet.error, "Couldn't log this bet. Please check the form and try again.")}
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={createBet.isPending}>
                 {createBet.isPending ? "Logging..." : "Log Bet"}
               </Button>
