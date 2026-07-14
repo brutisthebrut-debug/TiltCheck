@@ -230,7 +230,49 @@ router.delete("/parlays/:id", requireProfile, async (req, res): Promise<void> =>
     res.status(403).json({ error: "You can only delete your own parlays" });
     return;
   }
-  const [deleted] = await db.delete(parlaysTable).where(eq(parlaysTable.id, params.data.id)).returning();
+  // Delete the parlay (and its legs) and reverse any bankroll impact
+  // atomically so a deleted settled parlay can't leave ghost money in the ledger.
+  const deleted = await db.transaction(async (tx) => {
+    await tx.delete(parlayLegsTable).where(eq(parlayLegsTable.parlayId, params.data.id));
+    const [deletedParlay] = await tx.delete(parlaysTable).where(eq(parlaysTable.id, params.data.id)).returning();
+    if (!deletedParlay) return null;
+
+    // Find ledger entries tied to this parlay and reverse their net impact.
+    const linkedTxs = await tx
+      .select()
+      .from(transactionsTable)
+      .where(
+        and(
+          eq(transactionsTable.referenceId, deletedParlay.id),
+          eq(transactionsTable.referenceType, "parlay"),
+          eq(transactionsTable.userId, deletedParlay.userId)
+        )
+      );
+    const netImpact = linkedTxs.reduce((sum, t) => sum + Number(t.amount), 0);
+
+    if (linkedTxs.length > 0 && netImpact !== 0) {
+      const lastTx = await tx
+        .select()
+        .from(transactionsTable)
+        .where(eq(transactionsTable.userId, deletedParlay.userId))
+        .orderBy(desc(transactionsTable.createdAt))
+        .limit(1);
+      const currentBalance = lastTx.length > 0 ? Number(lastTx[0].balanceAfter) : Number(
+        (await tx.select().from(usersTable).where(eq(usersTable.id, deletedParlay.userId)))[0]?.startingBankroll ?? 0
+      );
+      await tx.insert(transactionsTable).values({
+        userId: deletedParlay.userId,
+        type: "adjustment",
+        amount: String((-netImpact).toFixed(2)),
+        balanceAfter: String((currentBalance - netImpact).toFixed(2)),
+        referenceId: deletedParlay.id,
+        referenceType: "parlay",
+        note: `Reversal: deleted parlay ${deletedParlay.name}`,
+      });
+    }
+
+    return deletedParlay;
+  });
   if (!deleted) {
     res.status(404).json({ error: "Parlay not found" });
     return;
