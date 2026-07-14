@@ -6,6 +6,7 @@ import {
   GetStatsBySportQueryParams,
   GetRecentActivityQueryParams,
   GetConfidenceAnalysisQueryParams,
+  GetStatsInsightsQueryParams,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -247,6 +248,125 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
   });
 
   res.json(result);
+});
+
+// GET /stats/insights
+router.get("/stats/insights", async (req, res): Promise<void> => {
+  const query = GetStatsInsightsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const emptyInsights = {
+    reviewedCount: 0,
+    lossesWithReason: 0,
+    missReasons: [],
+    soundReasoning: { total: 0, wins: 0, winRate: 0 },
+    flawedReasoning: { total: 0, wins: 0, winRate: 0 },
+    recentNotes: [],
+  };
+  let userId = query.data.userId;
+  if (userId == null) {
+    const [u] = await db.select().from(usersTable).orderBy(usersTable.id).limit(1);
+    if (!u) { res.json(emptyInsights); return; }
+    userId = u.id;
+  }
+
+  const bets = await db.select().from(betsTable).where(
+    and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
+  );
+  const parlays = await db.select().from(parlaysTable).where(
+    and(eq(parlaysTable.userId, userId), inArray(parlaysTable.status, ["won", "lost", "push"]))
+  );
+
+  type Reviewable = {
+    id: number;
+    type: "bet" | "parlay";
+    title: string;
+    status: string;
+    reasoningQuality: string | null;
+    missReason: string | null;
+    whatHappened: string | null;
+    settledAt: Date | null;
+  };
+
+  const items: Reviewable[] = [
+    ...bets.map((b) => ({
+      id: b.id,
+      type: "bet" as const,
+      title: `${b.pick} (${b.event})`,
+      status: b.status,
+      reasoningQuality: b.reasoningQuality,
+      missReason: b.missReason,
+      whatHappened: b.whatHappened,
+      settledAt: b.settledAt,
+    })),
+    ...parlays.map((p) => ({
+      id: p.id,
+      type: "parlay" as const,
+      title: `Parlay: ${p.name}`,
+      status: p.status,
+      reasoningQuality: p.reasoningQuality,
+      missReason: p.missReason,
+      whatHappened: p.whatHappened,
+      settledAt: p.settledAt,
+    })),
+  ];
+
+  const hasReview = (i: Reviewable) =>
+    i.reasoningQuality != null ||
+    (i.missReason != null && i.missReason !== "na") ||
+    (i.whatHappened != null && i.whatHappened.trim() !== "");
+
+  const reviewedCount = items.filter(hasReview).length;
+
+  // Miss-reason breakdown across losses (exclude "na" — it carries no signal)
+  const reasonCounts: Record<string, number> = {};
+  let lossesWithReason = 0;
+  for (const i of items) {
+    if (i.status !== "lost") continue;
+    if (i.missReason == null || i.missReason === "na") continue;
+    lossesWithReason++;
+    reasonCounts[i.missReason] = (reasonCounts[i.missReason] ?? 0) + 1;
+  }
+  const missReasons = Object.entries(reasonCounts)
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Sound vs flawed reasoning win rates (pushes excluded from win-rate denominator)
+  const qualityStats = (quality: "sound" | "flawed") => {
+    const group = items.filter((i) => i.reasoningQuality === quality);
+    const decided = group.filter((i) => i.status === "won" || i.status === "lost");
+    const wins = decided.filter((i) => i.status === "won").length;
+    return {
+      total: group.length,
+      wins,
+      winRate: decided.length > 0 ? Math.round((wins / decided.length) * 1000) / 10 : 0,
+    };
+  };
+
+  // 5 most recent "what happened" notes
+  const recentNotes = items
+    .filter((i) => i.whatHappened != null && i.whatHappened.trim() !== "")
+    .sort((a, b) => (b.settledAt?.getTime() ?? 0) - (a.settledAt?.getTime() ?? 0))
+    .slice(0, 5)
+    .map((i) => ({
+      id: i.id,
+      type: i.type,
+      title: i.title,
+      status: i.status as "won" | "lost" | "push" | "void",
+      whatHappened: i.whatHappened as string,
+      settledAt: i.settledAt ? i.settledAt.toISOString() : null,
+    }));
+
+  res.json({
+    reviewedCount,
+    lossesWithReason,
+    missReasons,
+    soundReasoning: qualityStats("sound"),
+    flawedReasoning: qualityStats("flawed"),
+    recentNotes,
+  });
 });
 
 export default router;

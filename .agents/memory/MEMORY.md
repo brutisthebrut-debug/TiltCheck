@@ -1,0 +1,1 @@
+- [OpenAPI codegen source of truth](openapi-codegen-source-of-truth.md) — orval `clean: true` wipes hand edits in generated clients; add fields to openapi.yaml only, then codegen.

@@ -20,4 +20,6 @@ export interface ParlayInput {
   rationale?: string;
   /** @minItems 2 */
   legs: ParlayLegInput[];
+  sportsbook?: string;
+  promoNote?: string;
 }

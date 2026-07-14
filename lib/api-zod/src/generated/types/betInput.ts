@@ -26,4 +26,6 @@ export interface BetInput {
   confidenceScore: number;
   rationale?: string;
   tags?: string[];
+  sportsbook?: string;
+  promoNote?: string;
 }

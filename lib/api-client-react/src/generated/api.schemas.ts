@@ -80,10 +80,15 @@ export interface Bet {
   createdAt: string;
   /** @nullable */
   settledAt?: string | null;
+  /** @nullable */
   sportsbook?: string | null;
+  /** @nullable */
   promoNote?: string | null;
+  /** @nullable */
   reasoningQuality?: string | null;
+  /** @nullable */
   whatHappened?: string | null;
+  /** @nullable */
   missReason?: string | null;
 }
 
@@ -159,13 +164,34 @@ export const BetSettlementStatus = {
   void: 'void',
 } as const;
 
+export type BetSettlementReasoningQuality = typeof BetSettlementReasoningQuality[keyof typeof BetSettlementReasoningQuality];
+
+
+export const BetSettlementReasoningQuality = {
+  sound: 'sound',
+  flawed: 'flawed',
+} as const;
+
+export type BetSettlementMissReason = typeof BetSettlementMissReason[keyof typeof BetSettlementMissReason];
+
+
+export const BetSettlementMissReason = {
+  bad_read: 'bad_read',
+  bad_price: 'bad_price',
+  lineup_injury: 'lineup_injury',
+  emotional: 'emotional',
+  misunderstood_market: 'misunderstood_market',
+  normal_variance: 'normal_variance',
+  na: 'na',
+} as const;
+
 export interface BetSettlement {
   status: BetSettlementStatus;
   postGameReview?: string;
   actualPayoutOverride?: number;
-  reasoningQuality?: 'sound' | 'flawed';
+  reasoningQuality?: BetSettlementReasoningQuality;
   whatHappened?: string;
-  missReason?: 'bad_read' | 'bad_price' | 'lineup_injury' | 'emotional' | 'misunderstood_market' | 'normal_variance' | 'na';
+  missReason?: BetSettlementMissReason;
 }
 
 export type ParlayStatus = typeof ParlayStatus[keyof typeof ParlayStatus];
@@ -234,10 +260,15 @@ export interface Parlay {
   createdAt: string;
   /** @nullable */
   settledAt?: string | null;
+  /** @nullable */
   sportsbook?: string | null;
+  /** @nullable */
   promoNote?: string | null;
+  /** @nullable */
   reasoningQuality?: string | null;
+  /** @nullable */
   whatHappened?: string | null;
+  /** @nullable */
   missReason?: string | null;
 }
 
@@ -301,6 +332,27 @@ export const ParlaySettlementStatus = {
   void: 'void',
 } as const;
 
+export type ParlaySettlementReasoningQuality = typeof ParlaySettlementReasoningQuality[keyof typeof ParlaySettlementReasoningQuality];
+
+
+export const ParlaySettlementReasoningQuality = {
+  sound: 'sound',
+  flawed: 'flawed',
+} as const;
+
+export type ParlaySettlementMissReason = typeof ParlaySettlementMissReason[keyof typeof ParlaySettlementMissReason];
+
+
+export const ParlaySettlementMissReason = {
+  bad_read: 'bad_read',
+  bad_price: 'bad_price',
+  lineup_injury: 'lineup_injury',
+  emotional: 'emotional',
+  misunderstood_market: 'misunderstood_market',
+  normal_variance: 'normal_variance',
+  na: 'na',
+} as const;
+
 export type LegResultStatus = typeof LegResultStatus[keyof typeof LegResultStatus];
 
 
@@ -321,9 +373,9 @@ export interface ParlaySettlement {
   postGameReview?: string;
   legResults?: LegResult[];
   actualPayoutOverride?: number;
-  reasoningQuality?: 'sound' | 'flawed';
+  reasoningQuality?: ParlaySettlementReasoningQuality;
   whatHappened?: string;
-  missReason?: 'bad_read' | 'bad_price' | 'lineup_injury' | 'emotional' | 'misunderstood_market' | 'normal_variance' | 'na';
+  missReason?: ParlaySettlementMissReason;
 }
 
 export interface Bankroll {
@@ -488,6 +540,69 @@ export interface ConfidenceBucket {
   avgOdds: number;
 }
 
+export type MissReasonBreakdownReason = typeof MissReasonBreakdownReason[keyof typeof MissReasonBreakdownReason];
+
+
+export const MissReasonBreakdownReason = {
+  bad_read: 'bad_read',
+  bad_price: 'bad_price',
+  lineup_injury: 'lineup_injury',
+  emotional: 'emotional',
+  misunderstood_market: 'misunderstood_market',
+  normal_variance: 'normal_variance',
+  na: 'na',
+} as const;
+
+export interface MissReasonBreakdown {
+  reason: MissReasonBreakdownReason;
+  count: number;
+}
+
+export interface ReasoningQualityStats {
+  total: number;
+  wins: number;
+  winRate: number;
+}
+
+export type ReviewNoteType = typeof ReviewNoteType[keyof typeof ReviewNoteType];
+
+
+export const ReviewNoteType = {
+  bet: 'bet',
+  parlay: 'parlay',
+} as const;
+
+export type ReviewNoteStatus = typeof ReviewNoteStatus[keyof typeof ReviewNoteStatus];
+
+
+export const ReviewNoteStatus = {
+  won: 'won',
+  lost: 'lost',
+  push: 'push',
+  void: 'void',
+} as const;
+
+export interface ReviewNote {
+  id: number;
+  type: ReviewNoteType;
+  title: string;
+  status: ReviewNoteStatus;
+  whatHappened: string;
+  /** @nullable */
+  settledAt?: string | null;
+}
+
+export interface InsightsResponse {
+  /** Settled bets/parlays that carry any review data */
+  reviewedCount: number;
+  /** Losses that have a miss reason recorded */
+  lossesWithReason: number;
+  missReasons: MissReasonBreakdown[];
+  soundReasoning: ReasoningQualityStats;
+  flawedReasoning: ReasoningQualityStats;
+  recentNotes: ReviewNote[];
+}
+
 export interface Workspace {
   id: number;
   name: string;
@@ -595,6 +710,13 @@ limit?: number;
 };
 
 export type GetConfidenceAnalysisParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+};
+
+export type GetStatsInsightsParams = {
 /**
  * @nullable
  */

@@ -6,10 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LegResult } from './legResult';
+import type { ParlaySettlementMissReason } from './parlaySettlementMissReason';
+import type { ParlaySettlementReasoningQuality } from './parlaySettlementReasoningQuality';
 import type { ParlaySettlementStatus } from './parlaySettlementStatus';
 
 export interface ParlaySettlement {
   status: ParlaySettlementStatus;
   postGameReview?: string;
   legResults?: LegResult[];
+  actualPayoutOverride?: number;
+  reasoningQuality?: ParlaySettlementReasoningQuality;
+  whatHappened?: string;
+  missReason?: ParlaySettlementMissReason;
 }

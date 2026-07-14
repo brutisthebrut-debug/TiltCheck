@@ -31,8 +31,10 @@ import type {
   GetConfidenceAnalysisParams,
   GetRecentActivityParams,
   GetStatsBySportParams,
+  GetStatsInsightsParams,
   GetStatsSummaryParams,
   HealthStatus,
+  InsightsResponse,
   ListBetsParams,
   ListParlaysParams,
   ListTransactionsParams,
@@ -1836,6 +1838,90 @@ export function useGetConfidenceAnalysis<TData = Awaited<ReturnType<typeof getCo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetConfidenceAnalysisQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetStatsInsightsUrl = (params?: GetStatsInsightsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stats/insights?${stringifiedParams}` : `/api/stats/insights`
+}
+
+/**
+ * @summary Post-result review insights (miss reasons, reasoning quality, recent notes)
+ */
+export const getStatsInsights = async (params?: GetStatsInsightsParams, options?: RequestInit): Promise<InsightsResponse> => {
+
+  return customFetch<InsightsResponse>(getGetStatsInsightsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStatsInsightsQueryKey = (params?: GetStatsInsightsParams,) => {
+    return [
+    `/api/stats/insights`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStatsInsightsQueryOptions = <TData = Awaited<ReturnType<typeof getStatsInsights>>, TError = ErrorType<unknown>>(params?: GetStatsInsightsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStatsInsightsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStatsInsights>>> = ({ signal }) => getStatsInsights(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStatsInsights>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStatsInsightsQueryResult = NonNullable<Awaited<ReturnType<typeof getStatsInsights>>>
+export type GetStatsInsightsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Post-result review insights (miss reasons, reasoning quality, recent notes)
+ */
+
+export function useGetStatsInsights<TData = Awaited<ReturnType<typeof getStatsInsights>>, TError = ErrorType<unknown>>(
+ params?: GetStatsInsightsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStatsInsightsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

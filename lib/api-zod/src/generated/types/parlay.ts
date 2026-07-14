@@ -30,4 +30,14 @@ export interface Parlay {
   createdAt: string;
   /** @nullable */
   settledAt?: string | null;
+  /** @nullable */
+  sportsbook?: string | null;
+  /** @nullable */
+  promoNote?: string | null;
+  /** @nullable */
+  reasoningQuality?: string | null;
+  /** @nullable */
+  whatHappened?: string | null;
+  /** @nullable */
+  missReason?: string | null;
 }

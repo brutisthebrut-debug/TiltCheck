@@ -15,5 +15,6 @@ export const TransactionType = {
   bet_win: 'bet_win',
   bet_loss: 'bet_loss',
   bet_push: 'bet_push',
+  bet_void: 'bet_void',
   adjustment: 'adjustment',
 } as const;

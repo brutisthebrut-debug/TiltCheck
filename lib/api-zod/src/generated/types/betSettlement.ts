@@ -5,9 +5,15 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { BetSettlementMissReason } from './betSettlementMissReason';
+import type { BetSettlementReasoningQuality } from './betSettlementReasoningQuality';
 import type { BetSettlementStatus } from './betSettlementStatus';
 
 export interface BetSettlement {
   status: BetSettlementStatus;
   postGameReview?: string;
+  actualPayoutOverride?: number;
+  reasoningQuality?: BetSettlementReasoningQuality;
+  whatHappened?: string;
+  missReason?: BetSettlementMissReason;
 }

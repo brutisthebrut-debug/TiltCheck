@@ -1,11 +1,22 @@
 import { useUser } from "@/contexts/UserContext"
-import { useGetStatsSummary, useGetStatsBySport, useGetConfidenceAnalysis, getGetStatsSummaryQueryKey, getGetStatsBySportQueryKey, getGetConfidenceAnalysisQueryKey } from "@workspace/api-client-react"
+import { useGetStatsSummary, useGetStatsBySport, useGetConfidenceAnalysis, useGetStatsInsights, getGetStatsSummaryQueryKey, getGetStatsBySportQueryKey, getGetConfidenceAnalysisQueryKey, getGetStatsInsightsQueryKey } from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
-import { BarChart2, Plus, Lock } from "lucide-react"
+import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight } from "lucide-react"
+
+const MISS_REASON_LABELS: Record<string, string> = {
+  bad_read: "Bad read",
+  bad_price: "Bad price",
+  lineup_injury: "Lineup / injury news",
+  emotional: "Emotional bet",
+  misunderstood_market: "Misunderstood market",
+  normal_variance: "Normal variance",
+  na: "N/A",
+}
 
 export default function Stats() {
   const { activeUser } = useUser()
@@ -23,6 +34,11 @@ export default function Stats() {
   const { data: confidenceData = [], isLoading: isConfidenceLoading } = useGetConfidenceAnalysis(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetConfidenceAnalysisQueryKey({ userId: activeUser?.id }) } }
+  )
+
+  const { data: insights } = useGetStatsInsights(
+    { userId: activeUser?.id },
+    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey({ userId: activeUser?.id }) } }
   )
 
   const isLoading = isSummaryLoading || isSportLoading || isConfidenceLoading
@@ -245,6 +261,142 @@ export default function Stats() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Post-result insights feed */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold tracking-tight">Lessons</h2>
+        </div>
+        {!insights || insights.reviewedCount < 3 ? (
+          <Card className="border-dashed border-2 border-muted">
+            <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <Lightbulb className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Not enough reviews yet</h3>
+                <p className="text-muted-foreground text-sm mt-1 max-w-md">
+                  Grade at least 3 bets with review details (reasoning quality, miss reason, or notes) to unlock
+                  patterns from your post-game reviews.
+                  {insights ? ` ${insights.reviewedCount} of 3 reviewed so far.` : ""}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card className="bg-card">
+              <CardHeader>
+                <CardTitle className="text-base">Why You Lost</CardTitle>
+                <CardDescription>Miss reasons across {insights.lossesWithReason} graded {insights.lossesWithReason === 1 ? "loss" : "losses"}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {insights.missReasons.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-md">
+                    No miss reasons recorded on losses yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {insights.missReasons.map((r) => (
+                      <div key={r.reason}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="font-medium">{MISS_REASON_LABELS[r.reason] ?? r.reason}</span>
+                          <span className="font-mono text-muted-foreground">{r.count} of {insights.lossesWithReason}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${r.reason === "normal_variance" ? "bg-chart-3" : "bg-destructive/70"}`}
+                            style={{ width: `${Math.round((r.count / Math.max(1, insights.lossesWithReason)) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {insights.missReasons[0] && insights.missReasons[0].reason !== "normal_variance" && insights.missReasons[0].count >= 2 && (
+                      <p className="text-xs text-muted-foreground pt-2 border-t">
+                        {insights.missReasons[0].count} of your {insights.lossesWithReason} losses were marked "{MISS_REASON_LABELS[insights.missReasons[0].reason]?.toLowerCase() ?? insights.missReasons[0].reason}" — worth a closer look.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card">
+              <CardHeader>
+                <CardTitle className="text-base">Process vs. Results</CardTitle>
+                <CardDescription>Win rate by reasoning quality</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {insights.soundReasoning.total === 0 && insights.flawedReasoning.total === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-md">
+                    No reasoning grades recorded yet.
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-md border p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="text-sm font-medium">Sound reasoning</span>
+                      </div>
+                      <div className="text-2xl font-bold font-mono">{insights.soundReasoning.winRate.toFixed(1)}%</div>
+                      <p className="text-xs text-muted-foreground mt-1">{insights.soundReasoning.wins} wins on {insights.soundReasoning.total} graded {insights.soundReasoning.total === 1 ? "bet" : "bets"}</p>
+                    </div>
+                    <div className="rounded-md border p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <XCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-sm font-medium">Flawed reasoning</span>
+                      </div>
+                      <div className="text-2xl font-bold font-mono">{insights.flawedReasoning.winRate.toFixed(1)}%</div>
+                      <p className="text-xs text-muted-foreground mt-1">{insights.flawedReasoning.wins} wins on {insights.flawedReasoning.total} graded {insights.flawedReasoning.total === 1 ? "bet" : "bets"}</p>
+                    </div>
+                    {insights.soundReasoning.total > 0 && insights.flawedReasoning.total > 0 && insights.soundReasoning.winRate > insights.flawedReasoning.winRate && (
+                      <p className="text-xs text-muted-foreground">
+                        Your sound-reasoning bets win {(insights.soundReasoning.winRate - insights.flawedReasoning.winRate).toFixed(0)} points more often — trust the process.
+                      </p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card">
+              <CardHeader>
+                <CardTitle className="text-base">Recent Reviews</CardTitle>
+                <CardDescription>Your latest "what happened" notes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {insights.recentNotes.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-md">
+                    No review notes written yet.
+                  </div>
+                ) : (
+                  <div className="max-h-[320px] overflow-y-auto space-y-3 pr-1">
+                    {insights.recentNotes.map((note) => (
+                      <Link
+                        key={`${note.type}-${note.id}`}
+                        href={note.type === "parlay" ? `/parlays/${note.id}` : `/bets/${note.id}`}
+                        className="block rounded-md border p-3 hover:bg-muted/50 transition-colors group"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-sm font-medium truncate">{note.title}</span>
+                          <Badge variant={note.status === "won" ? "default" : note.status === "lost" ? "destructive" : "secondary"} className="shrink-0 text-[10px] uppercase">
+                            {note.status}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{note.whatHappened}</p>
+                        <div className="flex items-center gap-1 text-xs text-primary mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          View bet <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       <Card className="bg-card">

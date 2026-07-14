@@ -98,7 +98,12 @@ export const ListBetsResponseItem = zod.object({
   "postGameReview": zod.string().nullish().describe('Post-game reflection'),
   "tags": zod.array(zod.string()).optional(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 export const ListBetsResponse = zod.array(ListBetsResponseItem)
 
@@ -148,7 +153,12 @@ export const CreateBetResponse = zod.object({
   "postGameReview": zod.string().nullish().describe('Post-game reflection'),
   "tags": zod.array(zod.string()).optional(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -178,7 +188,12 @@ export const GetBetResponse = zod.object({
   "postGameReview": zod.string().nullish().describe('Post-game reflection'),
   "tags": zod.array(zod.string()).optional(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -225,7 +240,12 @@ export const UpdateBetResponse = zod.object({
   "postGameReview": zod.string().nullish().describe('Post-game reflection'),
   "tags": zod.array(zod.string()).optional(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -274,7 +294,12 @@ export const SettleBetResponse = zod.object({
   "postGameReview": zod.string().nullish().describe('Post-game reflection'),
   "tags": zod.array(zod.string()).optional(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -311,7 +336,12 @@ export const ListParlaysResponseItem = zod.object({
   "rationale": zod.string().nullish(),
   "postGameReview": zod.string().nullish(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 export const ListParlaysResponse = zod.array(ListParlaysResponseItem)
 
@@ -335,8 +365,6 @@ export const CreateParlayBody = zod.object({
   "stake": zod.number(),
   "confidenceScore": zod.number().min(1).max(createParlayBodyConfidenceScoreMax),
   "rationale": zod.string().optional(),
-  "sportsbook": zod.string().optional(),
-  "promoNote": zod.string().optional(),
   "legs": zod.array(zod.object({
   "sport": zod.string().min(1),
   "event": zod.string().min(1),
@@ -344,7 +372,9 @@ export const CreateParlayBody = zod.object({
   "pick": zod.string().min(1),
   "odds": zod.number(),
   "gameDate": zod.string()
-})).min(createParlayBodyLegsMin)
+})).min(createParlayBodyLegsMin),
+  "sportsbook": zod.string().optional(),
+  "promoNote": zod.string().optional()
 })
 
 export const CreateParlayResponse = zod.object({
@@ -372,7 +402,12 @@ export const CreateParlayResponse = zod.object({
   "rationale": zod.string().nullish(),
   "postGameReview": zod.string().nullish(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -408,7 +443,12 @@ export const GetParlayResponse = zod.object({
   "rationale": zod.string().nullish(),
   "postGameReview": zod.string().nullish(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -455,7 +495,12 @@ export const UpdateParlayResponse = zod.object({
   "rationale": zod.string().nullish(),
   "postGameReview": zod.string().nullish(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -514,7 +559,12 @@ export const SettleParlayResponse = zod.object({
   "rationale": zod.string().nullish(),
   "postGameReview": zod.string().nullish(),
   "createdAt": zod.string(),
-  "settledAt": zod.string().nullish()
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
 })
 
 
@@ -683,6 +733,41 @@ export const GetConfidenceAnalysisResponseItem = zod.object({
   "avgOdds": zod.number()
 })
 export const GetConfidenceAnalysisResponse = zod.array(GetConfidenceAnalysisResponseItem)
+
+
+/**
+ * @summary Post-result review insights (miss reasons, reasoning quality, recent notes)
+ */
+export const GetStatsInsightsQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish()
+})
+
+export const GetStatsInsightsResponse = zod.object({
+  "reviewedCount": zod.number().describe('Settled bets\/parlays that carry any review data'),
+  "lossesWithReason": zod.number().describe('Losses that have a miss reason recorded'),
+  "missReasons": zod.array(zod.object({
+  "reason": zod.enum(['bad_read', 'bad_price', 'lineup_injury', 'emotional', 'misunderstood_market', 'normal_variance', 'na']),
+  "count": zod.number()
+})),
+  "soundReasoning": zod.object({
+  "total": zod.number(),
+  "wins": zod.number(),
+  "winRate": zod.number()
+}),
+  "flawedReasoning": zod.object({
+  "total": zod.number(),
+  "wins": zod.number(),
+  "winRate": zod.number()
+}),
+  "recentNotes": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['bet', 'parlay']),
+  "title": zod.string(),
+  "status": zod.enum(['won', 'lost', 'push', 'void']),
+  "whatHappened": zod.string(),
+  "settledAt": zod.string().nullish()
+}))
+})
 
 
 /**

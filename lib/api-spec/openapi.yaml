@@ -483,6 +483,24 @@ paths:
                 items:
                   $ref: "#/components/schemas/ConfidenceBucket"
 
+  /stats/insights:
+    get:
+      operationId: getStatsInsights
+      tags: [stats]
+      summary: Post-result review insights (miss reasons, reasoning quality, recent notes)
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Review insights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InsightsResponse"
+
   # ── Workspace ─────────────────────────────────────────────────────────────
   /workspace:
     get:
@@ -601,6 +619,16 @@ components:
           type: string
         settledAt:
           type: ["string", "null"]
+        sportsbook:
+          type: ["string", "null"]
+        promoNote:
+          type: ["string", "null"]
+        reasoningQuality:
+          type: ["string", "null"]
+        whatHappened:
+          type: ["string", "null"]
+        missReason:
+          type: ["string", "null"]
       required: [id, userId, sport, event, betType, pick, odds, stake, potentialPayout, status, gameDate, confidenceScore, createdAt]
 
     BetInput:
@@ -636,6 +664,10 @@ components:
           type: array
           items:
             type: string
+        sportsbook:
+          type: string
+        promoNote:
+          type: string
       required: [userId, sport, event, betType, pick, odds, stake, gameDate, confidenceScore]
 
     BetUpdate:
@@ -675,6 +707,16 @@ components:
           enum: [won, lost, push, void]
         postGameReview:
           type: string
+        actualPayoutOverride:
+          type: number
+        reasoningQuality:
+          type: string
+          enum: [sound, flawed]
+        whatHappened:
+          type: string
+        missReason:
+          type: string
+          enum: [bad_read, bad_price, lineup_injury, emotional, misunderstood_market, normal_variance, na]
       required: [status]
 
     Parlay:
@@ -714,6 +756,16 @@ components:
         createdAt:
           type: string
         settledAt:
+          type: ["string", "null"]
+        sportsbook:
+          type: ["string", "null"]
+        promoNote:
+          type: ["string", "null"]
+        reasoningQuality:
+          type: ["string", "null"]
+        whatHappened:
+          type: ["string", "null"]
+        missReason:
           type: ["string", "null"]
       required: [id, userId, name, stake, odds, potentialPayout, status, legs, confidenceScore, createdAt]
 
@@ -763,6 +815,10 @@ components:
           minItems: 2
           items:
             $ref: "#/components/schemas/ParlayLegInput"
+        sportsbook:
+          type: string
+        promoNote:
+          type: string
       required: [userId, name, stake, confidenceScore, legs]
 
     ParlayLegInput:
@@ -812,6 +868,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LegResult"
+        actualPayoutOverride:
+          type: number
+        reasoningQuality:
+          type: string
+          enum: [sound, flawed]
+        whatHappened:
+          type: string
+        missReason:
+          type: string
+          enum: [bad_read, bad_price, lineup_injury, emotional, misunderstood_market, normal_variance, na]
       required: [status]
 
     LegResult:
@@ -853,7 +919,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [deposit, withdraw, bet_win, bet_loss, bet_push, adjustment]
+          enum: [deposit, withdraw, bet_win, bet_loss, bet_push, bet_void, adjustment]
         amount:
           type: number
         balanceAfter:
@@ -1008,6 +1074,69 @@ components:
         avgOdds:
           type: number
       required: [confidenceRange, totalBets, wins, winRate, avgOdds]
+
+    MissReasonBreakdown:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum: [bad_read, bad_price, lineup_injury, emotional, misunderstood_market, normal_variance, na]
+        count:
+          type: integer
+      required: [reason, count]
+
+    ReasoningQualityStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        wins:
+          type: integer
+        winRate:
+          type: number
+      required: [total, wins, winRate]
+
+    ReviewNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [bet, parlay]
+        title:
+          type: string
+        status:
+          type: string
+          enum: [won, lost, push, void]
+        whatHappened:
+          type: string
+        settledAt:
+          type: ["string", "null"]
+      required: [id, type, title, status, whatHappened]
+
+    InsightsResponse:
+      type: object
+      properties:
+        reviewedCount:
+          type: integer
+          description: Settled bets/parlays that carry any review data
+        lossesWithReason:
+          type: integer
+          description: Losses that have a miss reason recorded
+        missReasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/MissReasonBreakdown"
+        soundReasoning:
+          $ref: "#/components/schemas/ReasoningQualityStats"
+        flawedReasoning:
+          $ref: "#/components/schemas/ReasoningQualityStats"
+        recentNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewNote"
+      required: [reviewedCount, lossesWithReason, missReasons, soundReasoning, flawedReasoning, recentNotes]
 
     Workspace:
       type: object
