@@ -44,12 +44,16 @@ async function formatParlay(p: typeof parlaysTable.$inferSelect, userName: strin
     confidenceScore: p.confidenceScore,
     rationale: p.rationale ?? null,
     postGameReview: p.postGameReview ?? null,
+    sportsbook: p.sportsbook ?? null,
+    promoNote: p.promoNote ?? null,
+    reasoningQuality: p.reasoningQuality ?? null,
+    whatHappened: p.whatHappened ?? null,
+    missReason: p.missReason ?? null,
     createdAt: p.createdAt.toISOString(),
     settledAt: p.settledAt ? p.settledAt.toISOString() : null,
   };
 }
 
-// Calculate combined parlay odds from decimal legs
 function americanToDecimal(odds: number): number {
   if (odds > 0) return odds / 100 + 1;
   return 100 / Math.abs(odds) + 1;
@@ -117,6 +121,8 @@ router.post("/parlays", async (req, res): Promise<void> => {
       potentialPayout: String(payout.toFixed(2)),
       confidenceScore: d.confidenceScore,
       rationale: d.rationale ?? null,
+      sportsbook: d.sportsbook ?? null,
+      promoNote: d.promoNote ?? null,
     })
     .returning();
 
@@ -218,22 +224,33 @@ router.patch("/parlays/:id/settle", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { status, postGameReview, legResults } = parsed.data;
+  const { status, postGameReview, legResults, actualPayoutOverride, reasoningQuality, whatHappened, missReason } = parsed.data;
   const [existing] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
   if (!existing) {
     res.status(404).json({ error: "Parlay not found" });
     return;
   }
 
-  const actualPayout = status === "won"
-    ? Number(existing.potentialPayout)
-    : status === "push"
-    ? Number(existing.stake)
-    : 0;
+  let actualPayout: number;
+  if (status === "won") {
+    actualPayout = actualPayoutOverride != null ? actualPayoutOverride : Number(existing.potentialPayout);
+  } else if (status === "push" || status === "void") {
+    actualPayout = Number(existing.stake);
+  } else {
+    actualPayout = 0;
+  }
 
   const [updated] = await db
     .update(parlaysTable)
-    .set({ status, actualPayout: String(actualPayout.toFixed(2)), postGameReview: postGameReview ?? null, settledAt: new Date() })
+    .set({
+      status,
+      actualPayout: String(actualPayout.toFixed(2)),
+      postGameReview: postGameReview ?? null,
+      reasoningQuality: reasoningQuality ?? null,
+      whatHappened: whatHappened ?? null,
+      missReason: missReason ?? null,
+      settledAt: new Date(),
+    })
     .where(eq(parlaysTable.id, params.data.id))
     .returning();
 
@@ -259,7 +276,14 @@ router.patch("/parlays/:id/settle", async (req, res): Promise<void> => {
 
   const profit = actualPayout - Number(existing.stake);
   const newBalance = currentBalance + profit;
-  const txType = status === "won" ? "bet_win" : status === "push" ? "bet_push" : "bet_loss";
+  const txType = status === "won" ? "bet_win"
+    : status === "push" ? "bet_push"
+    : status === "void" ? "bet_void"
+    : "bet_loss";
+  const txNote = status === "won" ? `Won parlay: ${existing.name}`
+    : status === "push" ? `Push parlay: ${existing.name}`
+    : status === "void" ? `Void parlay: ${existing.name}`
+    : `Lost parlay: ${existing.name}`;
 
   await db.insert(transactionsTable).values({
     userId: existing.userId,
@@ -268,7 +292,7 @@ router.patch("/parlays/:id/settle", async (req, res): Promise<void> => {
     balanceAfter: String(newBalance.toFixed(2)),
     referenceId: existing.id,
     referenceType: "parlay",
-    note: `${status === "won" ? "Won" : status === "push" ? "Push" : "Lost"} parlay: ${existing.name}`,
+    note: txNote,
   });
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));

@@ -1,8 +1,11 @@
 import { useUser } from "@/contexts/UserContext"
 import { useGetStatsSummary, useGetStatsBySport, useGetConfidenceAnalysis, getGetStatsSummaryQueryKey, getGetStatsBySportQueryKey, getGetConfidenceAnalysisQueryKey } from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/format"
+import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
+import { BarChart2, Plus, Lock } from "lucide-react"
 
 export default function Stats() {
   const { activeUser } = useUser()
@@ -33,24 +36,51 @@ export default function Stats() {
             <Card key={i} className="animate-pulse bg-muted/50 h-32" />
           ))}
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="animate-pulse bg-muted/50 h-80" />
-          <Card className="animate-pulse bg-muted/50 h-80" />
-        </div>
       </div>
     )
   }
 
   if (!summary) return null
 
-  // Ensure confidence data is sorted by range (1-3, 4-6, 7-10)
+  const gradedBets = (summary.straightBetRecord.wins + summary.straightBetRecord.losses + summary.straightBetRecord.pushes)
+    + (summary.parlayRecord.wins + summary.parlayRecord.losses + summary.parlayRecord.pushes)
+  const INSIGHTS_THRESHOLD = 5
+  const hasEnoughData = gradedBets >= INSIGHTS_THRESHOLD
+  const totalBets = gradedBets + (summary.pending ?? 0)
+
+  if (totalBets === 0) {
+    return (
+      <div className="space-y-8 animate-in fade-in-50 duration-500">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-muted-foreground mt-1">Deep dive into your betting performance.</p>
+        </div>
+        <Card className="border-dashed border-2 border-muted">
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+            <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
+              <BarChart2 className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">No data yet</h2>
+              <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+                Log and grade at least {INSIGHTS_THRESHOLD} bets to unlock sport breakdowns, confidence calibration, and ROI insights.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/bets/new"><Plus className="h-4 w-4 mr-1" />Log First Bet</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   const sortedConfidenceData = [...confidenceData].sort((a, b) => {
     const aVal = parseInt(a.confidenceRange.split('-')[0])
     const bVal = parseInt(b.confidenceRange.split('-')[0])
     return aVal - bVal
   })
 
-  // Prepare sport data, sorted by total wagered
   const sortedSportData = [...sportStats].sort((a, b) => b.totalWagered - a.totalWagered).slice(0, 7)
 
   return (
@@ -59,6 +89,29 @@ export default function Stats() {
         <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
         <p className="text-muted-foreground mt-1">Deep dive into your betting performance.</p>
       </div>
+
+      {/* Insight unlock progress banner */}
+      {!hasEnoughData && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Lock className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">Insights unlock after {INSIGHTS_THRESHOLD} graded bets</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {gradedBets} of {INSIGHTS_THRESHOLD} graded so far — {INSIGHTS_THRESHOLD - gradedBets} more to go
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-primary transition-all" 
+                  style={{ width: `${Math.min(100, (gradedBets / INSIGHTS_THRESHOLD) * 100)}%` }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-card">
@@ -97,9 +150,7 @@ export default function Stats() {
             <div className="text-2xl font-bold font-mono text-green-500">
               +{formatCurrency(summary.bestBetProfit)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Highest single payout
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Highest single payout</p>
           </CardContent>
         </Card>
 
@@ -111,9 +162,7 @@ export default function Stats() {
             <div className="text-2xl font-bold font-mono">
               {summary.avgOdds > 0 ? '+' : ''}{Math.round(summary.avgOdds)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across all straight bets
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Across all straight bets</p>
           </CardContent>
         </Card>
       </div>
@@ -125,7 +174,15 @@ export default function Stats() {
             <CardDescription>Top sports by net profit/loss</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            {sortedSportData.length > 0 ? (
+            {!hasEnoughData ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-center border border-dashed rounded-md p-4">
+                <Lock className="h-6 w-6 text-muted-foreground/50" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Unlocks at {INSIGHTS_THRESHOLD} graded bets</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">{gradedBets}/{INSIGHTS_THRESHOLD} graded</p>
+                </div>
+              </div>
+            ) : sortedSportData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={sortedSportData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -146,7 +203,7 @@ export default function Stats() {
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground border border-dashed rounded-md">
-                No sport data available
+                No sport data yet
               </div>
             )}
           </CardContent>
@@ -158,7 +215,15 @@ export default function Stats() {
             <CardDescription>Win rate by confidence score</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            {sortedConfidenceData.length > 0 ? (
+            {!hasEnoughData ? (
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-center border border-dashed rounded-md p-4">
+                <Lock className="h-6 w-6 text-muted-foreground/50" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Unlocks at {INSIGHTS_THRESHOLD} graded bets</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">{gradedBets}/{INSIGHTS_THRESHOLD} graded</p>
+                </div>
+              </div>
+            ) : sortedConfidenceData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={sortedConfidenceData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -175,7 +240,7 @@ export default function Stats() {
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-muted-foreground border border-dashed rounded-md">
-                No confidence data available
+                No confidence data yet
               </div>
             )}
           </CardContent>
@@ -188,22 +253,27 @@ export default function Stats() {
           <CardDescription>Detailed statistics per sport</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Sport</th>
-                  <th className="px-4 py-3 font-medium text-right">Bets</th>
-                  <th className="px-4 py-3 font-medium text-right">Record</th>
-                  <th className="px-4 py-3 font-medium text-right">Win Rate</th>
-                  <th className="px-4 py-3 font-medium text-right">Wagered</th>
-                  <th className="px-4 py-3 font-medium text-right">Profit</th>
-                  <th className="px-4 py-3 font-medium text-right">ROI</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {sortedSportData.length > 0 ? (
-                  sortedSportData.map((sport) => (
+          {sortedSportData.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground border border-dashed rounded-md">
+              <p className="text-sm">No graded bets yet.</p>
+              <p className="text-xs mt-1">Grade a bet to see sport-level breakdown.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Sport</th>
+                    <th className="px-4 py-3 font-medium text-right">Bets</th>
+                    <th className="px-4 py-3 font-medium text-right">Record</th>
+                    <th className="px-4 py-3 font-medium text-right">Win Rate</th>
+                    <th className="px-4 py-3 font-medium text-right">Wagered</th>
+                    <th className="px-4 py-3 font-medium text-right">Profit</th>
+                    <th className="px-4 py-3 font-medium text-right">ROI</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {sortedSportData.map((sport) => (
                     <tr key={sport.sport} className="hover:bg-muted/50 transition-colors">
                       <td className="px-4 py-3 font-medium">{sport.sport}</td>
                       <td className="px-4 py-3 text-right font-mono">{sport.wins + sport.losses + sport.pushes}</td>
@@ -217,17 +287,11 @@ export default function Stats() {
                         {sport.roi > 0 ? '+' : ''}{sport.roi.toFixed(1)}%
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                      No sport data available.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -10,15 +10,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Wallet, ArrowUpRight, ArrowDownRight, Activity } from "lucide-react"
+import { Wallet, ArrowUpRight, ArrowDownRight, Activity, Pencil } from "lucide-react"
 
 export default function Bankroll() {
-  const { activeUser } = useUser()
+  const { activeUser, setActiveUser } = useUser()
   const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
+  const [isEditBankrollOpen, setIsEditBankrollOpen] = useState(false)
   const [amount, setAmount] = useState("")
   const [type, setType] = useState<"deposit" | "withdraw" | "adjustment">("deposit")
   const [note, setNote] = useState("")
+  const [newStartingBankroll, setNewStartingBankroll] = useState("")
+  const [isSavingBankroll, setIsSavingBankroll] = useState(false)
 
   const { data: bankroll, isLoading: isBankrollLoading } = useGetBankroll(
     { userId: activeUser?.id },
@@ -55,6 +58,29 @@ export default function Bankroll() {
     })
   }
 
+  const handleEditStartingBankroll = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!activeUser || !newStartingBankroll || isNaN(Number(newStartingBankroll))) return
+    setIsSavingBankroll(true)
+    try {
+      const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, '') ?? ''
+      const response = await fetch(`${BASE_URL}/api/users/${activeUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startingBankroll: Number(newStartingBankroll) }),
+      })
+      if (response.ok) {
+        const updated = await response.json()
+        setActiveUser({ ...activeUser, startingBankroll: updated.startingBankroll })
+        queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
+        setIsEditBankrollOpen(false)
+        setNewStartingBankroll("")
+      }
+    } finally {
+      setIsSavingBankroll(false)
+    }
+  }
+
   const isLoading = isBankrollLoading || isTxLoading
 
   if (isLoading) {
@@ -71,65 +97,107 @@ export default function Bankroll() {
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-start gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bankroll</h1>
           <p className="text-muted-foreground mt-1">Manage your funds and track cash flow.</p>
         </div>
         
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button>Update Balance</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Update Bankroll</DialogTitle>
-              <DialogDescription>
-                Record a deposit, withdrawal, or manual adjustment.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleTransaction} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Transaction Type</Label>
-                <Select value={type} onValueChange={(val: any) => setType(val)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="deposit">Deposit</SelectItem>
-                    <SelectItem value="withdraw">Withdraw</SelectItem>
-                    <SelectItem value="adjustment">Manual Adjustment</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Amount ($)</Label>
-                <Input 
-                  type="number" 
-                  step="0.01" 
-                  min="0.01" 
-                  value={amount} 
-                  onChange={(e) => setAmount(e.target.value)} 
-                  placeholder="100.00"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Note (Optional)</Label>
-                <Input 
-                  value={note} 
-                  onChange={(e) => setNote(e.target.value)} 
-                  placeholder="e.g. Weekly reload"
-                />
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={createTx.isPending}>
-                  {createTx.isPending ? "Processing..." : "Confirm"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          {/* Edit starting bankroll */}
+          <Dialog open={isEditBankrollOpen} onOpenChange={setIsEditBankrollOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" onClick={() => setNewStartingBankroll(String(bankroll.startingBalance))}>
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Edit Start
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Starting Bankroll</DialogTitle>
+                <DialogDescription>
+                  Update your initial bankroll amount. This recalculates your net P/L and ROI baseline.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleEditStartingBankroll} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Starting Bankroll ($)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    min="0.01"
+                    value={newStartingBankroll} 
+                    onChange={(e) => setNewStartingBankroll(e.target.value)}
+                    placeholder={String(bankroll.startingBalance)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Current: {formatCurrency(bankroll.startingBalance)}</p>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsEditBankrollOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={isSavingBankroll}>
+                    {isSavingBankroll ? "Saving..." : "Save"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add transaction */}
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button>Update Balance</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Bankroll</DialogTitle>
+                <DialogDescription>
+                  Record a deposit, withdrawal, or manual adjustment.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleTransaction} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Transaction Type</Label>
+                  <Select value={type} onValueChange={(val: any) => setType(val)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="deposit">Deposit</SelectItem>
+                      <SelectItem value="withdraw">Withdraw</SelectItem>
+                      <SelectItem value="adjustment">Manual Adjustment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Amount ($)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    min="0.01" 
+                    value={amount} 
+                    onChange={(e) => setAmount(e.target.value)} 
+                    placeholder="100.00"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Note (Optional)</Label>
+                  <Input 
+                    value={note} 
+                    onChange={(e) => setNote(e.target.value)} 
+                    placeholder="e.g. Weekly reload"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={createTx.isPending}>
+                    {createTx.isPending ? "Processing..." : "Confirm"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -155,7 +223,16 @@ export default function Bankroll() {
               
               <div className="grid grid-cols-2 gap-x-8 gap-y-6 text-center md:text-left w-full md:w-auto">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Starting Balance</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                    Starting Balance
+                    <button 
+                      onClick={() => { setNewStartingBankroll(String(bankroll.startingBalance)); setIsEditBankrollOpen(true) }}
+                      className="text-muted-foreground/50 hover:text-muted-foreground transition-colors ml-1"
+                      title="Edit starting bankroll"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  </div>
                   <div className="text-xl font-mono font-medium">{formatCurrency(bankroll.startingBalance)}</div>
                 </div>
                 <div>
@@ -191,7 +268,13 @@ export default function Bankroll() {
           ) : (
             <div className="space-y-4">
               {transactions.map((tx) => {
-                const isPositive = ['deposit', 'bet_win', 'bet_push', 'adjustment'].includes(tx.type) && tx.amount > 0;
+                const isPositive = (
+                  tx.type === 'deposit' ||
+                  tx.type === 'bet_win' ||
+                  tx.type === 'bet_push' ||
+                  tx.type === 'bet_void' ||
+                  (tx.type === 'adjustment' && Number(tx.amount) >= 0)
+                );
                 
                 return (
                   <div key={tx.id} className="flex items-center justify-between py-3 border-b last:border-0 last:pb-0">
@@ -201,6 +284,7 @@ export default function Bankroll() {
                         tx.type === 'withdraw' ? 'bg-red-500/10 text-red-500' :
                         tx.type === 'bet_win' ? 'bg-primary/10 text-primary' :
                         tx.type === 'bet_loss' ? 'bg-muted text-muted-foreground' :
+                        tx.type === 'bet_void' ? 'bg-blue-500/10 text-blue-500' :
                         'bg-blue-500/10 text-blue-500'
                       }`}>
                         {tx.type === 'deposit' ? <ArrowUpRight className="h-5 w-5" /> :
@@ -216,14 +300,14 @@ export default function Bankroll() {
                         </div>
                         <div className="text-xs text-muted-foreground flex gap-2">
                           <span>{formatDate(tx.createdAt)}</span>
-                          {tx.note && <span>• {tx.note}</span>}
+                          {tx.note && <span>· {tx.note}</span>}
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className={`font-mono font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                         {isPositive ? '+' : tx.type === 'withdraw' || tx.type === 'bet_loss' ? '-' : ''}
-                        {formatCurrency(tx.amount)}
+                        {formatCurrency(Math.abs(Number(tx.amount)))}
                       </div>
                       <div className="text-xs text-muted-foreground font-mono">
                         Bal: {formatCurrency(tx.balanceAfter)}

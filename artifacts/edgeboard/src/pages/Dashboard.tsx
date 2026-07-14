@@ -3,14 +3,20 @@ import {
   useGetStatsSummary, 
   useGetRecentActivity,
   useGetBankroll,
+  useListBets,
+  useListParlays,
   getGetStatsSummaryQueryKey,
   getGetRecentActivityQueryKey,
-  getGetBankrollQueryKey
+  getGetBankrollQueryKey,
+  getListBetsQueryKey,
+  getListParlaysQueryKey,
 } from "@workspace/api-client-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
-import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, ListTodo, Check } from "lucide-react"
+import { Link } from "wouter"
+import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus } from "lucide-react"
 
 export default function Dashboard() {
   const { activeUser, isLoading: isUserLoading } = useUser();
@@ -30,7 +36,32 @@ export default function Dashboard() {
     { query: { enabled: !!activeUser?.id, queryKey: getGetBankrollQueryKey({ userId: activeUser?.id }) } }
   );
 
+  const { data: pendingBets = [] } = useListBets(
+    { userId: activeUser?.id, status: 'pending' },
+    { query: { enabled: !!activeUser?.id, queryKey: [...getListBetsQueryKey({ userId: activeUser?.id }), 'pending'] } }
+  );
+
+  const { data: pendingParlays = [] } = useListParlays(
+    { userId: activeUser?.id, status: 'pending' },
+    { query: { enabled: !!activeUser?.id, queryKey: [...getListParlaysQueryKey({ userId: activeUser?.id }), 'pending'] } }
+  );
+
   const isLoading = isUserLoading || isStatsLoading || isActivityLoading || isBankrollLoading;
+
+  const today = new Date().toISOString().split('T')[0];
+  const allPending = [
+    ...pendingBets.map(b => ({ ...b, _type: 'bet' as const })),
+    ...pendingParlays.map(p => ({ ...p, _type: 'parlay' as const, pick: p.name, event: p.legs?.[0]?.event ?? p.name })),
+  ];
+  const totalExposure = allPending.reduce((sum, p) => sum + Number(p.stake), 0);
+  const highestConf = allPending.reduce<typeof allPending[0] | null>((best, p) => 
+    best === null || p.confidenceScore > best.confidenceScore ? p : best, null
+  );
+  const todayEvents = pendingBets.filter(b => b.gameDate === today).length 
+    + pendingParlays.filter(p => p.legs?.some(l => l.gameDate === today)).length;
+
+  const totalBets = (stats?.wins ?? 0) + (stats?.losses ?? 0) + (stats?.pushes ?? 0) + (stats?.pending ?? 0);
+  const hasData = totalBets > 0;
 
   if (isLoading) {
     return (
@@ -47,6 +78,38 @@ export default function Dashboard() {
 
   if (!activeUser) return null;
 
+  if (!hasData) {
+    return (
+      <div className="space-y-8 animate-in fade-in-50 duration-500">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Welcome back, {activeUser.displayName}.</p>
+        </div>
+        <Card className="border-dashed border-2 border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <ClipboardList className="h-8 w-8 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">No bets logged yet</h2>
+              <p className="text-muted-foreground mt-1 max-w-sm">
+                Start tracking your plays to see your record, bankroll, and insights here.
+              </p>
+            </div>
+            <div className="flex gap-3 flex-wrap justify-center">
+              <Button asChild>
+                <Link href="/bets/new"><Plus className="h-4 w-4 mr-1" />Log First Bet</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/parlays/new"><Plus className="h-4 w-4 mr-1" />Log First Parlay</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       <div>
@@ -54,6 +117,7 @@ export default function Dashboard() {
         <p className="text-muted-foreground mt-1">Welcome back, {activeUser.displayName}. Here's your edge today.</p>
       </div>
 
+      {/* Stats cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -96,7 +160,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold font-mono ${stats && stats.roi > 0 ? 'text-green-500' : stats && stats.roi < 0 ? 'text-red-500' : ''}`}>
-              {stats?.roi > 0 ? '+' : ''}{(stats?.roi ?? 0).toFixed(1)}%
+              {stats?.roi != null && stats.roi > 0 ? '+' : ''}{(stats?.roi ?? 0).toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               On {formatCurrency(stats?.totalWagered ?? 0)} total wagered
@@ -127,6 +191,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Recent Activity */}
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
@@ -166,30 +231,72 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Today's Decisions */}
         <Card className="col-span-1 border-primary/20 bg-primary/5">
           <CardHeader>
-            <CardTitle>Action Center</CardTitle>
-            <CardDescription>Pending items that need your attention</CardDescription>
+            <CardTitle>Today's Decisions</CardTitle>
+            <CardDescription>Pending plays requiring your attention</CardDescription>
           </CardHeader>
           <CardContent>
-            {stats && stats.pending > 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 space-y-4">
-                <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
-                  <ListTodo className="h-8 w-8 text-primary" />
-                </div>
-                <div className="text-center">
-                  <h3 className="font-semibold text-lg">{stats.pending} Pending Bets</h3>
-                  <p className="text-sm text-muted-foreground">Waiting for results</p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 space-y-3 text-center border border-dashed border-primary/30 rounded-md">
-                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                  <Check className="h-6 w-6 text-muted-foreground" />
+            {allPending.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-3 text-center border border-dashed border-primary/30 rounded-md">
+                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  <Target className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="font-medium">All caught up!</p>
-                  <p className="text-xs text-muted-foreground mt-1">No pending bets to settle</p>
+                  <p className="font-medium">All settled up</p>
+                  <p className="text-xs text-muted-foreground mt-1">No pending bets or parlays</p>
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/bets/new"><Plus className="h-3 w-3 mr-1" />Log a bet</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="flex flex-col items-center p-3 rounded-lg bg-background/60 border border-border/50 text-center">
+                    <ClipboardList className="h-4 w-4 text-primary mb-1" />
+                    <div className="text-xl font-bold font-mono">{allPending.length}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Pending</div>
+                  </div>
+                  <div className="flex flex-col items-center p-3 rounded-lg bg-background/60 border border-border/50 text-center">
+                    <DollarSign className="h-4 w-4 text-amber-500 mb-1" />
+                    <div className="text-lg font-bold font-mono">{formatCurrency(totalExposure, false)}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Exposure</div>
+                  </div>
+                  <div className="flex flex-col items-center p-3 rounded-lg bg-background/60 border border-border/50 text-center">
+                    <CalendarDays className="h-4 w-4 text-blue-400 mb-1" />
+                    <div className="text-xl font-bold font-mono">{todayEvents}</div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Today</div>
+                  </div>
+                </div>
+
+                {/* Top confidence play */}
+                {highestConf && (
+                  <div className="p-3 rounded-lg bg-background/60 border border-primary/30 space-y-1">
+                    <div className="flex items-center gap-1 text-[10px] text-primary uppercase tracking-wider font-semibold">
+                      <Star className="h-3 w-3 fill-primary" /> Top Conviction Play
+                    </div>
+                    <div className="font-semibold text-sm truncate">
+                      {highestConf._type === 'bet' ? (highestConf as any).pick : (highestConf as any).name}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{highestConf.event}</div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-mono text-primary">{highestConf.confidenceScore}/10 confidence</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="font-mono">{formatCurrency(Number(highestConf.stake))} at stake</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button asChild size="sm" variant="outline" className="flex-1 text-xs">
+                    <Link href="/bets">Grade Bets</Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline" className="flex-1 text-xs">
+                    <Link href="/parlays">Grade Parlays</Link>
+                  </Button>
                 </div>
               </div>
             )}

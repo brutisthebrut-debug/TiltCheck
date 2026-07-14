@@ -15,6 +15,13 @@ export const parlaysTable = pgTable("parlays", {
   confidenceScore: integer("confidence_score").notNull(),
   rationale: text("rationale"),
   postGameReview: text("post_game_review"),
+  // Sportsbook & promo tracking
+  sportsbook: text("sportsbook"),
+  promoNote: text("promo_note"),
+  // Post-result review (structured)
+  reasoningQuality: text("reasoning_quality"), // 'sound' | 'flawed'
+  whatHappened: text("what_happened"),
+  missReason: text("miss_reason"), // bad_read | bad_price | lineup_injury | emotional | misunderstood_market | normal_variance | na
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   settledAt: timestamp("settled_at", { withTimezone: true }),
 });

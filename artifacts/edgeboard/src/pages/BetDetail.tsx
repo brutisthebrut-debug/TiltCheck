@@ -3,13 +3,28 @@ import { useGetBet, useSettleBet, getListBetsQueryKey, getGetBetQueryKey, getGet
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
-import { ArrowLeft, Target, Calendar, DollarSign, Brain, Check, X, Minus } from "lucide-react"
+import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock } from "lucide-react"
+
+type SettleStatus = 'won' | 'lost' | 'push' | 'void'
+
+const MISS_REASONS = [
+  { value: 'bad_read', label: 'Bad read — misread the matchup' },
+  { value: 'bad_price', label: 'Bad price — right read, wrong number' },
+  { value: 'lineup_injury', label: 'Lineup/injury — info unavailable at bet time' },
+  { value: 'emotional', label: 'Emotional / impulse bet' },
+  { value: 'misunderstood_market', label: 'Misunderstood market or line' },
+  { value: 'normal_variance', label: 'Normal variance — right process, wrong result' },
+  { value: 'na', label: 'N/A' },
+]
 
 export default function BetDetail() {
   const { id } = useParams()
@@ -23,22 +38,37 @@ export default function BetDetail() {
   })
   
   const settleBet = useSettleBet()
-  const [postGameReview, setPostGameReview] = useState("")
 
-  if (isLoading) {
-    return <div className="p-8 text-center animate-pulse">Loading bet details...</div>
+  // Modal state
+  const [pendingStatus, setPendingStatus] = useState<SettleStatus | null>(null)
+  const [reasoningQuality, setReasoningQuality] = useState<'sound' | 'flawed' | ''>('')
+  const [whatHappened, setWhatHappened] = useState('')
+  const [missReason, setMissReason] = useState('')
+  const [actualPayoutOverride, setActualPayoutOverride] = useState('')
+
+  const resetModal = () => {
+    setPendingStatus(null)
+    setReasoningQuality('')
+    setWhatHappened('')
+    setMissReason('')
+    setActualPayoutOverride('')
   }
 
-  if (!bet) {
-    return <div className="p-8 text-center text-destructive">Bet not found</div>
+  const handleGradeClick = (status: SettleStatus) => {
+    setPendingStatus(status)
   }
 
-  const handleSettle = (status: 'won' | 'lost' | 'push' | 'void') => {
+  const handleSubmitReview = () => {
+    if (!bet || !pendingStatus) return
+
     settleBet.mutate({
       id: betId,
       data: {
-        status,
-        postGameReview: postGameReview || undefined
+        status: pendingStatus,
+        reasoningQuality: reasoningQuality || undefined,
+        whatHappened: whatHappened || undefined,
+        missReason: (missReason as any) || undefined,
+        actualPayoutOverride: actualPayoutOverride ? Number(actualPayoutOverride) : undefined,
       }
     }, {
       onSuccess: () => {
@@ -49,12 +79,30 @@ export default function BetDetail() {
           queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
         }
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
+        resetModal()
       }
     })
   }
 
+  if (isLoading) {
+    return <div className="p-8 text-center animate-pulse">Loading bet details...</div>
+  }
+
+  if (!bet) {
+    return <div className="p-8 text-center text-destructive">Bet not found</div>
+  }
+
   const isPending = bet.status === 'pending'
   const canSettle = isPending && activeUser?.id === bet.userId
+  const isSettled = !isPending
+
+  const statusLabel: Record<SettleStatus, string> = { won: 'Won ✓', lost: 'Lost ✗', push: 'Push', void: 'Void' }
+  const statusColor: Record<SettleStatus, string> = {
+    won: 'bg-green-500/10 text-green-500 border-green-500/20',
+    lost: 'bg-red-500/10 text-red-500 border-red-500/20',
+    push: 'bg-muted text-foreground border-border',
+    void: 'bg-blue-500/10 text-blue-400 border-blue-400/20',
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -72,13 +120,14 @@ export default function BetDetail() {
         <Card className="md:col-span-2 bg-card">
           <CardHeader className="flex flex-row items-start justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Badge variant="outline">{bet.sport}</Badge>
                 <Badge variant="outline">{bet.betType}</Badge>
+                {bet.sportsbook && <Badge variant="outline" className="text-xs">{bet.sportsbook}</Badge>}
               </div>
               <CardTitle className="text-2xl mt-2">{bet.event}</CardTitle>
             </div>
-            <Badge variant={bet.status as any} className="text-base px-3 py-1">
+            <Badge variant={bet.status as any} className="text-base px-3 py-1 shrink-0">
               {bet.status.toUpperCase()}
             </Badge>
           </CardHeader>
@@ -105,7 +154,10 @@ export default function BetDetail() {
                 <div className="font-medium">{formatDate(bet.gameDate)}</div>
               </div>
               <div className="space-y-1">
-                <div className="text-sm text-muted-foreground flex items-center gap-1"><Brain className="h-3 w-3"/> Confidence</div>
+                <div className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Brain className="h-3 w-3"/> Confidence
+                  {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50 ml-1" />}
+                </div>
                 <div className="font-mono font-medium">{bet.confidenceScore} / 10</div>
               </div>
             </div>
@@ -119,72 +171,205 @@ export default function BetDetail() {
               </div>
             )}
 
+            {bet.promoNote && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground px-3 py-2 rounded bg-muted/30 border border-dashed border-muted-foreground/20">
+                <span className="shrink-0">🎁</span>
+                <span>{bet.promoNote}</span>
+              </div>
+            )}
+
             {bet.rationale && (
               <div className="space-y-2 pt-2 border-t">
-                <div className="text-sm font-semibold">Pre-game Rationale</div>
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  Pre-game Rationale
+                  {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50" />}
+                </div>
                 <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-3 rounded border">
                   {bet.rationale}
                 </p>
               </div>
             )}
             
-            {bet.postGameReview && (
-              <div className="space-y-2 pt-2 border-t">
-                <div className="text-sm font-semibold">Post-game Review</div>
-                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-3 rounded border">
-                  {bet.postGameReview}
-                </p>
+            {/* Post-game review (settled) */}
+            {isSettled && (bet.reasoningQuality || bet.whatHappened || bet.missReason) && (
+              <div className="space-y-3 pt-2 border-t">
+                <div className="text-sm font-semibold">Post-result Review</div>
+                {bet.reasoningQuality && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Reasoning:</span>
+                    <Badge variant={bet.reasoningQuality === 'sound' ? 'default' : 'destructive'} className="capitalize">
+                      {bet.reasoningQuality}
+                    </Badge>
+                  </div>
+                )}
+                {bet.missReason && bet.missReason !== 'na' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Miss reason:</span>
+                    <span className="font-medium">{MISS_REASONS.find(r => r.value === bet.missReason)?.label ?? bet.missReason}</span>
+                  </div>
+                )}
+                {bet.whatHappened && (
+                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-3 rounded border border-primary/20">
+                    {bet.whatHappened}
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
 
+        {/* Grade panel */}
         {canSettle && (
           <Card className="border-primary/20 bg-primary/5 h-fit">
             <CardHeader>
-              <CardTitle className="text-lg">Settle Bet</CardTitle>
+              <CardTitle className="text-lg">Grade Result</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="review">Post-game Review (Optional)</Label>
-                <Textarea 
-                  id="review" 
-                  placeholder="What did you learn? Was the rationale right even if the result was wrong?"
-                  value={postGameReview}
-                  onChange={(e) => setPostGameReview(e.target.value)}
-                  className="bg-background h-24 resize-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button 
-                  variant="outline" 
-                  className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20"
-                  onClick={() => handleSettle('won')}
-                  disabled={settleBet.isPending}
-                >
-                  <Check className="mr-2 h-4 w-4" /> Won
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
-                  onClick={() => handleSettle('lost')}
-                  disabled={settleBet.isPending}
-                >
-                  <X className="mr-2 h-4 w-4" /> Lost
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="col-span-2 bg-muted hover:bg-muted/80"
-                  onClick={() => handleSettle('push')}
-                  disabled={settleBet.isPending}
-                >
-                  <Minus className="mr-2 h-4 w-4" /> Push
-                </Button>
-              </div>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Select the outcome to open the review form.</p>
+              <Button 
+                variant="outline" 
+                className="w-full bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20"
+                onClick={() => handleGradeClick('won')}
+              >
+                <Check className="mr-2 h-4 w-4" /> Won
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
+                onClick={() => handleGradeClick('lost')}
+              >
+                <X className="mr-2 h-4 w-4" /> Lost
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => handleGradeClick('push')}
+              >
+                <Minus className="mr-2 h-4 w-4" /> Push
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full bg-blue-500/10 text-blue-400 border-blue-400/20 hover:bg-blue-500/20"
+                onClick={() => handleGradeClick('void')}
+              >
+                <Ban className="mr-2 h-4 w-4" /> Void
+              </Button>
+              <p className="text-[10px] text-muted-foreground">Void returns your stake and removes this bet from record counts.</p>
             </CardContent>
           </Card>
         )}
       </div>
+
+      {/* Post-result review modal */}
+      <Dialog open={pendingStatus !== null} onOpenChange={(open) => { if (!open) resetModal() }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Post-result Review</DialogTitle>
+            <DialogDescription>
+              Grading as: <span className={`font-semibold ${pendingStatus === 'won' ? 'text-green-500' : pendingStatus === 'lost' ? 'text-red-500' : pendingStatus === 'void' ? 'text-blue-400' : ''}`}>
+                {pendingStatus ? statusLabel[pendingStatus] : ''}
+              </span>
+              {' '}— {bet.pick} · {formatOdds(bet.odds)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Actual payout override (won + any promo) */}
+            {pendingStatus === 'won' && (
+              <div className="space-y-2">
+                <Label>
+                  Actual Payout Override 
+                  <span className="text-muted-foreground font-normal"> (optional — use for promo boosts)</span>
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder={`Default: ${formatCurrency(bet.potentialPayout)}`}
+                    value={actualPayoutOverride}
+                    onChange={e => setActualPayoutOverride(e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Leave blank to use calculated payout.</p>
+              </div>
+            )}
+
+            {/* Reasoning quality */}
+            <div className="space-y-2">
+              <Label>Was your reasoning sound?</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReasoningQuality('sound')}
+                  className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                    reasoningQuality === 'sound' 
+                      ? 'bg-green-500/10 text-green-500 border-green-500/30' 
+                      : 'bg-card border-border hover:border-primary/30'
+                  }`}
+                >
+                  ✓ Sound
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReasoningQuality('flawed')}
+                  className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                    reasoningQuality === 'flawed' 
+                      ? 'bg-red-500/10 text-red-500 border-red-500/30' 
+                      : 'bg-card border-border hover:border-primary/30'
+                  }`}
+                >
+                  ✗ Flawed
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                "Sound" = right process even if wrong result. "Flawed" = bad decision-making regardless of outcome.
+              </p>
+            </div>
+
+            {/* What happened */}
+            <div className="space-y-2">
+              <Label>What happened? <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea 
+                placeholder="Briefly describe what played out. What did you learn?"
+                value={whatHappened}
+                onChange={e => setWhatHappened(e.target.value)}
+                className="bg-background h-20 resize-none"
+              />
+            </div>
+
+            {/* Miss / result reason */}
+            <div className="space-y-2">
+              <Label>
+                {pendingStatus === 'won' ? 'Win category' : 'Miss reason'} 
+                <span className="text-muted-foreground font-normal"> (optional)</span>
+              </Label>
+              <Select value={missReason} onValueChange={setMissReason}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {MISS_REASONS.map(r => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={resetModal} className="sm:w-auto w-full">Cancel</Button>
+            <Button 
+              onClick={handleSubmitReview} 
+              disabled={settleBet.isPending}
+              className={`sm:w-auto w-full ${pendingStatus === 'won' ? 'bg-green-600 hover:bg-green-700' : pendingStatus === 'lost' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+            >
+              {settleBet.isPending ? 'Saving...' : `Confirm — ${pendingStatus ? statusLabel[pendingStatus] : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -124,7 +124,9 @@ export const CreateBetBody = zod.object({
   "gameDate": zod.string(),
   "confidenceScore": zod.number().min(1).max(createBetBodyConfidenceScoreMax),
   "rationale": zod.string().optional(),
-  "tags": zod.array(zod.string()).optional()
+  "tags": zod.array(zod.string()).optional(),
+  "sportsbook": zod.string().optional(),
+  "promoNote": zod.string().optional()
 })
 
 export const CreateBetResponse = zod.object({
@@ -246,7 +248,11 @@ export const SettleBetParams = zod.object({
 
 export const SettleBetBody = zod.object({
   "status": zod.enum(['won', 'lost', 'push', 'void']),
-  "postGameReview": zod.string().optional()
+  "postGameReview": zod.string().optional(),
+  "actualPayoutOverride": zod.number().optional(),
+  "reasoningQuality": zod.enum(['sound', 'flawed']).optional(),
+  "whatHappened": zod.string().optional(),
+  "missReason": zod.enum(['bad_read', 'bad_price', 'lineup_injury', 'emotional', 'misunderstood_market', 'normal_variance', 'na']).optional()
 })
 
 export const SettleBetResponse = zod.object({
@@ -329,6 +335,8 @@ export const CreateParlayBody = zod.object({
   "stake": zod.number(),
   "confidenceScore": zod.number().min(1).max(createParlayBodyConfidenceScoreMax),
   "rationale": zod.string().optional(),
+  "sportsbook": zod.string().optional(),
+  "promoNote": zod.string().optional(),
   "legs": zod.array(zod.object({
   "sport": zod.string().min(1),
   "event": zod.string().min(1),
@@ -474,7 +482,11 @@ export const SettleParlayBody = zod.object({
   "legResults": zod.array(zod.object({
   "legId": zod.number(),
   "status": zod.enum(['won', 'lost', 'push', 'void'])
-})).optional()
+})).optional(),
+  "actualPayoutOverride": zod.number().optional(),
+  "reasoningQuality": zod.enum(['sound', 'flawed']).optional(),
+  "whatHappened": zod.string().optional(),
+  "missReason": zod.enum(['bad_read', 'bad_price', 'lineup_injury', 'emotional', 'misunderstood_market', 'normal_variance', 'na']).optional()
 })
 
 export const SettleParlayResponse = zod.object({
@@ -537,7 +549,7 @@ export const ListTransactionsQueryParams = zod.object({
 export const ListTransactionsResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "type": zod.enum(['deposit', 'withdraw', 'bet_win', 'bet_loss', 'bet_push', 'adjustment']),
+  "type": zod.enum(['deposit', 'withdraw', 'bet_win', 'bet_loss', 'bet_push', 'bet_void', 'adjustment']),
   "amount": zod.number(),
   "balanceAfter": zod.number(),
   "note": zod.string().nullish(),
@@ -561,7 +573,7 @@ export const CreateTransactionBody = zod.object({
 export const CreateTransactionResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
-  "type": zod.enum(['deposit', 'withdraw', 'bet_win', 'bet_loss', 'bet_push', 'adjustment']),
+  "type": zod.enum(['deposit', 'withdraw', 'bet_win', 'bet_loss', 'bet_push', 'bet_void', 'adjustment']),
   "amount": zod.number(),
   "balanceAfter": zod.number(),
   "note": zod.string().nullish(),

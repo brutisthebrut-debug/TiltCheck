@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, betsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListBetsQueryParams,
@@ -37,6 +37,11 @@ function formatBet(b: typeof betsTable.$inferSelect, userName: string) {
     confidenceScore: b.confidenceScore,
     rationale: b.rationale ?? null,
     postGameReview: b.postGameReview ?? null,
+    sportsbook: b.sportsbook ?? null,
+    promoNote: b.promoNote ?? null,
+    reasoningQuality: b.reasoningQuality ?? null,
+    whatHappened: b.whatHappened ?? null,
+    missReason: b.missReason ?? null,
     tags: b.tags ?? [],
     createdAt: b.createdAt.toISOString(),
     settledAt: b.settledAt ? b.settledAt.toISOString() : null,
@@ -93,6 +98,8 @@ router.post("/bets", async (req, res): Promise<void> => {
       confidenceScore: d.confidenceScore,
       rationale: d.rationale ?? null,
       tags: d.tags ?? [],
+      sportsbook: d.sportsbook ?? null,
+      promoNote: d.promoNote ?? null,
     })
     .returning();
 
@@ -200,18 +207,25 @@ router.patch("/bets/:id/settle", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { status, postGameReview } = parsed.data;
+  const { status, postGameReview, actualPayoutOverride, reasoningQuality, whatHappened, missReason } = parsed.data;
   const [existing] = await db.select().from(betsTable).where(eq(betsTable.id, params.data.id));
   if (!existing) {
     res.status(404).json({ error: "Bet not found" });
     return;
   }
 
-  const actualPayout = status === "won"
-    ? Number(existing.potentialPayout)
-    : status === "push"
-    ? Number(existing.stake)
-    : 0;
+  // Calculate actual payout:
+  // - won: use override if provided, else potentialPayout
+  // - push/void: return stake (no profit)
+  // - lost: 0
+  let actualPayout: number;
+  if (status === "won") {
+    actualPayout = actualPayoutOverride != null ? actualPayoutOverride : Number(existing.potentialPayout);
+  } else if (status === "push" || status === "void") {
+    actualPayout = Number(existing.stake);
+  } else {
+    actualPayout = 0;
+  }
 
   const [updated] = await db
     .update(betsTable)
@@ -219,6 +233,9 @@ router.patch("/bets/:id/settle", async (req, res): Promise<void> => {
       status,
       actualPayout: String(actualPayout.toFixed(2)),
       postGameReview: postGameReview ?? null,
+      reasoningQuality: reasoningQuality ?? null,
+      whatHappened: whatHappened ?? null,
+      missReason: missReason ?? null,
       settledAt: new Date(),
     })
     .where(eq(betsTable.id, params.data.id))
@@ -235,9 +252,17 @@ router.patch("/bets/:id/settle", async (req, res): Promise<void> => {
     (await db.select().from(usersTable).where(eq(usersTable.id, existing.userId)))[0]?.startingBankroll ?? 0
   );
 
+  // profit: void/push = 0 (stake returned), won = payout - stake, lost = -stake
   const profit = actualPayout - Number(existing.stake);
   const newBalance = currentBalance + profit;
-  const txType = status === "won" ? "bet_win" : status === "push" ? "bet_push" : "bet_loss";
+  const txType = status === "won" ? "bet_win"
+    : status === "push" ? "bet_push"
+    : status === "void" ? "bet_void"
+    : "bet_loss";
+  const txNote = status === "won" ? `Won: ${existing.event}`
+    : status === "push" ? `Push: ${existing.event}`
+    : status === "void" ? `Void: ${existing.event}`
+    : `Lost: ${existing.event}`;
 
   await db.insert(transactionsTable).values({
     userId: existing.userId,
@@ -246,7 +271,7 @@ router.patch("/bets/:id/settle", async (req, res): Promise<void> => {
     balanceAfter: String(newBalance.toFixed(2)),
     referenceId: existing.id,
     referenceType: "bet",
-    note: `${status === "won" ? "Won" : status === "push" ? "Push" : "Lost"}: ${existing.event}`,
+    note: txNote,
   });
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));

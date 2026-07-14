@@ -5,17 +5,22 @@ import { useLocation } from "wouter"
 import { useCreateBet, getListBetsQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
 import { useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 import { 
   Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage 
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { calculatePotentialPayout, formatCurrency } from "@/lib/format"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ChevronDown } from "lucide-react"
+
+const SPORTSBOOKS = [
+  "bet365", "DraftKings", "FanDuel", "BetMGM", "Caesars", "PointsBet", "Hard Rock Bet", "ESPN Bet", "Other"
+]
 
 const formSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
@@ -27,6 +32,8 @@ const formSchema = z.object({
   gameDate: z.string().min(1, "Game date is required"),
   confidenceScore: z.number().min(1).max(10),
   rationale: z.string().optional(),
+  sportsbook: z.string().optional(),
+  promoNote: z.string().optional(),
 })
 
 export default function NewBet() {
@@ -34,6 +41,8 @@ export default function NewBet() {
   const [, setLocation] = useLocation()
   const queryClient = useQueryClient()
   const createBet = useCreateBet()
+  const [customSportsbook, setCustomSportsbook] = useState("")
+  const [showPromo, setShowPromo] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,21 +56,26 @@ export default function NewBet() {
       gameDate: new Date().toISOString().split('T')[0],
       confidenceScore: 5,
       rationale: "",
+      sportsbook: "",
+      promoNote: "",
     },
   })
 
   const watchOdds = form.watch("odds")
   const watchStake = form.watch("stake")
+  const watchSportsbook = form.watch("sportsbook")
   
   const potentialPayout = watchStake && watchOdds ? calculatePotentialPayout(watchStake, watchOdds) : 0
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!activeUser) return
-
+    const sportsbook = values.sportsbook === "Other" ? (customSportsbook || "Other") : (values.sportsbook || undefined)
     createBet.mutate({
       data: {
         userId: activeUser.id,
         ...values,
+        sportsbook,
+        promoNote: values.promoNote || undefined,
       }
     }, {
       onSuccess: () => {
@@ -231,6 +245,65 @@ export default function NewBet() {
                 </div>
               </div>
 
+              {/* Sportsbook */}
+              <FormField
+                control={form.control}
+                name="sportsbook"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sportsbook <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Where did you place this?" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {SPORTSBOOKS.map(sb => (
+                          <SelectItem key={sb} value={sb}>{sb}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {watchSportsbook === "Other" && (
+                <Input 
+                  placeholder="Book name" 
+                  value={customSportsbook} 
+                  onChange={e => setCustomSportsbook(e.target.value)} 
+                />
+              )}
+
+              {/* Promo toggle */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowPromo(!showPromo)}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showPromo ? 'rotate-180' : ''}`} />
+                  {showPromo ? 'Hide promo / boost note' : 'Add promo / profit-boost note'}
+                </button>
+                {showPromo && (
+                  <FormField
+                    control={form.control}
+                    name="promoNote"
+                    render={({ field }) => (
+                      <FormItem className="mt-3">
+                        <FormLabel>Promo / Boost Note</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 20% profit boost applied" {...field} />
+                        </FormControl>
+                        <FormDescription>Note any promotional boost on this bet. You can record the actual payout when you settle.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+
               <FormField
                 control={form.control}
                 name="confidenceScore"
@@ -273,7 +346,6 @@ export default function NewBet() {
                   </FormItem>
                 )}
               />
-
             </CardContent>
             <CardFooter className="border-t bg-muted/20 px-6 py-4">
               <Button type="submit" className="w-full" disabled={createBet.isPending}>

@@ -3,14 +3,29 @@ import { useGetParlay, useSettleParlay, getListParlaysQueryKey, getGetParlayQuer
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
-import { ArrowLeft, Target, Calendar, DollarSign, Brain, Check, X, Minus } from "lucide-react"
+import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock } from "lucide-react"
 import type { LegResult } from "@workspace/api-client-react"
+
+type SettleStatus = 'won' | 'lost' | 'push' | 'void'
+
+const MISS_REASONS = [
+  { value: 'bad_read', label: 'Bad read — misread the matchup' },
+  { value: 'bad_price', label: 'Bad price — right read, wrong number' },
+  { value: 'lineup_injury', label: 'Lineup/injury — info unavailable at bet time' },
+  { value: 'emotional', label: 'Emotional / impulse bet' },
+  { value: 'misunderstood_market', label: 'Misunderstood market or line' },
+  { value: 'normal_variance', label: 'Normal variance — right process, wrong result' },
+  { value: 'na', label: 'N/A' },
+]
 
 export default function ParlayDetail() {
   const { id } = useParams()
@@ -24,19 +39,29 @@ export default function ParlayDetail() {
   })
   
   const settleParlay = useSettleParlay()
-  const [postGameReview, setPostGameReview] = useState("")
   const [legResults, setLegResults] = useState<Record<number, 'won' | 'lost' | 'push' | 'void'>>({})
 
-  if (isLoading) {
-    return <div className="p-8 text-center animate-pulse">Loading parlay details...</div>
+  // Modal state
+  const [pendingStatus, setPendingStatus] = useState<SettleStatus | null>(null)
+  const [reasoningQuality, setReasoningQuality] = useState<'sound' | 'flawed' | ''>('')
+  const [whatHappened, setWhatHappened] = useState('')
+  const [missReason, setMissReason] = useState('')
+  const [actualPayoutOverride, setActualPayoutOverride] = useState('')
+
+  const resetModal = () => {
+    setPendingStatus(null)
+    setReasoningQuality('')
+    setWhatHappened('')
+    setMissReason('')
+    setActualPayoutOverride('')
   }
 
-  if (!parlay) {
-    return <div className="p-8 text-center text-destructive">Parlay not found</div>
+  const handleGradeClick = (status: SettleStatus) => {
+    setPendingStatus(status)
   }
 
-  const handleSettle = (status: 'won' | 'lost' | 'push' | 'void') => {
-    // Format leg results for the API
+  const handleSubmitReview = () => {
+    if (!parlay || !pendingStatus) return
     const formattedLegResults: LegResult[] = Object.entries(legResults).map(([legId, status]) => ({
       legId: Number(legId),
       status
@@ -45,8 +70,11 @@ export default function ParlayDetail() {
     settleParlay.mutate({
       id: parlayId,
       data: {
-        status,
-        postGameReview: postGameReview || undefined,
+        status: pendingStatus,
+        reasoningQuality: reasoningQuality || undefined,
+        whatHappened: whatHappened || undefined,
+        missReason: (missReason as any) || undefined,
+        actualPayoutOverride: actualPayoutOverride ? Number(actualPayoutOverride) : undefined,
         legResults: formattedLegResults.length > 0 ? formattedLegResults : undefined
       }
     }, {
@@ -58,6 +86,7 @@ export default function ParlayDetail() {
           queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
         }
         queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey({ limit: 5 }) })
+        resetModal()
       }
     })
   }
@@ -66,8 +95,19 @@ export default function ParlayDetail() {
     setLegResults(prev => ({ ...prev, [legId]: status }))
   }
 
+  if (isLoading) {
+    return <div className="p-8 text-center animate-pulse">Loading parlay details...</div>
+  }
+
+  if (!parlay) {
+    return <div className="p-8 text-center text-destructive">Parlay not found</div>
+  }
+
   const isPending = parlay.status === 'pending'
   const canSettle = isPending && activeUser?.id === parlay.userId
+  const isSettled = !isPending
+
+  const statusLabel: Record<SettleStatus, string> = { won: 'Won ✓', lost: 'Lost ✗', push: 'Push', void: 'Void' }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -87,11 +127,12 @@ export default function ParlayDetail() {
             <CardHeader className="flex flex-row items-start justify-between pb-4 border-b">
               <div>
                 <CardTitle className="text-2xl">{parlay.name}</CardTitle>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {parlay.legs.length} Legs • Logged {formatDate(parlay.createdAt)}
+                <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                  <span>{parlay.legs.length} Legs · Logged {formatDate(parlay.createdAt)}</span>
+                  {parlay.sportsbook && <Badge variant="outline" className="text-xs">{parlay.sportsbook}</Badge>}
                 </div>
               </div>
-              <Badge variant={parlay.status as any} className="text-base px-3 py-1">
+              <Badge variant={parlay.status as any} className="text-base px-3 py-1 shrink-0">
                 {parlay.status.toUpperCase()}
               </Badge>
             </CardHeader>
@@ -100,15 +141,15 @@ export default function ParlayDetail() {
                 {parlay.legs.map((leg, index) => (
                   <div key={leg.id} className={`p-4 ${leg.status === 'won' ? 'bg-green-500/5' : leg.status === 'lost' ? 'bg-red-500/5' : ''}`}>
                     <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider w-12">Leg {index + 1}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Leg {index + 1}</span>
                         <Badge variant="outline" className="text-xs">{leg.sport}</Badge>
                         <Badge variant="outline" className="text-xs">{leg.betType}</Badge>
                       </div>
-                      <Badge variant={leg.status as any} className="text-xs">{leg.status.toUpperCase()}</Badge>
+                      <Badge variant={leg.status as any} className="text-xs shrink-0">{leg.status.toUpperCase()}</Badge>
                     </div>
                     
-                    <div className="ml-14">
+                    <div className="ml-0 sm:ml-14">
                       <div className="font-medium text-muted-foreground text-sm">{leg.event}</div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-lg font-bold">{leg.pick}</span>
@@ -117,30 +158,23 @@ export default function ParlayDetail() {
                       <div className="text-xs text-muted-foreground mt-2">{formatDate(leg.gameDate)}</div>
                       
                       {canSettle && (
-                        <div className="mt-3 flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant={legResults[leg.id] === 'won' ? 'default' : 'outline'} 
-                            className={legResults[leg.id] === 'won' ? 'bg-green-500 hover:bg-green-600' : ''}
-                            onClick={() => handleLegResult(leg.id, 'won')}
-                          >
-                            W
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant={legResults[leg.id] === 'lost' ? 'default' : 'outline'}
-                            className={legResults[leg.id] === 'lost' ? 'bg-red-500 hover:bg-red-600' : ''}
-                            onClick={() => handleLegResult(leg.id, 'lost')}
-                          >
-                            L
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant={legResults[leg.id] === 'push' ? 'secondary' : 'outline'}
-                            onClick={() => handleLegResult(leg.id, 'push')}
-                          >
-                            P
-                          </Button>
+                        <div className="mt-3 flex gap-1.5">
+                          {(['won', 'lost', 'push', 'void'] as const).map(s => (
+                            <button
+                              key={s}
+                              onClick={() => handleLegResult(leg.id, s)}
+                              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                                legResults[leg.id] === s
+                                  ? s === 'won' ? 'bg-green-500 text-white border-green-600'
+                                  : s === 'lost' ? 'bg-red-500 text-white border-red-600'
+                                  : s === 'void' ? 'bg-blue-500 text-white border-blue-600'
+                                  : 'bg-secondary text-secondary-foreground border-secondary'
+                                : 'bg-card text-muted-foreground border-border hover:border-primary/30'
+                              }`}
+                            >
+                              {s === 'won' ? 'W' : s === 'lost' ? 'L' : s === 'push' ? 'P' : 'V'}
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -150,26 +184,52 @@ export default function ParlayDetail() {
             </CardContent>
           </Card>
           
-          {(parlay.rationale || parlay.postGameReview) && (
+          {(parlay.rationale || parlay.promoNote || isSettled) && (
             <Card className="bg-card">
               <CardContent className="p-6 space-y-6">
+                {parlay.promoNote && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground px-3 py-2 rounded bg-muted/30 border border-dashed border-muted-foreground/20">
+                    <span className="shrink-0">🎁</span>
+                    <span>{parlay.promoNote}</span>
+                  </div>
+                )}
+
                 {parlay.rationale && (
                   <div className="space-y-2">
-                    <div className="text-sm font-semibold">Pre-game Rationale</div>
+                    <div className="text-sm font-semibold flex items-center gap-2">
+                      Pre-game Rationale
+                      {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50" />}
+                    </div>
                     <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-4 rounded-md border">
                       {parlay.rationale}
                     </p>
                   </div>
                 )}
                 
-                {parlay.postGameReview && (
-                  <div className="space-y-2">
+                {isSettled && (parlay.reasoningQuality || parlay.whatHappened || parlay.missReason) && (
+                  <div className="space-y-3 pt-2 border-t">
                     <div className="text-sm font-semibold flex items-center gap-2">
-                      <Brain className="h-4 w-4" /> Post-game Review
+                      <Brain className="h-4 w-4" /> Post-result Review
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-4 rounded-md border border-primary/20">
-                      {parlay.postGameReview}
-                    </p>
+                    {parlay.reasoningQuality && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Reasoning:</span>
+                        <Badge variant={parlay.reasoningQuality === 'sound' ? 'default' : 'destructive'} className="capitalize">
+                          {parlay.reasoningQuality}
+                        </Badge>
+                      </div>
+                    )}
+                    {parlay.missReason && parlay.missReason !== 'na' && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Miss reason:</span>
+                        <span className="font-medium">{MISS_REASONS.find(r => r.value === parlay.missReason)?.label ?? parlay.missReason}</span>
+                      </div>
+                    )}
+                    {parlay.whatHappened && (
+                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-4 rounded-md border border-primary/20">
+                        {parlay.whatHappened}
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -197,7 +257,10 @@ export default function ParlayDetail() {
               </div>
               <div className="flex justify-between items-center py-2 border-b">
                 <span className="text-muted-foreground">Confidence</span>
-                <span className="font-mono font-medium text-lg">{parlay.confidenceScore} / 10</span>
+                <span className="font-mono font-medium text-lg flex items-center gap-1">
+                  {parlay.confidenceScore} / 10
+                  {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50" />}
+                </span>
               </div>
 
               {parlay.actualPayout !== null && parlay.actualPayout !== undefined && (
@@ -214,42 +277,153 @@ export default function ParlayDetail() {
           {canSettle && (
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader>
-                <CardTitle className="text-lg">Settle Parlay</CardTitle>
+                <CardTitle className="text-lg">Grade Parlay</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="review">Post-game Review (Optional)</Label>
-                  <Textarea 
-                    id="review" 
-                    placeholder="Review the overall parlay strategy"
-                    value={postGameReview}
-                    onChange={(e) => setPostGameReview(e.target.value)}
-                    className="bg-background h-24 resize-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <Button 
-                    variant="outline" 
-                    className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20"
-                    onClick={() => handleSettle('won')}
-                    disabled={settleParlay.isPending}
-                  >
-                    <Check className="mr-2 h-4 w-4" /> Won
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
-                    onClick={() => handleSettle('lost')}
-                    disabled={settleParlay.isPending}
-                  >
-                    <X className="mr-2 h-4 w-4" /> Lost
-                  </Button>
-                </div>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">Mark leg results above, then grade the overall parlay.</p>
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20"
+                  onClick={() => handleGradeClick('won')}
+                  disabled={settleParlay.isPending}
+                >
+                  <Check className="mr-2 h-4 w-4" /> Won
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
+                  onClick={() => handleGradeClick('lost')}
+                  disabled={settleParlay.isPending}
+                >
+                  <X className="mr-2 h-4 w-4" /> Lost
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => handleGradeClick('push')}
+                  disabled={settleParlay.isPending}
+                >
+                  <Minus className="mr-2 h-4 w-4" /> Push
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-blue-500/10 text-blue-400 border-blue-400/20 hover:bg-blue-500/20"
+                  onClick={() => handleGradeClick('void')}
+                  disabled={settleParlay.isPending}
+                >
+                  <Ban className="mr-2 h-4 w-4" /> Void
+                </Button>
+                <p className="text-[10px] text-muted-foreground">Void returns your stake and removes this parlay from record counts.</p>
               </CardContent>
             </Card>
           )}
         </div>
       </div>
+
+      {/* Post-result review modal */}
+      <Dialog open={pendingStatus !== null} onOpenChange={(open) => { if (!open) resetModal() }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Post-result Review</DialogTitle>
+            <DialogDescription>
+              Grading as: <span className={`font-semibold ${pendingStatus === 'won' ? 'text-green-500' : pendingStatus === 'lost' ? 'text-red-500' : pendingStatus === 'void' ? 'text-blue-400' : ''}`}>
+                {pendingStatus ? statusLabel[pendingStatus] : ''}
+              </span>
+              {' '}— {parlay.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {pendingStatus === 'won' && (
+              <div className="space-y-2">
+                <Label>
+                  Actual Payout Override 
+                  <span className="text-muted-foreground font-normal"> (optional — use for promo boosts)</span>
+                </Label>
+                <Input 
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder={`Default: ${formatCurrency(parlay.potentialPayout)}`}
+                  value={actualPayoutOverride}
+                  onChange={e => setActualPayoutOverride(e.target.value)}
+                  className="bg-background"
+                />
+                <p className="text-xs text-muted-foreground">Leave blank to use calculated payout.</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Was your reasoning sound?</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReasoningQuality('sound')}
+                  className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                    reasoningQuality === 'sound' 
+                      ? 'bg-green-500/10 text-green-500 border-green-500/30' 
+                      : 'bg-card border-border hover:border-primary/30'
+                  }`}
+                >
+                  ✓ Sound
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReasoningQuality('flawed')}
+                  className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
+                    reasoningQuality === 'flawed' 
+                      ? 'bg-red-500/10 text-red-500 border-red-500/30' 
+                      : 'bg-card border-border hover:border-primary/30'
+                  }`}
+                >
+                  ✗ Flawed
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                "Sound" = right process even if wrong result. "Flawed" = bad decision-making.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>What happened? <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea 
+                placeholder="Briefly describe what played out. What did you learn?"
+                value={whatHappened}
+                onChange={e => setWhatHappened(e.target.value)}
+                className="bg-background h-20 resize-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                Miss reason 
+                <span className="text-muted-foreground font-normal"> (optional)</span>
+              </Label>
+              <Select value={missReason} onValueChange={setMissReason}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {MISS_REASONS.map(r => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={resetModal} className="sm:w-auto w-full">Cancel</Button>
+            <Button 
+              onClick={handleSubmitReview} 
+              disabled={settleParlay.isPending}
+              className={`sm:w-auto w-full ${pendingStatus === 'won' ? 'bg-green-600 hover:bg-green-700' : pendingStatus === 'lost' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+            >
+              {settleParlay.isPending ? 'Saving...' : `Confirm — ${pendingStatus ? statusLabel[pendingStatus] : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

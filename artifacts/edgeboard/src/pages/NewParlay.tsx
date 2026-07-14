@@ -5,17 +5,22 @@ import { useLocation } from "wouter"
 import { useCreateParlay, getListParlaysQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
 import { useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 import { 
-  Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage 
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage 
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { calculatePotentialPayout, formatCurrency } from "@/lib/format"
-import { ArrowLeft, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react"
+
+const SPORTSBOOKS = [
+  "bet365", "DraftKings", "FanDuel", "BetMGM", "Caesars", "PointsBet", "Hard Rock Bet", "ESPN Bet", "Other"
+]
 
 const legSchema = z.object({
   sport: z.string().min(1, "Sport is required"),
@@ -31,6 +36,8 @@ const formSchema = z.object({
   stake: z.coerce.number().positive("Stake must be greater than 0"),
   confidenceScore: z.number().min(1).max(10),
   rationale: z.string().optional(),
+  sportsbook: z.string().optional(),
+  promoNote: z.string().optional(),
   legs: z.array(legSchema).min(2, "At least 2 legs are required"),
 })
 
@@ -39,6 +46,8 @@ export default function NewParlay() {
   const [, setLocation] = useLocation()
   const queryClient = useQueryClient()
   const createParlay = useCreateParlay()
+  const [customSportsbook, setCustomSportsbook] = useState("")
+  const [showPromo, setShowPromo] = useState(false)
 
   const defaultLeg = {
     sport: "NFL",
@@ -56,6 +65,8 @@ export default function NewParlay() {
       stake: 50,
       confidenceScore: 3,
       rationale: "",
+      sportsbook: "",
+      promoNote: "",
       legs: [defaultLeg, defaultLeg],
     },
   })
@@ -67,9 +78,8 @@ export default function NewParlay() {
 
   const watchLegs = form.watch("legs")
   const watchStake = form.watch("stake")
+  const watchSportsbook = form.watch("sportsbook")
   
-  // Calculate combined odds roughly (this is an approximation for American odds)
-  // Converting to decimal odds, multiplying, then converting back to American
   const calculateCombinedOdds = (legs: Array<{ odds: number }>) => {
     if (legs.length === 0) return 0
     if (legs.some(leg => !leg.odds)) return 0
@@ -97,11 +107,13 @@ export default function NewParlay() {
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!activeUser) return
-
+    const sportsbook = values.sportsbook === "Other" ? (customSportsbook || "Other") : (values.sportsbook || undefined)
     createParlay.mutate({
       data: {
         userId: activeUser.id,
         ...values,
+        sportsbook,
+        promoNote: values.promoNote || undefined,
       }
     }, {
       onSuccess: () => {
@@ -160,6 +172,64 @@ export default function NewParlay() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              {/* Sportsbook */}
+              <FormField
+                control={form.control}
+                name="sportsbook"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sportsbook <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Where did you place this?" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {SPORTSBOOKS.map(sb => (
+                          <SelectItem key={sb} value={sb}>{sb}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {watchSportsbook === "Other" && (
+                <Input 
+                  placeholder="Book name" 
+                  value={customSportsbook} 
+                  onChange={e => setCustomSportsbook(e.target.value)} 
+                />
+              )}
+
+              {/* Promo toggle */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowPromo(!showPromo)}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showPromo ? 'rotate-180' : ''}`} />
+                  {showPromo ? 'Hide promo / boost note' : 'Add promo / profit-boost note'}
+                </button>
+                {showPromo && (
+                  <FormField
+                    control={form.control}
+                    name="promoNote"
+                    render={({ field }) => (
+                      <FormItem className="mt-3">
+                        <FormLabel>Promo / Boost Note</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 25% parlay boost applied" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
               <FormField
@@ -258,6 +328,8 @@ export default function NewParlay() {
                               <SelectItem value="NCAAF">NCAAF</SelectItem>
                               <SelectItem value="NCAAB">NCAAB</SelectItem>
                               <SelectItem value="Soccer">Soccer</SelectItem>
+                              <SelectItem value="Tennis">Tennis</SelectItem>
+                              <SelectItem value="MMA">MMA</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -352,7 +424,7 @@ export default function NewParlay() {
             ))}
           </div>
 
-          <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background pb-safe">
+          <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <Card className="border-primary bg-card shadow-lg">
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="grid grid-cols-2 gap-8">

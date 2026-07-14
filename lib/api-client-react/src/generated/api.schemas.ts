@@ -80,6 +80,11 @@ export interface Bet {
   createdAt: string;
   /** @nullable */
   settledAt?: string | null;
+  sportsbook?: string | null;
+  promoNote?: string | null;
+  reasoningQuality?: string | null;
+  whatHappened?: string | null;
+  missReason?: string | null;
 }
 
 export type BetInputBetType = typeof BetInputBetType[keyof typeof BetInputBetType];
@@ -112,6 +117,8 @@ export interface BetInput {
   confidenceScore: number;
   rationale?: string;
   tags?: string[];
+  sportsbook?: string;
+  promoNote?: string;
 }
 
 export type BetUpdateBetType = typeof BetUpdateBetType[keyof typeof BetUpdateBetType];
@@ -155,6 +162,10 @@ export const BetSettlementStatus = {
 export interface BetSettlement {
   status: BetSettlementStatus;
   postGameReview?: string;
+  actualPayoutOverride?: number;
+  reasoningQuality?: 'sound' | 'flawed';
+  whatHappened?: string;
+  missReason?: 'bad_read' | 'bad_price' | 'lineup_injury' | 'emotional' | 'misunderstood_market' | 'normal_variance' | 'na';
 }
 
 export type ParlayStatus = typeof ParlayStatus[keyof typeof ParlayStatus];
@@ -223,6 +234,11 @@ export interface Parlay {
   createdAt: string;
   /** @nullable */
   settledAt?: string | null;
+  sportsbook?: string | null;
+  promoNote?: string | null;
+  reasoningQuality?: string | null;
+  whatHappened?: string | null;
+  missReason?: string | null;
 }
 
 export type ParlayLegInputBetType = typeof ParlayLegInputBetType[keyof typeof ParlayLegInputBetType];
@@ -260,6 +276,8 @@ export interface ParlayInput {
   rationale?: string;
   /** @minItems 2 */
   legs: ParlayLegInput[];
+  sportsbook?: string;
+  promoNote?: string;
 }
 
 export interface ParlayUpdate {
@@ -302,6 +320,10 @@ export interface ParlaySettlement {
   status: ParlaySettlementStatus;
   postGameReview?: string;
   legResults?: LegResult[];
+  actualPayoutOverride?: number;
+  reasoningQuality?: 'sound' | 'flawed';
+  whatHappened?: string;
+  missReason?: 'bad_read' | 'bad_price' | 'lineup_injury' | 'emotional' | 'misunderstood_market' | 'normal_variance' | 'na';
 }
 
 export interface Bankroll {
@@ -324,6 +346,7 @@ export const TransactionType = {
   bet_win: 'bet_win',
   bet_loss: 'bet_loss',
   bet_push: 'bet_push',
+  bet_void: 'bet_void',
   adjustment: 'adjustment',
 } as const;
 
