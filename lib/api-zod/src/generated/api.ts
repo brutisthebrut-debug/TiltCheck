@@ -766,6 +766,27 @@ export const GetNeedsSettlingResponse = zod.object({
 
 
 /**
+ * Returns every straight bet owned by the signed-in user as CSV with a header row, RFC 4180 escaping, and ISO dates. Ordered oldest-first so spreadsheets read chronologically.
+ * @summary Download the signed-in user's straight bets as a CSV file
+ */
+export const ExportBetsCsvResponse = zod.unknown()
+
+
+/**
+ * Returns every parlay owned by the signed-in user as CSV with one row per leg; parlay-level columns repeat on each leg row so spreadsheets can pivot on the parlay id.
+ * @summary Download the signed-in user's parlays as a CSV file (one row per leg)
+ */
+export const ExportParlaysCsvResponse = zod.unknown()
+
+
+/**
+ * Returns the signed-in user's full bankroll ledger as CSV with a header row, RFC 4180 escaping, and ISO dates. Ordered oldest-first.
+ * @summary Download the signed-in user's bankroll transactions as a CSV file
+ */
+export const ExportTransactionsCsvResponse = zod.unknown()
+
+
+/**
  * @summary Get current bankroll state for a user
  */
 export const GetBankrollQueryParams = zod.object({

@@ -5,6 +5,7 @@ import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Layout } from './components/Layout';
+import { Toaster } from './components/ui/toaster';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { useFirstRunSetupActive } from './hooks/use-first-run';
 
@@ -215,6 +216,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
+        <Toaster />
         <Switch>
           {/* REQUIRED — "/sign-in/*?" and "/sign-up/*?" verbatim for OAuth sub-paths */}
           <Route path="/sign-in/*?" component={SignInPage} />

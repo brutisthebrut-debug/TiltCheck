@@ -1,5 +1,5 @@
 import { useUser } from "@/contexts/UserContext"
-import { listParlays, getListParlaysQueryKey, type ListParlaysParams } from "@workspace/api-client-react"
+import { listParlays, getListParlaysQueryKey, exportParlaysCsv, type ListParlaysParams } from "@workspace/api-client-react"
 import { useInfiniteQuery } from "@tanstack/react-query"
 import { useMemo } from "react"
 import { Link } from "wouter"
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Layers } from "lucide-react"
 import { ListFilterBar } from "@/components/ListFilterBar"
+import { ExportCsvButton } from "@/components/ExportCsvButton"
 import { useUrlFilters, hasActiveFilters } from "@/hooks/use-url-filters"
 
 const PAGE_SIZE = 25
@@ -59,12 +60,15 @@ export default function Parlays() {
           <h1 className="text-3xl font-bold tracking-tight">Parlays</h1>
           <p className="text-muted-foreground mt-1">Track multi-leg bets and longshots.</p>
         </div>
-        <Button asChild>
-          <Link href="/parlays/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Parlay
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <ExportCsvButton fetchCsv={exportParlaysCsv} filenameStem="parlays" testId="button-export-parlays-csv" />
+          <Button asChild>
+            <Link href="/parlays/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Parlay
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <ListFilterBar

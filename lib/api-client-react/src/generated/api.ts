@@ -1579,6 +1579,240 @@ export function useGetNeedsSettling<TData = Awaited<ReturnType<typeof getNeedsSe
 
 
 
+export const getExportBetsCsvUrl = () => {
+
+
+
+
+  return `/api/export/bets.csv`
+}
+
+/**
+ * Returns every straight bet owned by the signed-in user as CSV with a header row, RFC 4180 escaping, and ISO dates. Ordered oldest-first so spreadsheets read chronologically.
+ * @summary Download the signed-in user's straight bets as a CSV file
+ */
+export const exportBetsCsv = async ( options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getExportBetsCsvUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportBetsCsvQueryKey = () => {
+    return [
+    `/api/export/bets.csv`
+    ] as const;
+    }
+
+
+export const getExportBetsCsvQueryOptions = <TData = Awaited<ReturnType<typeof exportBetsCsv>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportBetsCsv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportBetsCsvQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportBetsCsv>>> = ({ signal }) => exportBetsCsv({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportBetsCsv>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportBetsCsvQueryResult = NonNullable<Awaited<ReturnType<typeof exportBetsCsv>>>
+export type ExportBetsCsvQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download the signed-in user's straight bets as a CSV file
+ */
+
+export function useExportBetsCsv<TData = Awaited<ReturnType<typeof exportBetsCsv>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportBetsCsv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportBetsCsvQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getExportParlaysCsvUrl = () => {
+
+
+
+
+  return `/api/export/parlays.csv`
+}
+
+/**
+ * Returns every parlay owned by the signed-in user as CSV with one row per leg; parlay-level columns repeat on each leg row so spreadsheets can pivot on the parlay id.
+ * @summary Download the signed-in user's parlays as a CSV file (one row per leg)
+ */
+export const exportParlaysCsv = async ( options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getExportParlaysCsvUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportParlaysCsvQueryKey = () => {
+    return [
+    `/api/export/parlays.csv`
+    ] as const;
+    }
+
+
+export const getExportParlaysCsvQueryOptions = <TData = Awaited<ReturnType<typeof exportParlaysCsv>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportParlaysCsv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportParlaysCsvQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportParlaysCsv>>> = ({ signal }) => exportParlaysCsv({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportParlaysCsv>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportParlaysCsvQueryResult = NonNullable<Awaited<ReturnType<typeof exportParlaysCsv>>>
+export type ExportParlaysCsvQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download the signed-in user's parlays as a CSV file (one row per leg)
+ */
+
+export function useExportParlaysCsv<TData = Awaited<ReturnType<typeof exportParlaysCsv>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportParlaysCsv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportParlaysCsvQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getExportTransactionsCsvUrl = () => {
+
+
+
+
+  return `/api/export/bankroll.csv`
+}
+
+/**
+ * Returns the signed-in user's full bankroll ledger as CSV with a header row, RFC 4180 escaping, and ISO dates. Ordered oldest-first.
+ * @summary Download the signed-in user's bankroll transactions as a CSV file
+ */
+export const exportTransactionsCsv = async ( options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getExportTransactionsCsvUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportTransactionsCsvQueryKey = () => {
+    return [
+    `/api/export/bankroll.csv`
+    ] as const;
+    }
+
+
+export const getExportTransactionsCsvQueryOptions = <TData = Awaited<ReturnType<typeof exportTransactionsCsv>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportTransactionsCsv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportTransactionsCsvQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportTransactionsCsv>>> = ({ signal }) => exportTransactionsCsv({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportTransactionsCsv>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportTransactionsCsvQueryResult = NonNullable<Awaited<ReturnType<typeof exportTransactionsCsv>>>
+export type ExportTransactionsCsvQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download the signed-in user's bankroll transactions as a CSV file
+ */
+
+export function useExportTransactionsCsv<TData = Awaited<ReturnType<typeof exportTransactionsCsv>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportTransactionsCsv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportTransactionsCsvQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetBankrollUrl = (params?: GetBankrollParams,) => {
   const normalizedParams = new URLSearchParams();
 

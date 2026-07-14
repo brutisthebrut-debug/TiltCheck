@@ -1,5 +1,5 @@
 import { useUser } from "@/contexts/UserContext"
-import { listBets, getListBetsQueryKey, type ListBetsParams } from "@workspace/api-client-react"
+import { listBets, getListBetsQueryKey, exportBetsCsv, type ListBetsParams } from "@workspace/api-client-react"
 import { useInfiniteQuery } from "@tanstack/react-query"
 import { useMemo } from "react"
 import { Link } from "wouter"
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, ClipboardList, AlertTriangle } from "lucide-react"
 import { ListFilterBar } from "@/components/ListFilterBar"
+import { ExportCsvButton } from "@/components/ExportCsvButton"
 import { useUrlFilters, hasActiveFilters } from "@/hooks/use-url-filters"
 
 const PAGE_SIZE = 25
@@ -60,12 +61,15 @@ export default function Bets() {
           <h1 className="text-3xl font-bold tracking-tight">Straight Bets</h1>
           <p className="text-muted-foreground mt-1">Track and review your individual plays.</p>
         </div>
-        <Button asChild>
-          <Link href="/bets/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Bet
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <ExportCsvButton fetchCsv={exportBetsCsv} filenameStem="bets" testId="button-export-bets-csv" />
+          <Button asChild>
+            <Link href="/bets/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Bet
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <ListFilterBar

@@ -1,5 +1,5 @@
 import { useUser } from "@/contexts/UserContext"
-import { useGetBankroll, useListTransactions, getGetBankrollQueryKey, getListTransactionsQueryKey, useCreateTransaction, useUpdateUser } from "@workspace/api-client-react"
+import { useGetBankroll, useListTransactions, getGetBankrollQueryKey, getListTransactionsQueryKey, useCreateTransaction, useUpdateUser, exportTransactionsCsv } from "@workspace/api-client-react"
 import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Wallet, ArrowUpRight, ArrowDownRight, Activity, Pencil } from "lucide-react"
+import { ExportCsvButton } from "@/components/ExportCsvButton"
 
 export default function Bankroll() {
   const { activeUser, refreshUser } = useUser()
@@ -97,6 +98,7 @@ export default function Bankroll() {
         </div>
         
         <div className="flex gap-2">
+          <ExportCsvButton fetchCsv={exportTransactionsCsv} filenameStem="bankroll" testId="button-export-bankroll-csv" />
           {/* Edit starting bankroll */}
           <Dialog open={isEditBankrollOpen} onOpenChange={setIsEditBankrollOpen}>
             <DialogTrigger asChild>
