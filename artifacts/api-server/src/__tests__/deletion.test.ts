@@ -158,9 +158,12 @@ describe("DELETE /api/bets/:id", () => {
       .where(and(eq(transactionsTable.userId, user.id), eq(transactionsTable.type, "adjustment")));
     expect(reversals.length).toBe(1);
     expect(Number(reversals[0].amount)).toBeCloseTo(-150, 2);
+    expect(Number(reversals[0].balanceAfter)).toBeCloseTo(1000, 2);
+    expect(reversals[0].referenceId).toBe(bet.id);
+    expect(reversals[0].referenceType).toBe("bet");
   });
 
-  it("deleting a lost bet reverses the loss", async () => {
+  it("deleting a lost bet restores the stake and records the correct adjustment", async () => {
     const user = await createUser(1000);
     const bet = await createBet({ odds: 150, stake: 100 });
 
@@ -171,6 +174,15 @@ describe("DELETE /api/bets/:id", () => {
     const res = await request(app).delete(`/api/bets/${bet.id}`);
     expect(res.status).toBe(204);
     expect((await getBankroll(user.id)).currentBalance).toBeCloseTo(1000, 2);
+
+    // The reversal credits the lost stake back with the right running balance.
+    const reversals = await db
+      .select()
+      .from(transactionsTable)
+      .where(and(eq(transactionsTable.userId, user.id), eq(transactionsTable.type, "adjustment")));
+    expect(reversals.length).toBe(1);
+    expect(Number(reversals[0].amount)).toBeCloseTo(100, 2);
+    expect(Number(reversals[0].balanceAfter)).toBeCloseTo(1000, 2);
   });
 
   it("deleting a push bet adds no reversal entry (zero net impact)", async () => {
