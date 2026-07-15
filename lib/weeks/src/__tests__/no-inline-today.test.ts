@@ -83,6 +83,63 @@ const INLINE_TODAY_PATTERNS: ReadonlyArray<{ name: string; regex: RegExp }> = [
   },
 ];
 
+// Two-step spelling of the same idioms: the ISO string is stored in a
+// variable first, then sliced on a later line —
+//   const iso = new Date().toISOString();
+//   const today = iso.slice(0, 10);
+// The intermediate variable breaks the single-expression regexes above, so
+// we pair up (a) variables assigned directly from `toISOString()`/`toJSON()`
+// (statement must END with the call — further chaining is already covered
+// by the one-liner patterns) with (b) a later date-shaped extraction applied
+// to that exact variable name in the same file. Same for
+// `JSON.stringify(...)` variables followed by the quote-shifted
+// `.slice(1, 11)` / `.substr(1, 10)`.
+const ISO_VAR_ASSIGNMENT =
+  /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[^;\r\n]*?\bto(?:ISOString|JSON)\s*\(\s*\)\s*;?\s*$/gm;
+const STRINGIFY_VAR_ASSIGNMENT =
+  /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*JSON\s*\.\s*stringify\s*\((?:[^()]|\([^()]*\))*\)\s*;?\s*$/gm;
+
+function isoSliceOf(name: string): RegExp {
+  // NAME.slice(0, 10) / .substring(0, 10) / .substr(0, 10) / .split("T")[0]
+  return new RegExp(
+    String.raw`\b${name}\s*\.\s*(?:(?:slice|substring|substr)\s*\(\s*0\s*,\s*10\s*\)|split\s*\(\s*["'` +
+      "`" +
+      String.raw`]T["'` +
+      "`" +
+      String.raw`]\s*\)\s*\[\s*0\s*\])`,
+  );
+}
+
+function stringifySliceOf(name: string): RegExp {
+  // NAME.slice(1, 11) / .substring(1, 11) / .substr(1, 10) — offsets shifted
+  // by the leading quote JSON.stringify wraps around the ISO timestamp.
+  return new RegExp(
+    String.raw`\b${name}\s*\.\s*(?:(?:slice|substring)\s*\(\s*1\s*,\s*11\s*\)|substr\s*\(\s*1\s*,\s*10\s*\))`,
+  );
+}
+
+/**
+ * Returns a description for each variable that is assigned an ISO timestamp
+ * (or a JSON-stringified one) and later has a date-only prefix extracted
+ * from it — the two-step spelling of the inline-"today" idioms.
+ */
+function findTwoStepToday(content: string): string[] {
+  const findings: string[] = [];
+  for (const match of content.matchAll(ISO_VAR_ASSIGNMENT)) {
+    const name = match[1];
+    if (isoSliceOf(name).test(content)) {
+      findings.push(`two-step toISOString()/toJSON() then \`${name}.slice(0, 10)\`-style extraction`);
+    }
+  }
+  for (const match of content.matchAll(STRINGIFY_VAR_ASSIGNMENT)) {
+    const name = match[1];
+    if (stringifySliceOf(name).test(content)) {
+      findings.push(`two-step JSON.stringify(...) then \`${name}.slice(1, 11)\`-style extraction`);
+    }
+  }
+  return findings;
+}
+
 const SOURCE_DIRS = ["lib", "artifacts", "scripts"];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".git"]);
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
@@ -118,6 +175,9 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
         const content = readFileSync(file, "utf8");
         for (const { name, regex } of INLINE_TODAY_PATTERNS) {
           if (regex.test(content)) offenders.push(`${relPath} (${name})`);
+        }
+        for (const finding of findTwoStepToday(content)) {
+          offenders.push(`${relPath} (${finding})`);
         }
       }
     }
@@ -224,5 +284,50 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
     for (const { name, regex } of INLINE_TODAY_PATTERNS) {
       expect(regex.test(snippet), `${name} should not match: ${snippet}`).toBe(false);
     }
+  });
+
+  // Two-step regression fixtures: the ISO string is stored in a variable
+  // first and sliced on a later line. Each caught snippet is one file's
+  // worth of content; each safe snippet must produce zero findings.
+  const twoStepShouldMatch: string[] = [
+    'const iso = new Date().toISOString();\nconst today = iso.slice(0, 10);',
+    'const iso = now.toISOString()\nconst today = iso.substring(0, 10);',
+    'let stamp = new Date().toJSON();\nconst day = stamp.substr(0, 10);',
+    "const iso = new Date().toISOString();\nconst today = iso.split('T')[0];",
+    'const iso = new Date().toISOString();\nconst today = iso.split("T")[0];',
+    // Slicing can come before the assignment textually (e.g. in a helper
+    // defined above) — same file, same variable name, still a hidden "today".
+    'function day() { return iso.slice(0, 10); }\nconst iso = new Date().toISOString();',
+    'const wrapped = JSON.stringify(new Date());\nconst today = wrapped.slice(1, 11);',
+    'const wrapped = JSON.stringify(now);\nconst today = wrapped.substring(1, 11);',
+    'const wrapped = JSON.stringify(new Date());\nconst today = wrapped.substr(1, 10);',
+  ];
+
+  const twoStepShouldNotMatch: string[] = [
+    // ISO string kept whole — no date-only extraction:
+    'const iso = new Date().toISOString();\nreturn res.json({ createdAt: iso });',
+    // Slicing a variable that was never assigned an ISO timestamp:
+    'const header = req.headers.etag;\nconst prefix = header.slice(0, 10);',
+    // ISO variable sliced with non-date-shaped offsets (time-of-day, etc.):
+    'const iso = new Date().toISOString();\nconst hour = iso.slice(11, 13);',
+    'const iso = new Date().toISOString();\nconst year = iso.slice(0, 4);',
+    // Different variable is sliced than the one holding the ISO string:
+    'const iso = new Date().toISOString();\nconst prefix = other.slice(0, 10);',
+    // Stringified non-date trimmed of quotes, not sliced to a date:
+    'const inner = JSON.stringify(key);\nconst body = inner.slice(1, -1);',
+    // Stringify result sliced for a preview, not a date:
+    'const s = JSON.stringify(data);\nconst preview = s.slice(0, 100);',
+    // splitting a non-ISO variable on "T":
+    "const header = req.headers.x;\nconst parts = header.split('T')[0];",
+    // Assignment keeps chaining past the call (one-liner patterns own this):
+    'const today = new Date().toISOString().slice(0, 10);\nconst other = today.trim();',
+  ];
+
+  it.each(twoStepShouldMatch)("two-step detector catches: %s", (snippet) => {
+    expect(findTwoStepToday(snippet).length, snippet).toBeGreaterThan(0);
+  });
+
+  it.each(twoStepShouldNotMatch)("two-step detector does not flag: %s", (snippet) => {
+    expect(findTwoStepToday(snippet), snippet).toEqual([]);
   });
 });
