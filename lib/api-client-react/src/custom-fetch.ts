@@ -17,6 +17,17 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _urlRewrite: ((url: string) => string) | null = null;
+
+/**
+ * Register a rewrite function applied to every relative request URL (paths
+ * starting with `/`) before the base URL is prepended. Lets an app remap the
+ * generated client onto an alternate mount of the same API (e.g. the
+ * read-only demo mount at `/api/demo/...`). Pass `null` to clear.
+ */
+export function setUrlRewrite(rewrite: ((url: string) => string) | null): void {
+  _urlRewrite = rewrite;
+}
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -58,6 +69,17 @@ function resolveMethod(input: RequestInfo | URL, explicitMethod?: string): strin
 // differently, so `instanceof URL` can fail.
 function isUrl(input: RequestInfo | URL): input is URL {
   return typeof URL !== "undefined" && input instanceof URL;
+}
+
+function applyUrlRewrite(input: RequestInfo | URL): RequestInfo | URL {
+  if (!_urlRewrite) return input;
+  const url = resolveUrl(input);
+  if (!url.startsWith("/")) return input;
+  const rewritten = _urlRewrite(url);
+  if (rewritten === url) return input;
+  if (typeof input === "string") return rewritten;
+  if (isUrl(input)) return new URL(rewritten, "http://localhost");
+  return new Request(rewritten, input as Request);
 }
 
 function applyBaseUrl(input: RequestInfo | URL): RequestInfo | URL {
@@ -326,6 +348,7 @@ export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
+  input = applyUrlRewrite(input);
   input = applyBaseUrl(input);
   const { responseType = "auto", headers: headersInit, ...init } = options;
 

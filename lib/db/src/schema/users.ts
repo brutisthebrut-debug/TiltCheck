@@ -15,6 +15,10 @@ export const usersTable = pgTable("users", {
   // Founder = owner of the board: can manage beta invites and see the founder
   // dashboard. Assigned to the first account that links a profile.
   isFounder: boolean("is_founder").notNull().default(false),
+  // Demo crew member: fictional data shown on the public demo board only.
+  // Every real-user query is scoped to isDemo=false and every demo query to
+  // isDemo=true, so the two worlds never mix.
+  isDemo: boolean("is_demo").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

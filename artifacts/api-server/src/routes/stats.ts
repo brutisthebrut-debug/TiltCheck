@@ -13,6 +13,7 @@ import { isValidAmericanOdds } from "../lib/odds";
 import { isRealCalendarDate } from "../lib/dates";
 import { computeWeeklyRecap, mondayOf, lastCompletedWeekStart, dayOf } from "../lib/recap";
 import { requireProfile } from "../middlewares/auth";
+import { userScopeCondition, userInScope } from "../lib/scope";
 
 const router: IRouter = Router();
 
@@ -31,9 +32,12 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
   }
   let userId = query.data.userId;
   if (userId == null) {
-    const [u] = await db.select().from(usersTable).orderBy(usersTable.id).limit(1);
+    const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json(emptySummary(0)); return; }
     userId = u.id;
+  } else if (!(await userInScope(req, userId))) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
 
   const allBets = await db.select().from(betsTable).where(eq(betsTable.userId, userId));
@@ -134,9 +138,12 @@ router.get("/stats/by-sport", async (req, res): Promise<void> => {
   }
   let userId = query.data.userId;
   if (userId == null) {
-    const [u] = await db.select().from(usersTable).orderBy(usersTable.id).limit(1);
+    const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json([]); return; }
     userId = u.id;
+  } else if (!(await userInScope(req, userId))) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
 
   const bets = (
@@ -188,14 +195,16 @@ router.get("/stats/recent-activity", async (req, res): Promise<void> => {
   const bets = await db
     .select({ bet: betsTable, user: usersTable })
     .from(betsTable)
-    .leftJoin(usersTable, eq(betsTable.userId, usersTable.id))
+    .innerJoin(usersTable, eq(betsTable.userId, usersTable.id))
+    .where(userScopeCondition(req))
     .orderBy(desc(betsTable.createdAt))
     .limit(limit);
 
   const parlayRows = await db
     .select({ parlay: parlaysTable, user: usersTable })
     .from(parlaysTable)
-    .leftJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
+    .innerJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
+    .where(userScopeCondition(req))
     .orderBy(desc(parlaysTable.createdAt))
     .limit(limit);
 
@@ -242,9 +251,12 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
   }
   let userId = query.data.userId;
   if (userId == null) {
-    const [u] = await db.select().from(usersTable).orderBy(usersTable.id).limit(1);
+    const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json([]); return; }
     userId = u.id;
+  } else if (!(await userInScope(req, userId))) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
 
   const bets = (
@@ -292,9 +304,12 @@ router.get("/stats/insights", async (req, res): Promise<void> => {
   };
   let userId = query.data.userId;
   if (userId == null) {
-    const [u] = await db.select().from(usersTable).orderBy(usersTable.id).limit(1);
+    const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json(emptyInsights); return; }
     userId = u.id;
+  } else if (!(await userInScope(req, userId))) {
+    res.status(404).json({ error: "User not found" });
+    return;
   }
 
   const bets = await db.select().from(betsTable).where(
@@ -403,6 +418,10 @@ router.get("/stats/recap", requireProfile, async (req, res): Promise<void> => {
     return;
   }
   const userId = query.data.userId ?? req.currentUser!.id;
+  if (query.data.userId != null && !(await userInScope(req, query.data.userId))) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
 
   const today = dayOf(new Date());
   const latest = lastCompletedWeekStart(today);
@@ -419,11 +438,16 @@ router.get("/stats/recap", requireProfile, async (req, res): Promise<void> => {
     }
   }
 
-  const [users, bets, parlays] = await Promise.all([
-    db.select({ id: usersTable.id, displayName: usersTable.displayName }).from(usersTable),
+  // Crew highlights only ever cover the request's world: the demo recap talks
+  // about the demo crew, real recaps never mention demo bettors.
+  const [users, allBets, allParlays] = await Promise.all([
+    db.select({ id: usersTable.id, displayName: usersTable.displayName }).from(usersTable).where(userScopeCondition(req)),
     db.select().from(betsTable),
     db.select().from(parlaysTable),
   ]);
+  const scopedIds = new Set(users.map((u) => u.id));
+  const bets = allBets.filter((b) => scopedIds.has(b.userId));
+  const parlays = allParlays.filter((p) => scopedIds.has(p.userId));
 
   res.json(computeWeeklyRecap({ users, bets, parlays, userId, weekStart }));
 });

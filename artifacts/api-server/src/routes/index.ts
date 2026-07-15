@@ -11,11 +11,30 @@ import badgesRouter from "./badges";
 import workspaceRouter from "./workspace";
 import adminRouter from "./admin";
 import { requireAuth } from "../middlewares/auth";
+import { demoReadOnly, demoSession } from "../middlewares/demo";
 
 const router: IRouter = Router();
 
 // Public
 router.use(healthRouter);
+
+// Public demo board — no sign-in, strictly read-only, and scoped to the
+// fictional demo crew (see middlewares/demo.ts and lib/scope.ts). Reuses the
+// exact same route handlers as the real app so the demo IS the product.
+// Admin routes are deliberately not mounted here.
+const demoRouter: IRouter = Router();
+demoRouter.use(demoReadOnly);
+demoRouter.use(demoSession);
+demoRouter.use(usersRouter);
+demoRouter.use(betsRouter);
+demoRouter.use(parlaysRouter);
+demoRouter.use(settlementRouter);
+demoRouter.use(exportRouter);
+demoRouter.use(bankrollRouter);
+demoRouter.use(statsRouter);
+demoRouter.use(badgesRouter);
+demoRouter.use(workspaceRouter);
+router.use("/demo", demoRouter);
 
 // Everything below requires a signed-in session
 router.use(requireAuth);

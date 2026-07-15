@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { GetStreaksQueryParams } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
+import { userInScope } from "../lib/scope";
 import {
   BADGE_DEFINITIONS,
   computeQualifiedBadges,
@@ -60,6 +61,12 @@ router.get("/users/:id/badges", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid user id" });
     return;
   }
+  // World scoping: demo sessions can only open demo bettors' badge cases and
+  // real sessions never see demo profiles.
+  if (!(await userInScope(req, id))) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
   const input = await loadBadgeInput(id);
   if (!input) {
     res.status(404).json({ error: "User not found" });
@@ -98,6 +105,10 @@ router.get("/stats/streaks", requireProfile, async (req, res): Promise<void> => 
     return;
   }
   const userId = query.data.userId ?? req.currentUser!.id;
+  if (query.data.userId != null && !(await userInScope(req, query.data.userId))) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
   const input = await loadBadgeInput(userId);
   if (!input) {
     res.status(404).json({ error: "User not found" });

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { ensureDemoSeeded } from "./lib/demo-seed";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,16 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Self-seed the public demo board when its world is empty (first prod boot,
+  // or a dev database that tests have wiped). Idempotent and non-blocking.
+  ensureDemoSeeded()
+    .then((result) => {
+      if (result.seeded) {
+        logger.info({ users: result.users }, "Demo board seeded");
+      }
+    })
+    .catch((err) => {
+      logger.error({ err }, "Demo board seeding failed");
+    });
 });

@@ -166,12 +166,23 @@ export default function Landing() {
             yourself at &minus;110.
           </p>
 
-          <Button asChild size="lg" className="mt-10 gap-2 text-base px-8" data-testid="button-hero-cta">
-            <Link href="/sign-in">
-              Get on the board
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
+            <Button asChild size="lg" className="gap-2 text-base px-8" data-testid="button-hero-cta">
+              <Link href="/sign-in">
+                Get on the board
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="gap-2 text-base px-8 border-primary/30 text-primary hover:bg-primary/10"
+              data-testid="button-hero-demo"
+            >
+              <Link href="/demo">View the demo board</Link>
+            </Button>
+          </div>
           <p className="mt-3 text-xs text-muted-foreground/70">
             Sign in with Google. No picks. No touts. Just your own tape.
           </p>
@@ -223,6 +234,9 @@ export default function Landing() {
               Sign in with Google
               <ArrowRight className="h-4 w-4" />
             </Link>
+          </Button>
+          <Button asChild variant="ghost" className="mt-3 text-muted-foreground" data-testid="button-footer-demo">
+            <Link href="/demo">Not sure yet? Poke around the demo board</Link>
           </Button>
         </section>
       </main>

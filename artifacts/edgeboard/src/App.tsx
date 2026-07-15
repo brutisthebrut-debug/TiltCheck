@@ -23,6 +23,7 @@ import Workspace from './pages/Workspace';
 import Bankroll from './pages/Bankroll';
 import Recap from './pages/Recap';
 import Founder from './pages/Founder';
+import DemoApp from './pages/DemoApp';
 
 const queryClient = new QueryClient();
 
@@ -225,6 +226,11 @@ function ClerkProviderWithRoutes() {
           {/* REQUIRED — "/sign-in/*?" and "/sign-up/*?" verbatim for OAuth sub-paths */}
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
+          {/* Public demo board — works signed-out AND signed-in; it brings its
+              own QueryClient so it never touches the real session's cache. */}
+          <Route path="/demo" nest>
+            <DemoApp />
+          </Route>
           <Route>
             <Show when="signed-in">
               <AuthedApp />

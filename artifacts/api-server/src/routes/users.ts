@@ -3,6 +3,7 @@ import { and, eq, isNull, isNotNull, asc, count, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
 import { db, usersTable, invitesTable } from "@workspace/db";
 import { dayOf, lastCompletedWeekStart } from "../lib/recap";
+import { userScopeCondition } from "../lib/scope";
 import { founderEmail } from "../lib/founder";
 import {
   MarkRecapSeenResponse,
@@ -105,12 +106,14 @@ router.post("/users/me/recap-seen", async (req, res): Promise<void> => {
   res.json(MarkRecapSeenResponse.parse(formatUser(updated)));
 });
 
-// GET /users/unclaimed — profiles not yet linked to a sign-in account
-router.get("/users/unclaimed", async (_req, res): Promise<void> => {
+// GET /users/unclaimed — profiles not yet linked to a sign-in account.
+// Scoped to the request's world: demo crew members are unlinked by design and
+// must never show up as claimable profiles for real sign-ups.
+router.get("/users/unclaimed", async (req, res): Promise<void> => {
   const users = await db
     .select()
     .from(usersTable)
-    .where(isNull(usersTable.clerkUserId))
+    .where(and(isNull(usersTable.clerkUserId), userScopeCondition(req)))
     .orderBy(asc(usersTable.id));
   res.json(ListUnclaimedUsersResponse.parse(users.map(formatUser)));
 });
@@ -192,15 +195,29 @@ router.post("/users/claim", async (req, res): Promise<void> => {
 
       if (userId != null) {
         // Claim an existing profile — the isNull guard means two accounts can
-        // never claim the same profile
+        // never claim the same profile, and the isDemo guard means the
+        // fictional demo crew (whose ids are publicly listed on the demo
+        // board) can never be linked to a real sign-in.
         const [claimed] = await tx
           .update(usersTable)
           .set({ clerkUserId, email, ...(becomesFounder ? { isFounder: true } : {}) })
-          .where(and(eq(usersTable.id, userId), isNull(usersTable.clerkUserId)))
+          .where(
+            and(
+              eq(usersTable.id, userId),
+              isNull(usersTable.clerkUserId),
+              eq(usersTable.isDemo, false),
+            ),
+          )
           .returning();
         if (!claimed) {
-          const [existing] = await tx.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-          if (!existing) {
+          const [existing] = await tx
+            .select({ id: usersTable.id, isDemo: usersTable.isDemo })
+            .from(usersTable)
+            .where(eq(usersTable.id, userId))
+            .limit(1);
+          if (!existing || existing.isDemo) {
+            // Demo profiles are invisible to the real world — report them
+            // exactly like a nonexistent id.
             return { status: 404, body: { error: "Profile not found" } };
           }
           return { status: 409, body: { error: "Profile already claimed by another account" } };
@@ -252,9 +269,10 @@ router.post("/users/claim", async (req, res): Promise<void> => {
   res.status(outcome.status).json(outcome.body);
 });
 
-// GET /users
-router.get("/users", async (_req, res): Promise<void> => {
-  const users = await db.select().from(usersTable).orderBy(usersTable.id);
+// GET /users — scoped: real sessions see the real crew, demo sessions see the
+// fictional demo crew, never both.
+router.get("/users", async (req, res): Promise<void> => {
+  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
   res.json(ListUsersResponse.parse(users.map(formatUser)));
 });
 

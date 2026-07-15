@@ -7,6 +7,7 @@ import {
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { likeContains, clampPageSize } from "../lib/search";
+import { userScopeCondition } from "../lib/scope";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import {
   isValidAmericanOdds,
@@ -79,7 +80,9 @@ router.get("/parlays", async (req, res): Promise<void> => {
     return;
   }
   const { userId, status, sport, sportsbook, q, dateFrom, dateTo, limit, offset } = query.data;
-  const conditions = [];
+  // World scoping: inner join + scope condition keeps demo and real parlays
+  // strictly separated regardless of any explicit userId filter.
+  const conditions = [userScopeCondition(req)];
   if (userId != null) conditions.push(eq(parlaysTable.userId, userId));
   if (status != null) conditions.push(eq(parlaysTable.status, status));
   if (sportsbook != null) conditions.push(eq(parlaysTable.sportsbook, sportsbook));
@@ -117,8 +120,8 @@ router.get("/parlays", async (req, res): Promise<void> => {
   const rows = await db
     .select({ parlay: parlaysTable, user: usersTable })
     .from(parlaysTable)
-    .leftJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .innerJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
+    .where(and(...conditions))
     .orderBy(desc(parlaysTable.createdAt), desc(parlaysTable.id))
     .limit(clampPageSize(limit, 50))
     .offset(Math.max(0, offset ?? 0));
@@ -217,8 +220,8 @@ router.get("/parlays/:id", async (req, res): Promise<void> => {
   const rows = await db
     .select({ parlay: parlaysTable, user: usersTable })
     .from(parlaysTable)
-    .leftJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
-    .where(eq(parlaysTable.id, params.data.id));
+    .innerJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
+    .where(and(eq(parlaysTable.id, params.data.id), userScopeCondition(req)));
   if (rows.length === 0) {
     res.status(404).json({ error: "Parlay not found" });
     return;

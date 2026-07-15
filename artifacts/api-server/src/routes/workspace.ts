@@ -5,13 +5,18 @@ import { GetWorkspaceLeaderboardQueryParams } from "@workspace/api-zod";
 import { isValidAmericanOdds } from "../lib/odds";
 import { BADGE_DEFINITIONS } from "../lib/badges";
 import { requireProfile } from "../middlewares/auth";
+import { userScopeCondition } from "../lib/scope";
 
 const router: IRouter = Router();
 
 // GET /workspace
-router.get("/workspace", async (_req, res): Promise<void> => {
-  const users = await db.select().from(usersTable).orderBy(usersTable.id);
-  const betCount = await db.select({ count: betsTable.id }).from(betsTable);
+router.get("/workspace", async (req, res): Promise<void> => {
+  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
+  const betCount = await db
+    .select({ count: betsTable.id })
+    .from(betsTable)
+    .innerJoin(usersTable, eq(betsTable.userId, usersTable.id))
+    .where(userScopeCondition(req));
 
   res.json({
     id: 1,
@@ -30,8 +35,8 @@ router.get("/workspace", async (_req, res): Promise<void> => {
 });
 
 // GET /workspace/compare
-router.get("/workspace/compare", async (_req, res): Promise<void> => {
-  const users = await db.select().from(usersTable).orderBy(usersTable.id);
+router.get("/workspace/compare", async (req, res): Promise<void> => {
+  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
 
   const comparisons = await Promise.all(
     users.map(async (user) => {
@@ -102,9 +107,14 @@ router.get("/workspace/leaderboard", requireProfile, async (req, res): Promise<v
         ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         : null;
 
-  const users = await db.select().from(usersTable).orderBy(usersTable.id);
-  const allBets = (await db.select().from(betsTable)).filter((b) => isValidAmericanOdds(b.odds));
-  const allParlays = (await db.select().from(parlaysTable)).filter((p) => isValidAmericanOdds(p.odds));
+  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
+  const scopedIds = new Set(users.map((u) => u.id));
+  const allBets = (await db.select().from(betsTable)).filter(
+    (b) => isValidAmericanOdds(b.odds) && scopedIds.has(b.userId),
+  );
+  const allParlays = (await db.select().from(parlaysTable)).filter(
+    (p) => isValidAmericanOdds(p.odds) && scopedIds.has(p.userId),
+  );
 
   // Badge chips: up to 3 most recently earned per member (persisted awards
   // only — awarding itself happens on the badge-case endpoint).

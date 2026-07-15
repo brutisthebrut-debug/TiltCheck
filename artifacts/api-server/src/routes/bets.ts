@@ -15,6 +15,7 @@ import { requireProfile } from "../middlewares/auth";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import { isValidAmericanOdds, INVALID_ODDS_MESSAGE } from "../lib/odds";
 import { likeContains, clampPageSize } from "../lib/search";
+import { userScopeCondition } from "../lib/scope";
 
 const router: IRouter = Router();
 
@@ -61,7 +62,10 @@ router.get("/bets", async (req, res): Promise<void> => {
   }
   const { userId, status, sport, sportsbook, q, dateFrom, dateTo, limit, offset } = query.data;
 
-  const conditions = [];
+  // World scoping: the join to users is inner + scoped, so demo sessions only
+  // ever see demo bets and real sessions never see demo bets — even when an
+  // explicit userId filter points across the boundary.
+  const conditions = [userScopeCondition(req)];
   if (userId != null) conditions.push(eq(betsTable.userId, userId));
   if (status != null) conditions.push(eq(betsTable.status, status));
   if (sport != null) conditions.push(eq(betsTable.sport, sport));
@@ -76,8 +80,8 @@ router.get("/bets", async (req, res): Promise<void> => {
   const rows = await db
     .select({ bet: betsTable, user: usersTable })
     .from(betsTable)
-    .leftJoin(usersTable, eq(betsTable.userId, usersTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .innerJoin(usersTable, eq(betsTable.userId, usersTable.id))
+    .where(and(...conditions))
     .orderBy(desc(betsTable.createdAt), desc(betsTable.id))
     .limit(clampPageSize(limit, 50))
     .offset(Math.max(0, offset ?? 0));
@@ -138,8 +142,8 @@ router.get("/bets/:id", async (req, res): Promise<void> => {
   const rows = await db
     .select({ bet: betsTable, user: usersTable })
     .from(betsTable)
-    .leftJoin(usersTable, eq(betsTable.userId, usersTable.id))
-    .where(eq(betsTable.id, params.data.id));
+    .innerJoin(usersTable, eq(betsTable.userId, usersTable.id))
+    .where(and(eq(betsTable.id, params.data.id), userScopeCondition(req)));
   if (rows.length === 0) {
     res.status(404).json({ error: "Bet not found" });
     return;

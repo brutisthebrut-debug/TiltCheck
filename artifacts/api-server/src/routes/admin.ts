@@ -95,15 +95,18 @@ router.delete("/admin/invites/:id", async (req, res): Promise<void> => {
 
 // GET /admin/overview — seats, invites, and crew activity for the founder dash
 router.get("/admin/overview", async (req, res): Promise<void> => {
+  // Founder dash covers the real crew only — the fictional demo bettors and
+  // their seeded plays are excluded from every count.
   const [users, bets, parlays, invites] = await Promise.all([
-    db.select().from(usersTable).orderBy(usersTable.id),
+    db.select().from(usersTable).where(eq(usersTable.isDemo, false)).orderBy(usersTable.id),
     db.select({ userId: betsTable.userId, stake: betsTable.stake, createdAt: betsTable.createdAt }).from(betsTable),
     db.select({ userId: parlaysTable.userId, stake: parlaysTable.stake, createdAt: parlaysTable.createdAt }).from(parlaysTable),
     db.select().from(invitesTable),
   ]);
 
   const weekStart = new Date(`${mondayOf(dayOf(new Date()))}T00:00:00Z`);
-  const plays = [...bets, ...parlays];
+  const realIds = new Set(users.map((u) => u.id));
+  const plays = [...bets, ...parlays].filter((p) => realIds.has(p.userId));
 
   type MemberAgg = { plays: number; playsThisWeek: number; wagered: number; lastPlayAt: Date | null };
   const byUser = new Map<number, MemberAgg>();
