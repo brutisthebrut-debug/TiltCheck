@@ -30,6 +30,7 @@ import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, Plus, Trash2, ChevronDown, AlertTriangle, Lightbulb } from "lucide-react"
+import { MistakeWarning } from "@/components/MistakeWarning"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 import { dayOf } from "@workspace/weeks"
 
@@ -186,6 +187,8 @@ export default function NewParlay() {
           <p className="text-muted-foreground mt-1">Build a multi-leg parlay.</p>
         </div>
       </div>
+
+      <MistakeWarning />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

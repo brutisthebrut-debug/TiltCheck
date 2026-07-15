@@ -24,6 +24,7 @@ import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, ChevronDown, AlertTriangle, Lightbulb } from "lucide-react"
+import { MistakeWarning } from "@/components/MistakeWarning"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 import { dayOf } from "@workspace/weeks"
 
@@ -191,6 +192,8 @@ export default function NewBet() {
           <p className="text-muted-foreground mt-1">Log a new straight bet.</p>
         </div>
       </div>
+
+      <MistakeWarning />
 
       <Card className="bg-card">
         <Form {...form}>
