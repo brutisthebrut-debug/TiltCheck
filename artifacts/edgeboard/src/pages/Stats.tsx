@@ -3,6 +3,9 @@ import { useGetStatsSummary, useGetStatsBySport, useGetConfidenceAnalysis, useGe
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react"
+import { dayOf, addDays } from "@workspace/weeks"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { UpgradeCard } from "@/components/UpgradeCard"
 import { useProStatus } from "@/hooks/use-pro"
@@ -21,8 +24,20 @@ const MISS_REASON_LABELS: Record<string, string> = {
   na: "N/A",
 }
 
+const RANGE_LABELS: Record<string, string> = {
+  "30": "the last 30 days",
+  "90": "the last 90 days",
+}
+
+function sinceForRange(range: string): string | undefined {
+  if (range !== "30" && range !== "90") return undefined
+  return addDays(dayOf(new Date()), -parseInt(range, 10))
+}
+
 export default function Stats() {
   const { activeUser } = useUser()
+  const [lessonsSport, setLessonsSport] = useState<string>("all")
+  const [lessonsRange, setLessonsRange] = useState<string>("all")
 
   const { data: summary, isLoading: isSummaryLoading, isError: isSummaryError, refetch: refetchSummary, isRefetching: isSummaryRefetching } = useGetStatsSummary(
     { userId: activeUser?.id },
@@ -42,10 +57,17 @@ export default function Stats() {
   // Lessons are a Pro surface — keep the query off for free accounts so the
   // 402 never surfaces as an error state.
   const { isPro, isProLoading, isProUnknown } = useProStatus()
-  const { data: insights } = useGetStatsInsights(
-    { userId: activeUser?.id },
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey({ userId: activeUser?.id }) } }
+  const lessonsSince = sinceForRange(lessonsRange)
+  const insightsParams = {
+    userId: activeUser?.id,
+    ...(lessonsSport !== "all" ? { sport: lessonsSport } : {}),
+    ...(lessonsSince ? { since: lessonsSince } : {}),
+  }
+  const { data: insights, isLoading: isInsightsLoading } = useGetStatsInsights(
+    insightsParams,
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey(insightsParams) } }
   )
+  const lessonsFiltered = lessonsSport !== "all" || lessonsRange !== "all"
 
   const isLoading = isSummaryLoading || isSportLoading || isConfidenceLoading
   const isError = isSummaryError || isSportError || isConfidenceError
@@ -310,8 +332,8 @@ export default function Stats() {
 
       {/* Post-result insights feed */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 mr-auto">
             <Lightbulb className="h-5 w-5 text-primary" />
             <h2 className="text-xl font-semibold tracking-tight">Lessons</h2>
           </div>
@@ -319,6 +341,42 @@ export default function Stats() {
             Lesson Library
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
+          {isPro && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={lessonsSport} onValueChange={setLessonsSport}>
+                <SelectTrigger className="h-8 w-[140px]" data-testid="select-lessons-sport">
+                  <SelectValue placeholder="All sports" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All sports</SelectItem>
+                  {[...sportStats].map((s) => s.sport).sort().map((sport) => (
+                    <SelectItem key={sport} value={sport}>{sport}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex rounded-md border overflow-hidden">
+                {[
+                  { value: "30", label: "30d" },
+                  { value: "90", label: "90d" },
+                  { value: "all", label: "All time" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setLessonsRange(opt.value)}
+                    data-testid={`button-lessons-range-${opt.value}`}
+                    className={`px-3 h-8 text-xs font-medium transition-colors ${
+                      lessonsRange === opt.value
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         {!isPro ? (
           isProLoading ? (
@@ -326,23 +384,45 @@ export default function Stats() {
           ) : isProUnknown ? null : (
             <UpgradeCard compact feature="The Lessons feed" />
           )
+        ) : isInsightsLoading ? (
+          <Card className="animate-pulse bg-muted/50 h-32" />
         ) : !insights || insights.reviewedCount < 3 ? (
-          <Card className="border-dashed border-2 border-muted">
+          <Card className="border-dashed border-2 border-muted" data-testid="card-lessons-empty">
             <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                 <Lightbulb className="h-6 w-6 text-muted-foreground" />
               </div>
-              <div>
-                <h3 className="font-semibold">Not enough reviews yet</h3>
-                <p className="text-muted-foreground text-sm mt-1 max-w-md">
-                  Grade at least 3 bets with review details (reasoning quality, miss reason, or notes) to unlock
-                  patterns from your post-game reviews.
-                  {insights ? ` ${insights.reviewedCount} of 3 reviewed so far.` : ""}
-                </p>
-              </div>
+              {lessonsFiltered ? (
+                <div>
+                  <h3 className="font-semibold">Not much to learn from this slice</h3>
+                  <p className="text-muted-foreground text-sm mt-1 max-w-md">
+                    {lessonsSport !== "all" ? `${lessonsSport} ` : "Your plays "}
+                    {lessonsRange !== "all" ? `over ${RANGE_LABELS[lessonsRange]} ` : ""}
+                    {insights && insights.reviewedCount > 0
+                      ? `only has ${insights.reviewedCount} reviewed ${insights.reviewedCount === 1 ? "play" : "plays"} — patterns need at least 3.`
+                      : "has no reviewed plays yet — patterns need at least 3."}
+                    {" "}Widen the filter or grade more bets in this slice.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="font-semibold">Not enough reviews yet</h3>
+                  <p className="text-muted-foreground text-sm mt-1 max-w-md">
+                    Grade at least 3 bets with review details (reasoning quality, miss reason, or notes) to unlock
+                    patterns from your post-game reviews.
+                    {insights ? ` ${insights.reviewedCount} of 3 reviewed so far.` : ""}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : (
+          <div className="space-y-3">
+          {lessonsSport !== "all" && (
+            <p className="text-xs text-muted-foreground" data-testid="text-lessons-sport-note">
+              Parlays span sports, so this {lessonsSport} slice covers straight bets only.
+            </p>
+          )}
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="bg-card">
               <CardHeader>
@@ -452,6 +532,7 @@ export default function Stats() {
                 )}
               </CardContent>
             </Card>
+          </div>
           </div>
         )}
       </div>

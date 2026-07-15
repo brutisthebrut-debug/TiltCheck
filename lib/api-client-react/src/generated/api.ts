@@ -3773,6 +3773,7 @@ export const getGetStatsInsightsUrl = (params?: GetStatsInsightsParams,) => {
 }
 
 /**
+ * Aggregates post-game review data across settled plays. Optional filters slice the feed: `sport` limits it to straight bets in that sport (parlays span sports, so they drop out of a sport slice), and `since` (YYYY-MM-DD) keeps only plays settled on or after that date.
  * @summary Post-result review insights (miss reasons, reasoning quality, recent notes)
  */
 export const getStatsInsights = async (params?: GetStatsInsightsParams, options?: RequestInit): Promise<InsightsResponse> => {
@@ -3797,7 +3798,7 @@ export const getGetStatsInsightsQueryKey = (params?: GetStatsInsightsParams,) =>
     }
 
 
-export const getGetStatsInsightsQueryOptions = <TData = Awaited<ReturnType<typeof getStatsInsights>>, TError = ErrorType<unknown>>(params?: GetStatsInsightsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetStatsInsightsQueryOptions = <TData = Awaited<ReturnType<typeof getStatsInsights>>, TError = ErrorType<void>>(params?: GetStatsInsightsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -3816,14 +3817,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStatsInsightsQueryResult = NonNullable<Awaited<ReturnType<typeof getStatsInsights>>>
-export type GetStatsInsightsQueryError = ErrorType<unknown>
+export type GetStatsInsightsQueryError = ErrorType<void>
 
 
 /**
  * @summary Post-result review insights (miss reasons, reasoning quality, recent notes)
  */
 
-export function useGetStatsInsights<TData = Awaited<ReturnType<typeof getStatsInsights>>, TError = ErrorType<unknown>>(
+export function useGetStatsInsights<TData = Awaited<ReturnType<typeof getStatsInsights>>, TError = ErrorType<void>>(
  params?: GetStatsInsightsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

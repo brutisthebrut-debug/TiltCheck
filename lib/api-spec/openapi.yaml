@@ -1250,11 +1250,26 @@ paths:
       operationId: getStatsInsights
       tags: [stats]
       summary: Post-result review insights (miss reasons, reasoning quality, recent notes)
+      description: >
+        Aggregates post-game review data across settled plays. Optional
+        filters slice the feed: `sport` limits it to straight bets in that
+        sport (parlays span sports, so they drop out of a sport slice), and
+        `since` (YYYY-MM-DD) keeps only plays settled on or after that date.
       parameters:
         - name: userId
           in: query
           schema:
             type: ["integer", "null"]
+        - name: sport
+          in: query
+          description: Only include straight bets in this sport (excludes parlays)
+          schema:
+            type: ["string", "null"]
+        - name: since
+          in: query
+          description: Only include plays settled on or after this date (YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
       responses:
         "200":
           description: Review insights
@@ -1262,6 +1277,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InsightsResponse"
+        "400":
+          description: Invalid since date
 
   /stats/lessons:
     get:

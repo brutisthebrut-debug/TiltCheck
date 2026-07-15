@@ -1376,10 +1376,13 @@ export const GetConfidenceAnalysisResponse = zod.array(GetConfidenceAnalysisResp
 
 
 /**
+ * Aggregates post-game review data across settled plays. Optional filters slice the feed: `sport` limits it to straight bets in that sport (parlays span sports, so they drop out of a sport slice), and `since` (YYYY-MM-DD) keeps only plays settled on or after that date.
  * @summary Post-result review insights (miss reasons, reasoning quality, recent notes)
  */
 export const GetStatsInsightsQueryParams = zod.object({
-  "userId": zod.coerce.number().nullish()
+  "userId": zod.coerce.number().nullish(),
+  "sport": zod.coerce.string().nullish().describe('Only include straight bets in this sport (excludes parlays)'),
+  "since": zod.coerce.string().nullish().describe('Only include plays settled on or after this date (YYYY-MM-DD)')
 })
 
 export const GetStatsInsightsResponse = zod.object({

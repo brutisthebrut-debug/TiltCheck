@@ -321,6 +321,14 @@ router.get("/stats/insights", requirePro, async (req, res): Promise<void> => {
     flawedReasoning: { total: 0, wins: 0, winRate: 0 },
     recentNotes: [],
   };
+  const sportFilter = query.data.sport ?? null;
+  const sinceParam = query.data.since ?? null;
+  if (sinceParam != null && !isRealCalendarDate(sinceParam)) {
+    res.status(400).json({ error: "since must be a real calendar date (YYYY-MM-DD)" });
+    return;
+  }
+  const sinceDate = sinceParam != null ? new Date(`${sinceParam}T00:00:00.000Z`) : null;
+
   let userId = query.data.userId;
   if (userId == null) {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
@@ -334,10 +342,21 @@ router.get("/stats/insights", requirePro, async (req, res): Promise<void> => {
   }
 
   const bets = await db.select().from(betsTable).where(
-    and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
+    and(
+      eq(betsTable.userId, userId),
+      inArray(betsTable.status, ["won", "lost", "push"]),
+      ...(sportFilter != null ? [eq(betsTable.sport, sportFilter)] : []),
+      ...(sinceDate != null ? [gte(betsTable.settledAt, sinceDate)] : []),
+    )
   );
-  const parlays = await db.select().from(parlaysTable).where(
-    and(eq(parlaysTable.userId, userId), inArray(parlaysTable.status, ["won", "lost", "push"]))
+  // A sport slice is straight-bets-only — a parlay spans sports, so it can't
+  // honestly belong to any single sport's lessons.
+  const parlays = sportFilter != null ? [] : await db.select().from(parlaysTable).where(
+    and(
+      eq(parlaysTable.userId, userId),
+      inArray(parlaysTable.status, ["won", "lost", "push"]),
+      ...(sinceDate != null ? [gte(parlaysTable.settledAt, sinceDate)] : []),
+    )
   );
 
   type Reviewable = {

@@ -1580,6 +1580,16 @@ export type GetStatsInsightsParams = {
  * @nullable
  */
 userId?: number | null;
+/**
+ * Only include straight bets in this sport (excludes parlays)
+ * @nullable
+ */
+sport?: string | null;
+/**
+ * Only include plays settled on or after this date (YYYY-MM-DD)
+ * @nullable
+ */
+since?: string | null;
 };
 
 export type GetLessonsParams = {
