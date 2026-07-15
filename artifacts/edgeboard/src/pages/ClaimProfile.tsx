@@ -23,6 +23,8 @@ import {
   setFavoriteSports,
 } from "@/lib/preferences"
 import { setFirstRunSetupActive } from "@/hooks/use-first-run"
+import { CrewOnboarding } from "@/components/CrewOnboarding"
+import { getPendingInviteCode, clearPendingInviteCode } from "@/lib/pending-invite"
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
@@ -42,6 +44,10 @@ export default function ClaimProfile() {
   const [bankrollInput, setBankrollInput] = useState("")
   const [sportsbook, setSportsbook] = useState("")
   const [favoriteSports, setFavoriteSportsState] = useState<string[]>([])
+
+  // Step 3: walk the new bettor onto a board (join with a code / start a
+  // crew / skip). Shown once, right after the baseline setup.
+  const [crewStep, setCrewStep] = useState(false)
 
   const finish = () => {
     setFirstRunSetupActive(false)
@@ -108,13 +114,13 @@ export default function ClaimProfile() {
     const validAmount = bankrollInput.trim() !== "" && !isNaN(amount) && amount > 0
     if (!validAmount || amount === claimedUser.startingBankroll) {
       // Nothing to save server-side — keep whatever the profile already has
-      finish()
+      setCrewStep(true)
       return
     }
     updateUser.mutate(
       { id: claimedUser.id, data: { startingBankroll: amount } },
       {
-        onSuccess: finish,
+        onSuccess: () => setCrewStep(true),
         onError: () => setError("Couldn't save your bankroll. You can set it later on the Bankroll page."),
       },
     )
@@ -122,7 +128,20 @@ export default function ClaimProfile() {
 
   const skipSetup = () => {
     savePreferences()
-    finish()
+    setCrewStep(true)
+  }
+
+  // ── Step 3: get on a board ──────────────────────────────────────────────
+  if (claimedUser && crewStep) {
+    return (
+      <CrewOnboarding
+        initialCode={getPendingInviteCode()}
+        onDone={() => {
+          clearPendingInviteCode()
+          finish()
+        }}
+      />
+    )
   }
 
   // ── Step 2: first-run setup ─────────────────────────────────────────────

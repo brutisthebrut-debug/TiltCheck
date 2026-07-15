@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
+import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -8,6 +8,8 @@ import { Layout } from './components/Layout';
 import { Toaster } from './components/ui/toaster';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { useFirstRunSetupActive } from './hooks/use-first-run';
+import { CrewOnboarding } from './components/CrewOnboarding';
+import { getPendingInviteCode, setPendingInviteCode, clearPendingInviteCode } from './lib/pending-invite';
 
 import Landing from './pages/Landing';
 import ClaimProfile from './pages/ClaimProfile';
@@ -158,11 +160,30 @@ function AuthedApp() {
 function ProfileGate() {
   const { activeUser, isLoading, needsClaim } = useUser();
   const firstRunSetupActive = useFirstRunSetupActive();
+  // Bumped when a pending invite is consumed/skipped so the gate re-reads
+  // storage and lets the app through.
+  const [, setInviteHandledAt] = useState(0);
 
   // Keep the claim/setup screen up while first-run setup is in progress,
   // even if a background refetch already resolved the linked profile.
   if (needsClaim || firstRunSetupActive) return <ClaimProfile />;
   if (isLoading || !activeUser) return <LoadingScreen />;
+
+  // An invite link (/join/CODE) followed by someone who already has a
+  // profile: hand them straight to the join step, pre-filled. (Fresh signups
+  // consume the code inside the claim flow instead.)
+  const pendingCode = getPendingInviteCode();
+  if (pendingCode) {
+    return (
+      <CrewOnboarding
+        initialCode={pendingCode}
+        onDone={() => {
+          clearPendingInviteCode();
+          setInviteHandledAt(Date.now());
+        }}
+      />
+    );
+  }
 
   return (
     <Layout>
@@ -184,6 +205,29 @@ function ProfileGate() {
         <Route component={NotFound} />
       </Switch>
     </Layout>
+  );
+}
+
+/**
+ * Invite deep link: /join/CODE. Stashes the code so it survives the whole
+ * Clerk sign-up round-trip, then routes by auth state — signed-out visitors
+ * go create an account (the claim flow's crew step picks the code up),
+ * signed-in bettors land on the pre-filled join screen via ProfileGate.
+ */
+function JoinRoute({ code }: { code: string }) {
+  // Written synchronously during render (idempotent) so the code is stashed
+  // before the Redirect's effect fires.
+  if (code) setPendingInviteCode(decodeURIComponent(code));
+
+  return (
+    <>
+      <Show when="signed-in">
+        <Redirect to="/" replace />
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/sign-up" replace />
+      </Show>
+    </>
   );
 }
 
@@ -235,6 +279,8 @@ function ClerkProviderWithRoutes() {
           <Route path="/demo" nest>
             <DemoApp />
           </Route>
+          {/* Crew invite deep link — pre-fills the join flow through sign-up. */}
+          <Route path="/join/:code">{(params) => <JoinRoute code={params.code} />}</Route>
           <Route>
             <Show when="signed-in">
               <AuthedApp />
