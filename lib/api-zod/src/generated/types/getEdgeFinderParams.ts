@@ -5,10 +5,19 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { GetEdgeFinderPeriod } from './getEdgeFinderPeriod';
 
 export type GetEdgeFinderParams = {
 /**
  * @nullable
  */
 userId?: number | null;
+/**
+ * Time window over settledAt — week (7 days), month (30 days), or all history
+ */
+period?: GetEdgeFinderPeriod;
+/**
+ * Only bets in this sport (exact match)
+ */
+sport?: string;
 };

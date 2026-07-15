@@ -92,6 +92,15 @@ export default function NewBet() {
   const leakWarning = (() => {
     if (!leakProfile) return null
     const stakeNum = Number(watchStake)
+    // 0) Tilt spiral: the session-level pattern outranks everything — a
+    // cluster of Ls followed by rapid, escalated plays is happening *now*.
+    if (leakProfile.tiltSpiral) {
+      const t = leakProfile.tiltSpiral
+      return {
+        key: "tilt-spiral",
+        text: `Pump the brakes. ${t.recentLosses} Ls in the last ${t.windowHours} hours, ${t.rapidPlays} quick plays since, staked ${t.stakeRatio}x your usual. This is the tilt playbook — the board will still be here tomorrow.`,
+      }
+    }
     // 1) Chasing: an oversized stake shortly after taking an L
     if (
       leakProfile.avgStake != null &&

@@ -14,3 +14,5 @@ description: How the public read-only demo world stays isolated from real data, 
 **Seeding:** The api-server test suite wipes the dev DB (recap tests `delete(usersTable)` with no filter). The server self-seeds an empty demo world at boot (`ensureDemoSeeded`), so restarting the API workflow restores dev, and prod seeds itself on first boot after publish. Force rebuild (e.g. after seed-logic changes): `pnpm --filter @workspace/scripts run seed-demo-board`.
 
 **Frontend:** The generated API client has a module-global `setUrlRewrite` used by the `/demo` route to remap `/api/*` → `/api/demo/*`; the demo shell uses its own QueryClient so caches never mix. If demo and real views ever render concurrently, replace the global rewrite with an instance-scoped client first.
+
+**Device preferences in demo mode:** the demo board reuses the real pages and UserProvider, so any preference that syncs to the profile (e.g. odds format) must check the module-level server-sync switch (`setOddsFormatServerSync(false)` set by DemoApp) — otherwise toggles PATCH the read-only demo API (403 + scold toast) and the demo persona's saved value overwrites the viewer's local choice.

@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
 import { Link } from "wouter"
-import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy, Newspaper, ArrowRight, AlertTriangle } from "lucide-react"
+import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy, Newspaper, ArrowRight, AlertTriangle, WifiOff, RotateCw } from "lucide-react"
 import { formatDate } from "@/lib/format"
 import { isRecapUnseen } from "@/lib/recapTeaser"
 import { dayOf } from "@workspace/weeks"
@@ -69,25 +69,42 @@ export default function Dashboard() {
     { query: { enabled: !!activeUser?.id, queryKey: [...getListParlaysQueryKey({ userId: activeUser?.id }), 'pending'] } }
   );
 
-  const { data: needsSettling } = useGetNeedsSettling(
+  const { data: needsSettling, isError: isNeedsSettlingError, refetch: refetchNeedsSettling, isRefetching: isNeedsSettlingRefetching } = useGetNeedsSettling(
     { query: { enabled: !!activeUser?.id, queryKey: getGetNeedsSettlingQueryKey() } }
   );
 
-  const { data: streaks } = useGetStreaks(
+  const { data: streaks, isError: isStreaksError, refetch: refetchStreaks, isRefetching: isStreaksRefetching } = useGetStreaks(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetStreaksQueryKey({ userId: activeUser?.id }) } }
   );
 
-  const { data: badges = [] } = useGetUserBadges(
+  const { data: badges = [], isError: isBadgesError, refetch: refetchBadges, isRefetching: isBadgesRefetching } = useGetUserBadges(
     activeUser?.id ?? 0,
     { query: { enabled: !!activeUser?.id, queryKey: getGetUserBadgesQueryKey(activeUser?.id ?? 0) } }
   );
   const earnedBadges = badges.filter(b => b.earnedAt != null);
 
-  const { data: leakProfile } = useGetLeakProfile(
+  const { data: leakProfile, isError: isLeakProfileError, refetch: refetchLeakProfile, isRefetching: isLeakProfileRefetching } = useGetLeakProfile(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
   );
+
+  // The smaller widgets normally hide themselves when they have nothing to
+  // show — which means a failed fetch would make them vanish silently. Name
+  // what's missing and offer one retry for all of it.
+  const failedWidgets = [
+    isStreaksError && "streaks",
+    isNeedsSettlingError && "needs settling",
+    isBadgesError && "badges",
+    isLeakProfileError && "your leak read",
+  ].filter((w): w is string => typeof w === "string");
+  const isWidgetRetrying = isStreaksRefetching || isNeedsSettlingRefetching || isBadgesRefetching || isLeakProfileRefetching;
+  const retryFailedWidgets = () => {
+    if (isStreaksError) refetchStreaks();
+    if (isNeedsSettlingError) refetchNeedsSettling();
+    if (isBadgesError) refetchBadges();
+    if (isLeakProfileError) refetchLeakProfile();
+  };
 
   // The single most damaging qualifying leak. Mirrors the bet-form priority,
   // minus chasing (that one only means something at bet time): worst sport by
@@ -294,6 +311,33 @@ export default function Dashboard() {
         <p className="text-muted-foreground mt-1">Welcome back, {activeUser.displayName}. Here's your edge today.</p>
       </div>
 
+      {/* Some smaller widgets hide themselves when empty — if their data
+          failed to load, say so instead of letting them vanish silently. */}
+      {failedWidgets.length > 0 && (
+        <div
+          className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-muted bg-card px-4 py-3"
+          role="alert"
+          data-testid="card-widget-retry"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <WifiOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 text-sm text-muted-foreground">
+              Couldn't load {failedWidgets.join(", ")} — the rest of the board is live.
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="card-widget-retry-button"
+            disabled={isWidgetRetrying}
+            onClick={retryFailedWidgets}
+          >
+            <RotateCw className={`h-4 w-4 mr-2 ${isWidgetRetrying ? "animate-spin" : ""}`} />
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* Habit streaks — showing up and grading honestly, gamified */}
       {streaks && (
         <div className="grid grid-cols-2 gap-4" data-testid="streak-strip">
@@ -399,6 +443,33 @@ export default function Dashboard() {
                 </Button>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tilt spiral — the "right now" alarm. Losses landed, the plays got
+          fast and big. Outranks the slow-burn leak card below because this
+          one is happening tonight. */}
+      {leakProfile?.tiltSpiral && (
+        <Card
+          className="border-chart-2/60 bg-chart-2/15 glow-destructive"
+          data-testid="card-tilt-spiral"
+        >
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.8)]" />
+              <CardTitle className="text-base text-chart-2 text-glow-destructive">Tilt Check</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-foreground">
+              {leakProfile.tiltSpiral.recentLosses} Ls in the last {leakProfile.tiltSpiral.windowHours} hours,{" "}
+              {leakProfile.tiltSpiral.rapidPlays} quick plays since — staked{" "}
+              {leakProfile.tiltSpiral.stakeRatio}x your usual ({formatCurrency(leakProfile.tiltSpiral.burstAvgStake)} a pop).
+            </p>
+            <p className="text-sm text-muted-foreground">
+              That's the tilt playbook, and the book wrote it. Close the app, take the walk — the board will still be here tomorrow.
+            </p>
           </CardContent>
         </Card>
       )}

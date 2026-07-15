@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LeakProfileOverconfidence } from './leakProfileOverconfidence';
+import type { LeakProfileTiltSpiral } from './leakProfileTiltSpiral';
 import type { LeakProfileTopMissReason } from './leakProfileTopMissReason';
 import type { LeakProfileWorstSport } from './leakProfileWorstSport';
 
@@ -39,6 +40,11 @@ export interface LeakProfile {
      * @nullable
      */
   topMissReason: LeakProfileTopMissReason;
+  /**
+     * Present when the bettor looks mid-tilt right now: at least two settled losses inside the short window, followed by a burst of rapid plays at escalated stakes relative to their own baseline. Null when data is thin (needs a real avgStake baseline) or the pattern is absent.
+     * @nullable
+     */
+  tiltSpiral: LeakProfileTiltSpiral;
   /** True while the one-time "trend flipped" celebration is available: the reported leak's trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST /users/me/leak-celebration-seen, after which responses return false and the celebration never repeats. */
   trendFlip: boolean;
 }

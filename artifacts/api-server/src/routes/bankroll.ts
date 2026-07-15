@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sum, and, inArray } from "drizzle-orm";
+import { eq, desc, sum, and, inArray, sql } from "drizzle-orm";
 import { db, transactionsTable, usersTable, betsTable, parlaysTable } from "@workspace/db";
 import {
   GetBankrollQueryParams,
@@ -8,6 +8,7 @@ import {
   CreateTransactionBody,
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
+import { lockUserLedger } from "../lib/ledger";
 
 const router: IRouter = Router();
 
@@ -203,18 +204,42 @@ router.post("/bankroll/transactions", requireProfile, async (req, res): Promise<
     return;
   }
   const signedAmount = type === "withdraw" ? -Math.abs(Number(amount)) : Number(amount);
-  const newBalance = bankroll.currentBalance + signedAmount;
 
-  const [tx] = await db
-    .insert(transactionsTable)
-    .values({
-      userId,
-      type,
-      amount: String(signedAmount.toFixed(2)),
-      balanceAfter: String(newBalance.toFixed(2)),
-      note: note ?? null,
-    })
-    .returning();
+  // Append under the per-user ledger lock: the balance must be re-read
+  // inside the locked transaction, or a concurrent settle could hand us a
+  // stale snapshot and corrupt the running balance.
+  const insertedTx = await db.transaction(async (dbTx) => {
+    await lockUserLedger(dbTx, userId);
+    const lastTx = await dbTx
+      .select()
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, userId))
+      .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
+      .limit(1);
+    const currentBalance = lastTx.length > 0 ? Number(lastTx[0].balanceAfter) : Number(
+      (await dbTx.select().from(usersTable).where(eq(usersTable.id, userId)))[0]?.startingBankroll ?? 0
+    );
+    const newBalance = currentBalance + signedAmount;
+    const [row] = await dbTx
+      .insert(transactionsTable)
+      .values({
+        userId,
+        type,
+        amount: String(signedAmount.toFixed(2)),
+        balanceAfter: String(newBalance.toFixed(2)),
+        note: note ?? null,
+        // Stamp inside the lock with the DB's wall clock: the column
+        // default (now()) is transaction-START time, so a tx that waited on
+        // the ledger lock would get an earlier timestamp than the row it
+        // chains onto, breaking the (createdAt, id) ordering convention.
+        // clock_timestamp() uses one authoritative clock (the DB's), immune
+        // to app-host clock skew across instances.
+        createdAt: sql`clock_timestamp()`,
+      })
+      .returning();
+    return row;
+  });
+  const tx = insertedTx;
 
   res.status(201).json({
     id: tx.id,

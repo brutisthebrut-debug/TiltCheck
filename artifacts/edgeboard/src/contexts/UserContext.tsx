@@ -1,4 +1,5 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, useEffect, ReactNode } from 'react';
+import { syncOddsFormatFromServer } from '@/hooks/use-odds-format';
 import {
   useGetCurrentUser,
   useListUsers,
@@ -33,6 +34,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const { data: allUsers = [], isLoading: isUsersLoading } = useListUsers({
     query: { enabled: !!currentUser, queryKey: getListUsersQueryKey() },
   });
+
+  // The profile's saved odds-format preference is the source of truth across
+  // devices — hydrate the local cache whenever the profile arrives.
+  useEffect(() => {
+    if (currentUser?.oddsFormat) syncOddsFormatFromServer(currentUser.oddsFormat);
+  }, [currentUser?.oddsFormat]);
 
   return (
     <UserContext.Provider

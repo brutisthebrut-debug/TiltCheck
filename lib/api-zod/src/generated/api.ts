@@ -27,7 +27,8 @@ export const GetCurrentUserResponse = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })
 
 
@@ -43,7 +44,8 @@ export const MarkRecapSeenResponse = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })
 
 
@@ -59,7 +61,8 @@ export const MarkLeakCelebrationSeenResponse = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })
 
 
@@ -74,7 +77,8 @@ export const ListUnclaimedUsersResponseItem = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })
 export const ListUnclaimedUsersResponse = zod.array(ListUnclaimedUsersResponseItem)
 
@@ -98,7 +102,8 @@ export const ClaimProfileResponse = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })
 
 
@@ -113,7 +118,8 @@ export const ListUsersResponseItem = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
@@ -133,7 +139,8 @@ export const updateUserBodyStartingBankrollExclusiveMin = 0;
 export const UpdateUserBody = zod.object({
   "startingBankroll": zod.number().gt(updateUserBodyStartingBankrollExclusiveMin).optional(),
   "displayName": zod.string().min(1).optional(),
-  "avatarColor": zod.string().optional()
+  "avatarColor": zod.string().optional(),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).optional().describe('Preferred odds display format — follows the user across devices')
 }).describe('All fields optional; only provided fields are updated')
 
 export const UpdateUserResponse = zod.object({
@@ -144,7 +151,8 @@ export const UpdateUserResponse = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })
 
 
@@ -400,6 +408,42 @@ export const SettleBetBody = zod.object({
 })
 
 export const SettleBetResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().optional(),
+  "sport": zod.string(),
+  "event": zod.string(),
+  "betType": zod.enum(['moneyline', 'spread', 'total', 'prop', 'futures']),
+  "pick": zod.string(),
+  "odds": zod.number().describe('American odds (e.g. -110, +150)'),
+  "stake": zod.number(),
+  "potentialPayout": zod.number(),
+  "actualPayout": zod.number().nullish(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void']),
+  "gameDate": zod.string(),
+  "confidenceScore": zod.number().describe('1-10 confidence rating'),
+  "rationale": zod.string().nullish().describe('Pre-game reasoning'),
+  "postGameReview": zod.string().nullish().describe('Post-game reflection'),
+  "tags": zod.array(zod.string()).optional(),
+  "createdAt": zod.string(),
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
+})
+
+
+/**
+ * Owner-only. Returns the bet to pending and appends a compensating adjustment to the bankroll ledger reversing the settlement's net impact (the ledger is append-only — recorded rows are never rewritten). The bet can then be settled again with the correct result. Post-game review fields are kept and will be overwritten by the next settle.
+ * @summary Reopen a settled bet so a wrong result can be fixed
+ */
+export const UnsettleBetParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UnsettleBetResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
   "userName": zod.string().optional(),
@@ -811,6 +855,48 @@ export const SettleParlayResponse = zod.object({
 
 
 /**
+ * Owner-only. Returns the parlay and all of its legs to pending and appends a compensating adjustment to the bankroll ledger reversing the settlement's net impact (the ledger is append-only — recorded rows are never rewritten). The parlay can then be settled again with the correct result. Post-game review fields are kept and will be overwritten by the next settle.
+ * @summary Reopen a settled parlay so a wrong result can be fixed
+ */
+export const UnsettleParlayParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UnsettleParlayResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().optional(),
+  "name": zod.string(),
+  "stake": zod.number(),
+  "odds": zod.number().describe('Combined American odds'),
+  "potentialPayout": zod.number(),
+  "actualPayout": zod.number().nullish(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void']),
+  "legs": zod.array(zod.object({
+  "id": zod.number(),
+  "parlayId": zod.number(),
+  "sport": zod.string(),
+  "event": zod.string(),
+  "betType": zod.enum(['moneyline', 'spread', 'total', 'prop']),
+  "pick": zod.string(),
+  "odds": zod.number(),
+  "gameDate": zod.string(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void'])
+})),
+  "confidenceScore": zod.number().describe('1-10 confidence rating'),
+  "rationale": zod.string().nullish(),
+  "postGameReview": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
+})
+
+
+/**
  * Returns pending straight bets whose game date is before today, and pending parlays whose every leg's game date is before today, for the signed-in user only. Used to nudge bettors to settle finished games.
  * @summary List the signed-in user's pending bets and parlays whose games are already over
  */
@@ -1157,16 +1243,25 @@ export const GetLeakProfileResponse = zod.object({
   "recentCount": zod.number().describe('Losses graded with this reason inside the recent window'),
   "recentNetLoss": zod.number().describe('Dollars lost to this reason inside the recent window')
 }).nullable().describe('Most common self-graded miss reason across settled losses (excluding normal variance)'),
+  "tiltSpiral": zod.object({
+  "windowHours": zod.number().describe('Length of the \"right now\" window the signal looks at'),
+  "recentLosses": zod.number().describe('Settled losses (bets + parlays) inside the window'),
+  "rapidPlays": zod.number().describe('Plays logged since the first of those losses landed'),
+  "burstAvgStake": zod.number().describe('Average stake across the rapid plays'),
+  "stakeRatio": zod.number().describe('burstAvgStake divided by the bettor\'s baseline average stake')
+}).nullable().describe('Present when the bettor looks mid-tilt right now: at least two settled losses inside the short window, followed by a burst of rapid plays at escalated stakes relative to their own baseline. Null when data is thin (needs a real avgStake baseline) or the pattern is absent.'),
   "trendFlip": zod.boolean().describe('True while the one-time \"trend flipped\" celebration is available: the reported leak\'s trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST \/users\/me\/leak-celebration-seen, after which responses return false and the celebration never repeats.')
 })
 
 
 /**
- * Slices the signed-in bettor's settled straight bets (valid odds only) into lanes — by sport, favorite vs underdog, odds band, day of week, and stake size band — each with record, money wagered, net profit, and ROI, so the Edge Finder page can show where they actually make money. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user.
+ * Slices the signed-in bettor's settled straight bets (valid odds only) into lanes — by sport, favorite vs underdog, odds band, day of week, and stake size band — each with record, money wagered, net profit, and ROI, so the Edge Finder page can show where they actually make money. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user. Optional filters narrow the slice: period (settled in the last 7/30 days) and sport.
  * @summary A bettor's settled history sliced into lanes to find their edge
  */
 export const GetEdgeFinderQueryParams = zod.object({
-  "userId": zod.coerce.number().nullish()
+  "userId": zod.coerce.number().nullish(),
+  "period": zod.enum(['week', 'month', 'all']).optional().describe('Time window over settledAt — week (7 days), month (30 days), or all history'),
+  "sport": zod.coerce.string().optional().describe('Only bets in this sport (exact match)')
 })
 
 export const GetEdgeFinderResponse = zod.object({
@@ -1349,7 +1444,8 @@ export const GetWorkspaceResponse = zod.object({
   "startingBankroll": zod.number(),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
-  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
 })),
   "totalBets": zod.number(),
   "createdAt": zod.string()

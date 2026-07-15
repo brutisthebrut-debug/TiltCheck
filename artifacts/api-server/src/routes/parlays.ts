@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, or, ilike, inArray, isNull, sql } from "drizzle-orm";
+import { eq, desc, and, or, ilike, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { db, parlaysTable, parlayLegsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListParlaysQueryParams,
@@ -8,6 +8,7 @@ import {
 import { requireProfile } from "../middlewares/auth";
 import { likeContains, clampPageSize } from "../lib/search";
 import { userScopeCondition } from "../lib/scope";
+import { lockUserLedger } from "../lib/ledger";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import {
   isValidAmericanOdds,
@@ -22,6 +23,7 @@ import {
   DeleteParlayParams,
   SettleParlayParams,
   SettleParlayBody,
+  UnsettleParlayParams,
   UpdateParlayLegParams,
   RecomputeParlayOddsParams,
   UpdateParlayLegBody,
@@ -518,6 +520,7 @@ router.delete("/parlays/:id", requireProfile, async (req, res): Promise<void> =>
   // appended "adjustment" row preserves the chain invariant
   // balanceAfter[n] = balanceAfter[n-1] + amount[n] for every row.
   const deleted = await db.transaction(async (tx) => {
+    await lockUserLedger(tx, owned.userId);
     await tx.delete(parlayLegsTable).where(eq(parlayLegsTable.parlayId, params.data.id));
     const [deletedParlay] = await tx.delete(parlaysTable).where(eq(parlaysTable.id, params.data.id)).returning();
     if (!deletedParlay) return null;
@@ -553,6 +556,10 @@ router.delete("/parlays/:id", requireProfile, async (req, res): Promise<void> =>
         referenceId: deletedParlay.id,
         referenceType: "parlay",
         note: `Reversal: deleted parlay ${deletedParlay.name}`,
+        // Stamped inside the ledger lock with the DB clock (default now() is
+        // tx-start time, which can misorder rows for lock waiters; JS clocks
+        // can skew across instances).
+        createdAt: sql`clock_timestamp()`,
       });
     }
 
@@ -660,6 +667,7 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
   let updated: typeof parlaysTable.$inferSelect;
   try {
     updated = await db.transaction(async (tx) => {
+    await lockUserLedger(tx, existing.userId);
     // The write re-checks pending status so two concurrent settles can never
     // both land (a double ledger entry would corrupt the bankroll).
     const [updatedParlay] = await tx
@@ -727,6 +735,10 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
       referenceId: existing.id,
       referenceType: "parlay",
       note: txNote,
+      // Stamped inside the ledger lock with the DB clock (default now() is
+      // tx-start time, which can misorder rows for lock waiters; JS clocks
+      // can skew across instances).
+      createdAt: sql`clock_timestamp()`,
     });
 
     return updatedParlay;
@@ -742,6 +754,102 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
   res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
+});
+
+// POST /parlays/:id/unsettle — reopen a settled parlay so a wrong result can
+// be fixed. Owner-only. Appends a compensating ledger adjustment reversing
+// the settlement's net impact (the ledger is append-only — recorded rows are
+// never rewritten), returns the parlay AND its legs to pending, so the
+// normal settle flow can run again with the right result.
+router.post("/parlays/:id/unsettle", requireProfile, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = UnsettleParlayParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [existing] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  if (existing.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only reopen your own parlays" });
+    return;
+  }
+
+  let reopened: typeof parlaysTable.$inferSelect;
+  try {
+    reopened = await db.transaction(async (tx) => {
+      await lockUserLedger(tx, existing.userId);
+      // The WHERE re-checks settled state so a concurrent unsettle (or a
+      // racing settle) can never double-append the reversal.
+      const [updatedParlay] = await tx
+        .update(parlaysTable)
+        .set({ status: "pending", actualPayout: null, settledAt: null })
+        .where(and(eq(parlaysTable.id, params.data.id), isNotNull(parlaysTable.settledAt)))
+        .returning();
+      if (!updatedParlay) {
+        throw Object.assign(new Error("This parlay isn't settled — there's nothing to reopen."), { statusCode: 409 });
+      }
+
+      // Legs go back to pending too — the re-settle records fresh outcomes,
+      // and stale leg results would pre-fill the wrong ones.
+      await tx
+        .update(parlayLegsTable)
+        .set({ status: "pending" })
+        .where(eq(parlayLegsTable.parlayId, updatedParlay.id));
+
+      // Reverse the settlement's net ledger impact with a compensating
+      // adjustment, exactly like deletion does.
+      const linkedTxs = await tx
+        .select()
+        .from(transactionsTable)
+        .where(
+          and(
+            eq(transactionsTable.referenceId, updatedParlay.id),
+            eq(transactionsTable.referenceType, "parlay"),
+            eq(transactionsTable.userId, updatedParlay.userId)
+          )
+        );
+      const netImpact = linkedTxs.reduce((sum, t) => sum + Number(t.amount), 0);
+      if (linkedTxs.length > 0 && netImpact !== 0) {
+        const lastTx = await tx
+          .select()
+          .from(transactionsTable)
+          .where(eq(transactionsTable.userId, updatedParlay.userId))
+          .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
+          .limit(1);
+        const currentBalance = lastTx.length > 0 ? Number(lastTx[0].balanceAfter) : Number(
+          (await tx.select().from(usersTable).where(eq(usersTable.id, updatedParlay.userId)))[0]?.startingBankroll ?? 0
+        );
+        await tx.insert(transactionsTable).values({
+          userId: updatedParlay.userId,
+          type: "adjustment",
+          amount: String((-netImpact).toFixed(2)),
+          balanceAfter: String((currentBalance - netImpact).toFixed(2)),
+          referenceId: updatedParlay.id,
+          referenceType: "parlay",
+          note: `Reversal: reopened parlay ${updatedParlay.name}`,
+          // Stamped inside the ledger lock with the DB clock (default now() is
+          // tx-start time, which can misorder rows for lock waiters; JS clocks
+          // can skew across instances).
+          createdAt: sql`clock_timestamp()`,
+        });
+      }
+      return updatedParlay;
+    });
+  } catch (err) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    if (statusCode === 409) {
+      res.status(409).json({ error: (err as Error).message });
+      return;
+    }
+    throw err;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, reopened.userId));
+  res.json(await formatParlay(reopened, user?.displayName ?? "Unknown"));
 });
 
 export default router;

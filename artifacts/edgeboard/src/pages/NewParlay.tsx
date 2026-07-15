@@ -2,7 +2,7 @@ import { useFieldArray, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useLocation } from "wouter"
-import { useCreateParlay, getListParlaysQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
+import { useCreateParlay, useGetLeakProfile, getGetLeakProfileQueryKey, getListParlaysQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
@@ -28,7 +28,7 @@ import {
 import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
-import { ArrowLeft, Plus, Trash2, ChevronDown } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, ChevronDown, AlertTriangle } from "lucide-react"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 import { dayOf } from "@workspace/weeks"
 
@@ -102,6 +102,14 @@ export default function NewParlay() {
   const watchSportsbook = form.watch("sportsbook")
   const [oddsFormat, setOddsFormatPref] = useOddsFormat()
 
+  // Tilt check — a parlay slip mid-spiral is the classic "get it all back
+  // in one ticket" move, so the session-level warning shows here too.
+  const { data: leakProfile } = useGetLeakProfile(
+    { userId: activeUser?.id },
+    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+  )
+  const tiltSpiral = leakProfile?.tiltSpiral ?? null
+
   // Only price the slip once every leg carries a real American price.
   const legOdds = watchLegs.map((leg) => leg.odds)
   const allLegsPriced = legOdds.length > 0 && legOdds.every((o) => isValidAmericanOdds(o))
@@ -116,6 +124,15 @@ export default function NewParlay() {
   // What a book like bet365 shows for the same slip: it multiplies the
   // 2-decimal displayed prices, so its total can differ by a little.
   const bookStylePayout = allLegsPriced && watchStake ? combineDecimalBookStyle(legOdds) * watchStake : 0
+
+  // Mirror the server's storage bounds (int4 combined odds, numeric(12,2)
+  // payout) so builders find out the slip is too big while they're still
+  // building it, not from a failed save.
+  const INT4_MAX = 2147483647
+  const MAX_PAYOUT = 9_999_999_999.99
+  const exceedsStorageBounds =
+    allLegsPriced &&
+    (!Number.isFinite(combinedOdds) || Math.abs(combinedOdds) > INT4_MAX || potentialPayout > MAX_PAYOUT)
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!activeUser) return
@@ -478,12 +495,32 @@ export default function NewParlay() {
 
           <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <Card className="border-primary bg-card shadow-lg">
+              {tiltSpiral && (
+                <div
+                  className="mx-4 mt-4 flex items-start gap-2.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-500"
+                  data-testid="warning-leak-tilt-spiral"
+                >
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>
+                    Pump the brakes. {tiltSpiral.recentLosses} Ls in the last {tiltSpiral.windowHours} hours, {tiltSpiral.rapidPlays} quick plays since, staked {tiltSpiral.stakeRatio}x your usual. A parlay won't get it back faster — the board will still be here tomorrow.
+                  </span>
+                </div>
+              )}
               {createParlay.isError && (
                 <div className="mx-4 mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
                   {getApiErrorMessage(createParlay.error, "Couldn't log this parlay. Please check the form and try again.")}
                 </div>
               )}
               <CardContent className="p-4 space-y-2">
+                {exceedsStorageBounds && (
+                  <div
+                    className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                    role="alert"
+                    data-testid="text-odds-bound-warning"
+                  >
+                    These combined odds are too big to save. Remove a leg or shorten the longest prices before logging.
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="grid grid-cols-2 gap-8">
                     <div>
@@ -509,7 +546,7 @@ export default function NewParlay() {
                       )}
                     </div>
                   </div>
-                  <Button type="submit" size="lg" disabled={createParlay.isPending || fields.length < 2}>
+                  <Button type="submit" size="lg" disabled={createParlay.isPending || fields.length < 2 || exceedsStorageBounds}>
                     {createParlay.isPending ? "Logging..." : "Log Parlay"}
                   </Button>
                 </div>

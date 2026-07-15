@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
 import { Route, Switch, Link } from 'wouter';
 import { setUrlRewrite } from '@workspace/api-client-react';
+import { setOddsFormatServerSync } from '@/hooks/use-odds-format';
 import { Layout } from '@/components/Layout';
 import { UserProvider } from '@/contexts/UserContext';
 import { toast } from '@/hooks/use-toast';
@@ -34,6 +35,9 @@ export default function DemoApp() {
   // rewrite is in place before any hook fetches.
   const [queryClient] = useState(() => {
     setUrlRewrite(demoRewrite);
+    // Odds-format choice stays on this device — never PATCH the read-only
+    // demo API, never let the demo persona's preference overwrite it.
+    setOddsFormatServerSync(false);
     return new QueryClient({
       mutationCache: new MutationCache({
         onError: (_error, _variables, _context, mutation) => {
@@ -52,7 +56,11 @@ export default function DemoApp() {
 
   useEffect(() => {
     setUrlRewrite(demoRewrite);
-    return () => setUrlRewrite(null);
+    setOddsFormatServerSync(false);
+    return () => {
+      setUrlRewrite(null);
+      setOddsFormatServerSync(true);
+    };
   }, []);
 
   return (

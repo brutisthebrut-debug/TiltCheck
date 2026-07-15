@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, or, gte, lte, ilike, isNull } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, ilike, isNull, isNotNull, sql } from "drizzle-orm";
 import { db, betsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListBetsQueryParams,
@@ -10,12 +10,14 @@ import {
   DeleteBetParams,
   SettleBetParams,
   SettleBetBody,
+  UnsettleBetParams,
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import { isValidAmericanOdds, INVALID_ODDS_MESSAGE } from "../lib/odds";
 import { likeContains, clampPageSize } from "../lib/search";
 import { userScopeCondition } from "../lib/scope";
+import { lockUserLedger } from "../lib/ledger";
 
 const router: IRouter = Router();
 
@@ -255,6 +257,7 @@ router.delete("/bets/:id", requireProfile, async (req, res): Promise<void> => {
   // append a compensating "adjustment" row, which preserves the chain
   // invariant balanceAfter[n] = balanceAfter[n-1] + amount[n] for every row.
   const deleted = await db.transaction(async (tx) => {
+    await lockUserLedger(tx, existing.userId);
     const [deletedBet] = await tx.delete(betsTable).where(eq(betsTable.id, params.data.id)).returning();
     if (!deletedBet) return null;
 
@@ -289,6 +292,10 @@ router.delete("/bets/:id", requireProfile, async (req, res): Promise<void> => {
         referenceId: deletedBet.id,
         referenceType: "bet",
         note: `Reversal: deleted bet ${deletedBet.event}`,
+        // Stamped inside the ledger lock with the DB clock (default now() is
+        // tx-start time, which can misorder rows for lock waiters; JS clocks
+        // can skew across instances).
+        createdAt: sql`clock_timestamp()`,
       });
     }
 
@@ -349,6 +356,7 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
   let updated: typeof betsTable.$inferSelect;
   try {
     updated = await db.transaction(async (tx) => {
+    await lockUserLedger(tx, existing.userId);
     const [updatedBet] = await tx
       .update(betsTable)
       .set({
@@ -397,6 +405,10 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
       referenceId: existing.id,
       referenceType: "bet",
       note: txNote,
+      // Stamped inside the ledger lock with the DB clock (default now() is
+      // tx-start time, which can misorder rows for lock waiters; JS clocks
+      // can skew across instances).
+      createdAt: sql`clock_timestamp()`,
     });
 
     return updatedBet;
@@ -412,6 +424,95 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
   res.json(formatBet(updated, user?.displayName ?? "Unknown"));
+});
+
+// POST /bets/:id/unsettle — reopen a settled bet so a wrong result can be
+// fixed. Owner-only. Appends a compensating ledger adjustment reversing the
+// settlement's net impact (the ledger is append-only — recorded rows are
+// never rewritten) and returns the bet to pending so the normal settle flow
+// can run again with the right result.
+router.post("/bets/:id/unsettle", requireProfile, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = UnsettleBetParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [existing] = await db.select().from(betsTable).where(eq(betsTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Bet not found" });
+    return;
+  }
+  if (existing.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only reopen your own bets" });
+    return;
+  }
+
+  let reopened: typeof betsTable.$inferSelect;
+  try {
+    reopened = await db.transaction(async (tx) => {
+      await lockUserLedger(tx, existing.userId);
+      // The WHERE re-checks settled state so a concurrent unsettle (or a
+      // racing settle) can never double-append the reversal.
+      const [updatedBet] = await tx
+        .update(betsTable)
+        .set({ status: "pending", actualPayout: null, settledAt: null })
+        .where(and(eq(betsTable.id, params.data.id), isNotNull(betsTable.settledAt)))
+        .returning();
+      if (!updatedBet) {
+        throw Object.assign(new Error("This bet isn't settled — there's nothing to reopen."), { statusCode: 409 });
+      }
+
+      // Reverse the settlement's net ledger impact with a compensating
+      // adjustment, exactly like deletion does.
+      const linkedTxs = await tx
+        .select()
+        .from(transactionsTable)
+        .where(
+          and(
+            eq(transactionsTable.referenceId, updatedBet.id),
+            eq(transactionsTable.referenceType, "bet"),
+            eq(transactionsTable.userId, updatedBet.userId)
+          )
+        );
+      const netImpact = linkedTxs.reduce((sum, t) => sum + Number(t.amount), 0);
+      if (linkedTxs.length > 0 && netImpact !== 0) {
+        const lastTx = await tx
+          .select()
+          .from(transactionsTable)
+          .where(eq(transactionsTable.userId, updatedBet.userId))
+          .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
+          .limit(1);
+        const currentBalance = lastTx.length > 0 ? Number(lastTx[0].balanceAfter) : Number(
+          (await tx.select().from(usersTable).where(eq(usersTable.id, updatedBet.userId)))[0]?.startingBankroll ?? 0
+        );
+        await tx.insert(transactionsTable).values({
+          userId: updatedBet.userId,
+          type: "adjustment",
+          amount: String((-netImpact).toFixed(2)),
+          balanceAfter: String((currentBalance - netImpact).toFixed(2)),
+          referenceId: updatedBet.id,
+          referenceType: "bet",
+          note: `Reversal: reopened bet ${updatedBet.event}`,
+          // Stamped inside the ledger lock with the DB clock (default now() is
+          // tx-start time, which can misorder rows for lock waiters; JS clocks
+          // can skew across instances).
+          createdAt: sql`clock_timestamp()`,
+        });
+      }
+      return updatedBet;
+    });
+  } catch (err) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    if (statusCode === 409) {
+      res.status(409).json({ error: (err as Error).message });
+      return;
+    }
+    throw err;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, reopened.userId));
+  res.json(formatBet(reopened, user?.displayName ?? "Unknown"));
 });
 
 export default router;

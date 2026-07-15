@@ -9,6 +9,18 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * Preferred odds display format — follows the user across devices
+ */
+export type UserOddsFormat = typeof UserOddsFormat[keyof typeof UserOddsFormat];
+
+
+export const UserOddsFormat = {
+  american: 'american',
+  decimal: 'decimal',
+  fractional: 'fractional',
+} as const;
+
 export interface User {
   id: number;
   username: string;
@@ -23,6 +35,8 @@ export interface User {
   recapSeenWeek?: string | null;
   /** Founder of the board — can manage beta invites and see the founder dashboard */
   isFounder: boolean;
+  /** Preferred odds display format — follows the user across devices */
+  oddsFormat: UserOddsFormat;
 }
 
 export interface Invite {
@@ -86,6 +100,18 @@ export interface ClaimProfileInput {
 }
 
 /**
+ * Preferred odds display format — follows the user across devices
+ */
+export type UpdateUserInputOddsFormat = typeof UpdateUserInputOddsFormat[keyof typeof UpdateUserInputOddsFormat];
+
+
+export const UpdateUserInputOddsFormat = {
+  american: 'american',
+  decimal: 'decimal',
+  fractional: 'fractional',
+} as const;
+
+/**
  * All fields optional; only provided fields are updated
  */
 export interface UpdateUserInput {
@@ -94,6 +120,8 @@ export interface UpdateUserInput {
   /** @minLength 1 */
   displayName?: string;
   avatarColor?: string;
+  /** Preferred odds display format — follows the user across devices */
+  oddsFormat?: UpdateUserInputOddsFormat;
 }
 
 export type BetBetType = typeof BetBetType[keyof typeof BetBetType];
@@ -637,6 +665,23 @@ export type LeakProfileTopMissReason = {
   recentNetLoss: number;
 } | null;
 
+/**
+ * Present when the bettor looks mid-tilt right now: at least two settled losses inside the short window, followed by a burst of rapid plays at escalated stakes relative to their own baseline. Null when data is thin (needs a real avgStake baseline) or the pattern is absent.
+ * @nullable
+ */
+export type LeakProfileTiltSpiral = {
+  /** Length of the "right now" window the signal looks at */
+  windowHours: number;
+  /** Settled losses (bets + parlays) inside the window */
+  recentLosses: number;
+  /** Plays logged since the first of those losses landed */
+  rapidPlays: number;
+  /** Average stake across the rapid plays */
+  burstAvgStake: number;
+  /** burstAvgStake divided by the bettor's baseline average stake */
+  stakeRatio: number;
+} | null;
+
 export interface LeakProfile {
   /** Settled straight bets counted toward the profile */
   settledCount: number;
@@ -667,6 +712,11 @@ export interface LeakProfile {
      * @nullable
      */
   topMissReason: LeakProfileTopMissReason;
+  /**
+     * Present when the bettor looks mid-tilt right now: at least two settled losses inside the short window, followed by a burst of rapid plays at escalated stakes relative to their own baseline. Null when data is thin (needs a real avgStake baseline) or the pattern is absent.
+     * @nullable
+     */
+  tiltSpiral: LeakProfileTiltSpiral;
   /** True while the one-time "trend flipped" celebration is available: the reported leak's trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST /users/me/leak-celebration-seen, after which responses return false and the celebration never repeats. */
   trendFlip: boolean;
 }
@@ -1259,7 +1309,24 @@ export type GetEdgeFinderParams = {
  * @nullable
  */
 userId?: number | null;
+/**
+ * Time window over settledAt — week (7 days), month (30 days), or all history
+ */
+period?: GetEdgeFinderPeriod;
+/**
+ * Only bets in this sport (exact match)
+ */
+sport?: string;
 };
+
+export type GetEdgeFinderPeriod = typeof GetEdgeFinderPeriod[keyof typeof GetEdgeFinderPeriod];
+
+
+export const GetEdgeFinderPeriod = {
+  week: 'week',
+  month: 'month',
+  all: 'all',
+} as const;
 
 export type GetWeeklyRecapParams = {
 /**

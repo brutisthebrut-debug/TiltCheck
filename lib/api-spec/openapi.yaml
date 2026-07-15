@@ -371,6 +371,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/Bet"
 
+  /bets/{id}/unsettle:
+    post:
+      operationId: unsettleBet
+      tags: [bets]
+      summary: Reopen a settled bet so a wrong result can be fixed
+      description: >
+        Owner-only. Returns the bet to pending and appends a compensating
+        adjustment to the bankroll ledger reversing the settlement's net
+        impact (the ledger is append-only — recorded rows are never
+        rewritten). The bet can then be settled again with the correct
+        result. Post-game review fields are kept and will be overwritten by
+        the next settle.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bet returned to pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bet"
+        "404":
+          description: Bet not found
+        "409":
+          description: Bet is not settled — nothing to reopen
+
   # ── Parlays ───────────────────────────────────────────────────────────────
   /parlays:
     get:
@@ -594,6 +624,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Parlay"
+
+  /parlays/{id}/unsettle:
+    post:
+      operationId: unsettleParlay
+      tags: [parlays]
+      summary: Reopen a settled parlay so a wrong result can be fixed
+      description: >
+        Owner-only. Returns the parlay and all of its legs to pending and
+        appends a compensating adjustment to the bankroll ledger reversing
+        the settlement's net impact (the ledger is append-only — recorded
+        rows are never rewritten). The parlay can then be settled again with
+        the correct result. Post-game review fields are kept and will be
+        overwritten by the next settle.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Parlay returned to pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parlay"
+        "404":
+          description: Parlay not found
+        "409":
+          description: Parlay is not settled — nothing to reopen
 
   /settlement/needs-settling:
     get:
@@ -895,12 +955,24 @@ paths:
         and stake size band — each with record, money wagered, net profit, and
         ROI, so the Edge Finder page can show where they actually make money.
         Always scoped to the signed-in user; a userId param is only accepted
-        when it matches the session user.
+        when it matches the session user. Optional filters narrow the slice:
+        period (settled in the last 7/30 days) and sport.
       parameters:
         - name: userId
           in: query
           schema:
             type: ["integer", "null"]
+        - name: period
+          in: query
+          description: Time window over settledAt — week (7 days), month (30 days), or all history
+          schema:
+            type: string
+            enum: [week, month, all]
+        - name: sport
+          in: query
+          description: Only bets in this sport (exact match)
+          schema:
+            type: string
       responses:
         "200":
           description: Edge finder lanes
@@ -1164,7 +1236,11 @@ components:
         isFounder:
           type: boolean
           description: Founder of the board — can manage beta invites and see the founder dashboard
-      required: [id, username, displayName, avatarColor, startingBankroll, createdAt, isFounder]
+        oddsFormat:
+          type: string
+          enum: [american, decimal, fractional]
+          description: Preferred odds display format — follows the user across devices
+      required: [id, username, displayName, avatarColor, startingBankroll, createdAt, isFounder, oddsFormat]
 
     Invite:
       type: object
@@ -1266,6 +1342,10 @@ components:
           minLength: 1
         avatarColor:
           type: string
+        oddsFormat:
+          type: string
+          enum: [american, decimal, fractional]
+          description: Preferred odds display format — follows the user across devices
 
     NeedsSettling:
       type: object
@@ -1785,6 +1865,31 @@ components:
               type: number
               description: Dollars lost to this reason inside the recent window
           required: [reason, count, netLoss, recentCount, recentNetLoss]
+        tiltSpiral:
+          type: ["object", "null"]
+          description: >-
+            Present when the bettor looks mid-tilt right now: at least two
+            settled losses inside the short window, followed by a burst of
+            rapid plays at escalated stakes relative to their own baseline.
+            Null when data is thin (needs a real avgStake baseline) or the
+            pattern is absent.
+          properties:
+            windowHours:
+              type: integer
+              description: Length of the "right now" window the signal looks at
+            recentLosses:
+              type: integer
+              description: Settled losses (bets + parlays) inside the window
+            rapidPlays:
+              type: integer
+              description: Plays logged since the first of those losses landed
+            burstAvgStake:
+              type: number
+              description: Average stake across the rapid plays
+            stakeRatio:
+              type: number
+              description: burstAvgStake divided by the bettor's baseline average stake
+          required: [windowHours, recentLosses, rapidPlays, burstAvgStake, stakeRatio]
         trendFlip:
           type: boolean
           description: >-
@@ -1794,7 +1899,7 @@ components:
             consumes the celebration — clients that render the card must POST
             /users/me/leak-celebration-seen, after which responses return
             false and the celebration never repeats.
-      required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason, trendFlip]
+      required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason, tiltSpiral, trendFlip]
 
     EdgeFinderLane:
       type: object

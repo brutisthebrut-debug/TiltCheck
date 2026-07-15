@@ -184,6 +184,43 @@ describe("GET /stats/edge-finder", () => {
     expect(keys.indexOf("mon")).toBeLessThan(keys.indexOf("sun"));
   });
 
+  it("filters by sport and by settledAt period window", async () => {
+    const { user, clerkUserId } = await createLinkedUser();
+    currentClerkUserId = clerkUserId;
+
+    const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+    // NBA: one recent win (2 days ago), one old loss (60 days ago)
+    await seedBet(user.id, { status: "won", settledAt: daysAgo(2) });
+    await seedBet(user.id, { status: "lost", settledAt: daysAgo(60) });
+    // NFL: one loss 10 days ago (inside month, outside week)
+    await seedBet(user.id, { sport: "NFL", status: "lost", settledAt: daysAgo(10) });
+
+    // Sport filter: only NFL rows remain
+    const bySport = await request(app).get("/api/stats/edge-finder").query({ sport: "NFL" });
+    expect(bySport.status).toBe(200);
+    expect(bySport.body.settledCount).toBe(1);
+    expect(lane(bySport.body.sport, "NFL")?.losses).toBe(1);
+    expect(lane(bySport.body.sport, "NBA")).toBeUndefined();
+
+    // Week window: only the 2-day-old NBA win
+    const byWeek = await request(app).get("/api/stats/edge-finder").query({ period: "week" });
+    expect(byWeek.status).toBe(200);
+    expect(byWeek.body.settledCount).toBe(1);
+    expect(lane(byWeek.body.sport, "NBA")?.wins).toBe(1);
+
+    // Month window: NBA win + NFL loss, old NBA loss excluded
+    const byMonth = await request(app).get("/api/stats/edge-finder").query({ period: "month" });
+    expect(byMonth.body.settledCount).toBe(2);
+
+    // Combined: month + NBA → just the recent NBA win
+    const combined = await request(app)
+      .get("/api/stats/edge-finder")
+      .query({ period: "month", sport: "NBA" });
+    expect(combined.body.settledCount).toBe(1);
+    expect(lane(combined.body.sport, "NBA")?.wins).toBe(1);
+    currentClerkUserId = null;
+  });
+
   it("draws stake bands relative to the bettor's average stake", async () => {
     const { user, clerkUserId } = await createLinkedUser();
     currentClerkUserId = clerkUserId;

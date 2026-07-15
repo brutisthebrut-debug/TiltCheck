@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter"
-import { useGetBet, useSettleBet, useUpdateBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
+import { useGetBet, useSettleBet, useUnsettleBet, useUpdateBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -17,7 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 
@@ -46,7 +46,27 @@ export default function BetDetail() {
   })
   
   const settleBet = useSettleBet()
+  const unsettleBet = useUnsettleBet()
   const updateBet = useUpdateBet()
+
+  const invalidateBetQueries = () => {
+    queryClient.invalidateQueries({ queryKey: getGetBetQueryKey(betId) })
+    queryClient.invalidateQueries({ queryKey: getListBetsQueryKey() })
+    queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
+    if (activeUser) {
+      queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
+      queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
+      queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey() })
+      queryClient.invalidateQueries({ queryKey: getGetUserBadgesQueryKey(activeUser.id) })
+      queryClient.invalidateQueries({ queryKey: getGetStreaksQueryKey({ userId: activeUser.id }) })
+    }
+  }
+
+  const handleReopen = () => {
+    unsettleBet.mutate({ id: betId }, {
+      onSuccess: invalidateBetQueries,
+    })
+  }
 
   // Odds re-entry (dead-zone repair) state
   const [fixOpen, setFixOpen] = useState(false)
@@ -350,6 +370,39 @@ export default function BetDetail() {
                 <Ban className="mr-2 h-4 w-4" /> Void
               </Button>
               <p className="text-[10px] text-muted-foreground">Void returns your stake and removes this bet from record counts.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Fix a wrong result — reopen the bet so it can be graded again.
+            The bankroll ledger gets a compensating adjustment; nothing is
+            silently rewritten. */}
+        {isSettled && isOwner && (
+          <Card className="border-border/60 bg-card h-fit">
+            <CardHeader>
+              <CardTitle className="text-lg">Wrong result?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Reopening returns this bet to pending and reverses its bankroll impact with a
+                correction entry, so you can grade it again with the right result. Your bankroll
+                history keeps both entries — nothing is erased.
+              </p>
+              {unsettleBet.isError && (
+                <p className="text-xs text-destructive" role="alert">
+                  {getApiErrorMessage(unsettleBet.error, "Couldn't reopen this bet. Please try again.")}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleReopen}
+                disabled={unsettleBet.isPending}
+                data-testid="button-reopen-bet"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                {unsettleBet.isPending ? 'Reopening...' : 'Reopen to fix result'}
+              </Button>
             </CardContent>
           </Card>
         )}

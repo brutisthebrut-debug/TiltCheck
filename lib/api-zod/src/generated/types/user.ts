@@ -5,6 +5,7 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserOddsFormat } from './userOddsFormat';
 
 export interface User {
   id: number;
@@ -20,4 +21,6 @@ export interface User {
   recapSeenWeek?: string | null;
   /** Founder of the board — can manage beta invites and see the founder dashboard */
   isFounder: boolean;
+  /** Preferred odds display format — follows the user across devices */
+  oddsFormat: UserOddsFormat;
 }

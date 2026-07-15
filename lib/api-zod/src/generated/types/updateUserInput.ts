@@ -5,6 +5,7 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateUserInputOddsFormat } from './updateUserInputOddsFormat';
 
 /**
  * All fields optional; only provided fields are updated
@@ -15,4 +16,6 @@ export interface UpdateUserInput {
   /** @minLength 1 */
   displayName?: string;
   avatarColor?: string;
+  /** Preferred odds display format — follows the user across devices */
+  oddsFormat?: UpdateUserInputOddsFormat;
 }

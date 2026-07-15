@@ -1221,6 +1221,78 @@ export const useSettleBet = <TError = ErrorType<unknown>,
       return useMutation(getSettleBetMutationOptions(options));
     }
 
+export const getUnsettleBetUrl = (id: number,) => {
+
+
+
+
+  return `/api/bets/${id}/unsettle`
+}
+
+/**
+ * Owner-only. Returns the bet to pending and appends a compensating adjustment to the bankroll ledger reversing the settlement's net impact (the ledger is append-only — recorded rows are never rewritten). The bet can then be settled again with the correct result. Post-game review fields are kept and will be overwritten by the next settle.
+ * @summary Reopen a settled bet so a wrong result can be fixed
+ */
+export const unsettleBet = async (id: number, options?: RequestInit): Promise<Bet> => {
+
+  return customFetch<Bet>(getUnsettleBetUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnsettleBetMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsettleBet>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unsettleBet>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['unsettleBet'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unsettleBet>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unsettleBet(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnsettleBetMutationResult = NonNullable<Awaited<ReturnType<typeof unsettleBet>>>
+
+    export type UnsettleBetMutationError = ErrorType<void>
+
+    /**
+ * @summary Reopen a settled bet so a wrong result can be fixed
+ */
+export const useUnsettleBet = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsettleBet>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unsettleBet>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUnsettleBetMutationOptions(options));
+    }
+
 export const getListParlaysUrl = (params?: ListParlaysParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1812,6 +1884,78 @@ export const useSettleParlay = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSettleParlayMutationOptions(options));
+    }
+
+export const getUnsettleParlayUrl = (id: number,) => {
+
+
+
+
+  return `/api/parlays/${id}/unsettle`
+}
+
+/**
+ * Owner-only. Returns the parlay and all of its legs to pending and appends a compensating adjustment to the bankroll ledger reversing the settlement's net impact (the ledger is append-only — recorded rows are never rewritten). The parlay can then be settled again with the correct result. Post-game review fields are kept and will be overwritten by the next settle.
+ * @summary Reopen a settled parlay so a wrong result can be fixed
+ */
+export const unsettleParlay = async (id: number, options?: RequestInit): Promise<Parlay> => {
+
+  return customFetch<Parlay>(getUnsettleParlayUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnsettleParlayMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsettleParlay>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unsettleParlay>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['unsettleParlay'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unsettleParlay>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unsettleParlay(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnsettleParlayMutationResult = NonNullable<Awaited<ReturnType<typeof unsettleParlay>>>
+
+    export type UnsettleParlayMutationError = ErrorType<void>
+
+    /**
+ * @summary Reopen a settled parlay so a wrong result can be fixed
+ */
+export const useUnsettleParlay = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsettleParlay>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unsettleParlay>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUnsettleParlayMutationOptions(options));
     }
 
 export const getGetNeedsSettlingUrl = () => {
@@ -2971,7 +3115,7 @@ export const getGetEdgeFinderUrl = (params?: GetEdgeFinderParams,) => {
 }
 
 /**
- * Slices the signed-in bettor's settled straight bets (valid odds only) into lanes — by sport, favorite vs underdog, odds band, day of week, and stake size band — each with record, money wagered, net profit, and ROI, so the Edge Finder page can show where they actually make money. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user.
+ * Slices the signed-in bettor's settled straight bets (valid odds only) into lanes — by sport, favorite vs underdog, odds band, day of week, and stake size band — each with record, money wagered, net profit, and ROI, so the Edge Finder page can show where they actually make money. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user. Optional filters narrow the slice: period (settled in the last 7/30 days) and sport.
  * @summary A bettor's settled history sliced into lanes to find their edge
  */
 export const getEdgeFinder = async (params?: GetEdgeFinderParams, options?: RequestInit): Promise<EdgeFinder> => {

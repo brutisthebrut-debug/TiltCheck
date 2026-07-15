@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, inArray, gte, sql } from "drizzle-orm";
 import { db, betsTable, parlaysTable, usersTable, transactionsTable, recapNarrativesTable } from "@workspace/db";
 import {
   GetStatsSummaryQueryParams,
@@ -538,6 +538,58 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
     };
   }
 
+  // Tilt spiral — is the bettor mid-spiral *right now*? Fires only when all
+  // three hold inside a short window: (1) two or more settled losses landed,
+  // (2) since the first of those Ls they've logged a burst of 3+ new plays,
+  // and (3) that burst is staked well above their own baseline. Needs a real
+  // avgStake sample so it never fires on thin data. This is a session-level
+  // pattern check — the single-bet chasing warning on the bet form covers
+  // the one-off oversized stake.
+  const TILT_WINDOW_HOURS = 12;
+  const TILT_MIN_LOSSES = 2;
+  const TILT_MIN_PLAYS = 3;
+  const TILT_STAKE_RATIO = 1.5;
+  let tiltSpiral: {
+    windowHours: number;
+    recentLosses: number;
+    rapidPlays: number;
+    burstAvgStake: number;
+    stakeRatio: number;
+  } | null = null;
+  if (avgStake != null && avgStake > 0) {
+    const tiltCutoff = new Date(Date.now() - TILT_WINDOW_HOURS * 60 * 60 * 1000);
+    const recentLossTimes = [...bets, ...parlays]
+      .filter((r) => r.status === "lost" && r.settledAt != null && r.settledAt >= tiltCutoff)
+      .map((r) => r.settledAt!.getTime())
+      .sort((a, b) => a - b);
+    if (recentLossTimes.length >= TILT_MIN_LOSSES) {
+      const firstLossAt = new Date(recentLossTimes[0]);
+      // Every play (any status) logged since that first L landed — the burst.
+      const burstBets = await db
+        .select({ stake: betsTable.stake })
+        .from(betsTable)
+        .where(and(eq(betsTable.userId, self), gte(betsTable.createdAt, firstLossAt)));
+      const burstParlays = await db
+        .select({ stake: parlaysTable.stake })
+        .from(parlaysTable)
+        .where(and(eq(parlaysTable.userId, self), gte(parlaysTable.createdAt, firstLossAt)));
+      const burst = [...burstBets, ...burstParlays];
+      if (burst.length >= TILT_MIN_PLAYS) {
+        const burstAvgStake = burst.reduce((s, r) => s + Number(r.stake), 0) / burst.length;
+        const stakeRatio = burstAvgStake / avgStake;
+        if (stakeRatio >= TILT_STAKE_RATIO) {
+          tiltSpiral = {
+            windowHours: TILT_WINDOW_HOURS,
+            recentLosses: recentLossTimes.length,
+            rapidPlays: burst.length,
+            burstAvgStake: Math.round(burstAvgStake * 100) / 100,
+            stakeRatio: Math.round(stakeRatio * 10) / 10,
+          };
+        }
+      }
+    }
+  }
+
   // One-time trend-flip celebration. The reported leak is the same priority
   // order the dashboard uses (worst sport > miss reason > overconfidence),
   // and "improving" mirrors its trend rules exactly. This GET only *reports*
@@ -566,6 +618,7 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
     worstSport,
     overconfidence,
     topMissReason,
+    tiltSpiral,
     trendFlip,
   });
 });
@@ -590,11 +643,25 @@ router.get("/stats/edge-finder", requireProfile, async (req, res): Promise<void>
     return;
   }
 
+  // Optional filters: a settledAt window (matching the leaderboard's
+  // week/month convention) and an exact sport.
+  const period = query.data.period ?? "all";
+  const windowStart =
+    period === "week"
+      ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      : period === "month"
+        ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        : null;
+  const sportFilter = query.data.sport;
+
   const bets = (
     await db.select().from(betsTable).where(
       and(eq(betsTable.userId, self), inArray(betsTable.status, ["won", "lost", "push"]))
     )
-  ).filter(hasValidOdds);
+  )
+    .filter(hasValidOdds)
+    .filter((b) => windowStart == null || (b.settledAt != null && b.settledAt >= windowStart))
+    .filter((b) => sportFilter == null || b.sport === sportFilter);
 
   const settledCount = bets.length;
   const avgStake =

@@ -7,12 +7,14 @@ import {
   getCompareWorkspaceMembersQueryKey,
   useListBets,
   getListBetsQueryKey,
+  useListParlays,
+  getListParlaysQueryKey,
   type LeaderboardEntry,
 } from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
-import { Trophy, Flame, Snowflake, Swords, Users, Crown, X } from "lucide-react"
+import { Trophy, Flame, Snowflake, Swords, Users, Crown, X, Layers } from "lucide-react"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 
 type Period = "week" | "month" | "all"
@@ -78,6 +80,20 @@ export default function Workspace() {
     { userId: selectedId, limit: 5 },
     { query: { enabled: selectedId != null, queryKey: [...getListBetsQueryKey({ userId: selectedId }), "recent5"] } },
   )
+  const { data: friendParlays = [], isLoading: isFriendParlaysLoading } = useListParlays(
+    { userId: selectedId, limit: 5 },
+    { query: { enabled: selectedId != null, queryKey: [...getListParlaysQueryKey({ userId: selectedId }), "recent5"] } },
+  )
+
+  // Head-to-head counts parlays in the numbers, so the recent list shows
+  // them too — merged with straight bets, newest first, capped at five.
+  const friendPlays = [
+    ...friendBets.map((bet) => ({ kind: "bet" as const, createdAt: bet.createdAt, bet })),
+    ...friendParlays.map((parlay) => ({ kind: "parlay" as const, createdAt: parlay.createdAt, parlay })),
+  ]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5)
+  const isFriendPlaysLoading = isFriendBetsLoading || isFriendParlaysLoading
 
   const me = comparisons.find((c) => c.userId === activeUser?.id)
   const them = comparisons.find((c) => c.userId === selectedId)
@@ -302,37 +318,61 @@ export default function Workspace() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{them.userName}'s Recent Bets</CardTitle>
-              <CardDescription>The last five plays they put on the record.</CardDescription>
+              <CardTitle className="text-base">{them.userName}'s Recent Plays</CardTitle>
+              <CardDescription>The last five plays they put on the record — parlays included.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {isFriendBetsLoading ? (
+              {isFriendPlaysLoading ? (
                 <div className="animate-pulse h-24 rounded-md bg-muted/50" />
-              ) : friendBets.length === 0 ? (
+              ) : friendPlays.length === 0 ? (
                 <div className="text-sm text-muted-foreground text-center py-8 border border-dashed rounded-md">
-                  No straight bets logged yet.
+                  No plays logged yet.
                 </div>
               ) : (
-                friendBets.map((bet) => (
-                  <div
-                    key={bet.id}
-                    className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5"
-                    data-testid={`row-friend-bet-${bet.id}`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{bet.pick}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {bet.event} · {formatDate(bet.gameDate)} · {formatOdds(bet.odds)} · {formatCurrency(Number(bet.stake), false)}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={bet.status === "won" ? "default" : bet.status === "lost" ? "destructive" : "secondary"}
-                      className="shrink-0 text-[10px] uppercase"
+                friendPlays.map((play) =>
+                  play.kind === "bet" ? (
+                    <div
+                      key={`bet-${play.bet.id}`}
+                      className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5"
+                      data-testid={`row-friend-bet-${play.bet.id}`}
                     >
-                      {bet.status === "pending" ? "in play" : bet.status}
-                    </Badge>
-                  </div>
-                ))
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold">{play.bet.pick}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {play.bet.event} · {formatDate(play.bet.gameDate)} · {formatOdds(play.bet.odds)} · {formatCurrency(Number(play.bet.stake), false)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={play.bet.status === "won" ? "default" : play.bet.status === "lost" ? "destructive" : "secondary"}
+                        className="shrink-0 text-[10px] uppercase"
+                      >
+                        {play.bet.status === "pending" ? "in play" : play.bet.status}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div
+                      key={`parlay-${play.parlay.id}`}
+                      className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5"
+                      data-testid={`row-friend-parlay-${play.parlay.id}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5 shrink-0 text-chart-5" />
+                          <p className="truncate text-sm font-bold">{play.parlay.name}</p>
+                        </div>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {play.parlay.legs.length}-leg parlay · {formatOdds(play.parlay.odds)} · {formatCurrency(Number(play.parlay.stake), false)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={play.parlay.status === "won" ? "default" : play.parlay.status === "lost" ? "destructive" : "secondary"}
+                        className="shrink-0 text-[10px] uppercase"
+                      >
+                        {play.parlay.status === "pending" ? "in play" : play.parlay.status}
+                      </Badge>
+                    </div>
+                  )
+                )
               )}
             </CardContent>
           </Card>

@@ -107,8 +107,94 @@ describe("GET /stats/leak-profile", () => {
       worstSport: null,
       overconfidence: null,
       topMissReason: null,
+      tiltSpiral: null,
       trendFlip: false,
     });
+  });
+
+  it("flags a tilt spiral: losses inside the window, then a rapid escalated burst", async () => {
+    const { user, clerkUserId } = await createLinkedUser();
+    currentClerkUserId = clerkUserId;
+
+    const hoursAgo = (n: number) => new Date(Date.now() - n * 60 * 60 * 1000);
+    // Baseline: five settled $40 bets, all settled days ago (outside the
+    // tilt window), created days ago too.
+    for (let i = 0; i < 5; i++) {
+      await seedBet(user.id, {
+        status: i % 2 === 0 ? "won" : "lost",
+        stake: "40.00",
+        actualPayout: i % 2 === 0 ? "76.36" : "0.00",
+        settledAt: hoursAgo(24 * 5),
+        createdAt: hoursAgo(24 * 6),
+      });
+    }
+    // Two Ls land inside the last 12 hours (created before they settled).
+    await seedBet(user.id, { status: "lost", stake: "40.00", settledAt: hoursAgo(3), createdAt: hoursAgo(5) });
+    await seedBet(user.id, { status: "lost", stake: "40.00", settledAt: hoursAgo(2), createdAt: hoursAgo(5) });
+
+    // Not tilted yet: only the two Ls, no burst behind them.
+    const calm = await request(app).get("/api/stats/leak-profile");
+    expect(calm.body.tiltSpiral).toBeNull();
+
+    // The burst: three fresh plays at 2.5x the baseline stake.
+    for (let i = 0; i < 3; i++) {
+      await seedBet(user.id, { status: "pending", stake: "100.00", actualPayout: null, settledAt: null });
+    }
+
+    const res = await request(app).get("/api/stats/leak-profile");
+    expect(res.status).toBe(200);
+    expect(res.body.tiltSpiral).toMatchObject({
+      windowHours: 12,
+      recentLosses: 2,
+      rapidPlays: 3,
+      burstAvgStake: 100,
+      stakeRatio: 2.5,
+    });
+  });
+
+  it("stays quiet when the burst is staked normally or only one loss landed", async () => {
+    const { user, clerkUserId } = await createLinkedUser();
+    currentClerkUserId = clerkUserId;
+
+    const hoursAgo = (n: number) => new Date(Date.now() - n * 60 * 60 * 1000);
+    for (let i = 0; i < 5; i++) {
+      await seedBet(user.id, {
+        status: "won",
+        stake: "40.00",
+        actualPayout: "76.36",
+        settledAt: hoursAgo(24 * 5),
+        createdAt: hoursAgo(24 * 6),
+      });
+    }
+    // Only one L inside the window + a big burst → no spiral (one loss is a night, not a pattern)
+    await seedBet(user.id, { status: "lost", stake: "40.00", settledAt: hoursAgo(2), createdAt: hoursAgo(5) });
+    for (let i = 0; i < 3; i++) {
+      await seedBet(user.id, { status: "pending", stake: "100.00", actualPayout: null, settledAt: null });
+    }
+    const oneLoss = await request(app).get("/api/stats/leak-profile");
+    expect(oneLoss.body.tiltSpiral).toBeNull();
+
+    // Second L lands — but the burst was normal-staked? Reseed scenario:
+    // add the second loss; burst avg now (100*3 + 40)/4 = 85 → 2.1x fires.
+    // To prove the stake guard, use a fresh user with a normal-staked burst.
+    const fresh = await createLinkedUser();
+    currentClerkUserId = fresh.clerkUserId;
+    for (let i = 0; i < 5; i++) {
+      await seedBet(fresh.user.id, {
+        status: "won",
+        stake: "40.00",
+        actualPayout: "76.36",
+        settledAt: hoursAgo(24 * 5),
+        createdAt: hoursAgo(24 * 6),
+      });
+    }
+    await seedBet(fresh.user.id, { status: "lost", stake: "40.00", settledAt: hoursAgo(3), createdAt: hoursAgo(5) });
+    await seedBet(fresh.user.id, { status: "lost", stake: "40.00", settledAt: hoursAgo(2), createdAt: hoursAgo(5) });
+    for (let i = 0; i < 3; i++) {
+      await seedBet(fresh.user.id, { status: "pending", stake: "45.00", actualPayout: null, settledAt: null });
+    }
+    const normalStakes = await request(app).get("/api/stats/leak-profile");
+    expect(normalStakes.body.tiltSpiral).toBeNull();
   });
 
   it("computes avgStake and lastLossAt once the sample is real", async () => {

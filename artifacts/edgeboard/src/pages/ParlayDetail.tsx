@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter"
-import { useGetParlay, useSettleParlay, useUpdateParlayLeg, useRecomputeParlayOdds, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
+import { useGetParlay, useSettleParlay, useUnsettleParlay, useUpdateParlayLeg, useRecomputeParlayOdds, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -17,7 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import type { LegResult } from "@workspace/api-client-react"
@@ -47,7 +47,26 @@ export default function ParlayDetail() {
   })
   
   const settleParlay = useSettleParlay()
+  const unsettleParlay = useUnsettleParlay()
   const updateParlayLeg = useUpdateParlayLeg()
+
+  const handleReopen = () => {
+    unsettleParlay.mutate({ id: parlayId }, {
+      onSuccess: () => {
+        setLegResults({})
+        queryClient.invalidateQueries({ queryKey: getGetParlayQueryKey(parlayId) })
+        queryClient.invalidateQueries({ queryKey: getListParlaysQueryKey() })
+        queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
+        if (activeUser) {
+          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
+          queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
+          queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey() })
+          queryClient.invalidateQueries({ queryKey: getGetUserBadgesQueryKey(activeUser.id) })
+          queryClient.invalidateQueries({ queryKey: getGetStreaksQueryKey({ userId: activeUser.id }) })
+        }
+      },
+    })
+  }
   const recomputeOdds = useRecomputeParlayOdds()
   const [recomputeError, setRecomputeError] = useState<string | null>(null)
 
@@ -511,6 +530,39 @@ export default function ParlayDetail() {
                   <Ban className="mr-2 h-4 w-4" /> Void
                 </Button>
                 <p className="text-[10px] text-muted-foreground">Void returns your stake and removes this parlay from record counts.</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Fix a wrong result — reopen the parlay so it can be graded
+              again. Legs go back to pending and the bankroll ledger gets a
+              compensating adjustment; nothing is silently rewritten. */}
+          {isSettled && isOwner && (
+            <Card className="border-border/60 bg-card">
+              <CardHeader>
+                <CardTitle className="text-lg">Wrong result?</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Reopening returns this parlay and all its legs to pending and reverses its
+                  bankroll impact with a correction entry, so you can grade it again with the
+                  right results. Your bankroll history keeps both entries — nothing is erased.
+                </p>
+                {unsettleParlay.isError && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {getApiErrorMessage(unsettleParlay.error, "Couldn't reopen this parlay. Please try again.")}
+                  </p>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleReopen}
+                  disabled={unsettleParlay.isPending}
+                  data-testid="button-reopen-parlay"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  {unsettleParlay.isPending ? 'Reopening...' : 'Reopen to fix result'}
+                </Button>
               </CardContent>
             </Card>
           )}

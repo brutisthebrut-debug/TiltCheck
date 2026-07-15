@@ -1,8 +1,10 @@
+import { useState } from "react"
 import { useUser } from "@/contexts/UserContext"
 import { useGetEdgeFinder, getGetEdgeFinderQueryKey } from "@workspace/api-client-react"
 import type { EdgeFinderLane } from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
@@ -53,13 +55,33 @@ function signedCurrency(n: number): string {
   return `${n > 0 ? "+" : ""}${formatCurrency(n, true)}`
 }
 
+type Period = "week" | "month" | "all"
+
+const PERIODS: { value: Period; label: string }[] = [
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "all", label: "All Time" },
+]
+
 export default function EdgeFinder() {
   const { activeUser } = useUser()
+  const [period, setPeriod] = useState<Period>("all")
+  const [sport, setSport] = useState<string | null>(null)
+  const hasFilters = period !== "all" || sport != null
 
+  const filterParams = { userId: activeUser?.id, period, sport: sport ?? undefined }
   const { data, isLoading, isError, refetch, isRefetching } = useGetEdgeFinder(
+    filterParams,
+    { query: { enabled: !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey(filterParams) } }
+  )
+
+  // Unfiltered slice just to know which sports exist — keeps the sport
+  // dropdown stable while a sport filter is applied.
+  const { data: allTime } = useGetEdgeFinder(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey({ userId: activeUser?.id }) } }
   )
+  const sportOptions = (allTime?.sport ?? []).map((l) => l.key).sort()
 
   if (isError) {
     return (
@@ -96,7 +118,79 @@ export default function EdgeFinder() {
 
   const minSample = data.minSample
 
-  if (data.settledCount < minSample) {
+  const filterBar = (
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="inline-flex rounded-lg bg-muted/60 p-1" role="tablist" aria-label="Time window">
+        {PERIODS.map((p) => (
+          <button
+            key={p.value}
+            role="tab"
+            aria-selected={period === p.value}
+            onClick={() => setPeriod(p.value)}
+            data-testid={`tab-edge-period-${p.value}`}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+              period === p.value
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {sportOptions.length > 1 && (
+        <Select value={sport ?? "__all__"} onValueChange={(v) => setSport(v === "__all__" ? null : v)}>
+          <SelectTrigger className="h-9 w-[160px]" data-testid="select-edge-sport">
+            <SelectValue placeholder="All sports" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All sports</SelectItem>
+            {sportOptions.map((s) => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {hasFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground"
+          onClick={() => { setPeriod("all"); setSport(null) }}
+          data-testid="button-edge-clear-filters"
+        >
+          Clear filters
+        </Button>
+      )}
+    </div>
+  )
+
+  // A filtered slice with nothing in it is not an onboarding problem —
+  // keep the filters visible so the bettor can widen the window.
+  if (hasFilters && data.settledCount === 0) {
+    return (
+      <div className="space-y-8 animate-in fade-in-50 duration-500">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Edge Finder</h1>
+          <p className="text-muted-foreground mt-1">Where you actually make money — and where you donate it.</p>
+        </div>
+        {filterBar}
+        <Card className="border-dashed border-2 border-muted" data-testid="card-edge-finder-filtered-empty">
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+            <Crosshair className="h-7 w-7 text-muted-foreground" />
+            <div>
+              <h2 className="text-base font-semibold">Nothing settled in this slice</h2>
+              <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+                No settled bets match these filters. Widen the window or clear the sport.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!hasFilters && data.settledCount < minSample) {
     return (
       <div className="space-y-8 animate-in fade-in-50 duration-500">
         <div>
@@ -189,6 +283,8 @@ export default function EdgeFinder() {
         <h1 className="text-3xl font-bold tracking-tight">Edge Finder</h1>
         <p className="text-muted-foreground mt-1">Where you actually make money — and where you donate it.</p>
       </div>
+
+      {filterBar}
 
       {/* Hero callouts */}
       <div className="grid gap-4 md:grid-cols-2">
