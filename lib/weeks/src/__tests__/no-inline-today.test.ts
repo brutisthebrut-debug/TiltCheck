@@ -27,13 +27,16 @@ const ALLOWED = [join("lib", "weeks", "src"), join("artifacts", "api-server", "s
 const INLINE_TODAY_PATTERNS: ReadonlyArray<{ name: string; regex: RegExp }> = [
   {
     // .toISOString().slice(0, 10) / .substring(0, 10) / .substr(0, 10)
-    name: "toISOString().slice(0, 10)",
-    regex: /toISOString\s*\(\s*\)\s*\.\s*(?:slice|substring|substr)\s*\(\s*0\s*,\s*10\s*\)/,
+    // Date.prototype.toJSON() returns the same ISO string, so the toJSON()
+    // spelling is the same hidden "today" definition and is matched too.
+    name: "toISOString()/toJSON().slice(0, 10)",
+    regex: /to(?:ISOString|JSON)\s*\(\s*\)\s*\.\s*(?:slice|substring|substr)\s*\(\s*0\s*,\s*10\s*\)/,
   },
   {
-    // .toISOString().split("T")[0] — any quote style
-    name: 'toISOString().split("T")[0]',
-    regex: /toISOString\s*\(\s*\)\s*\.\s*split\s*\(\s*["'`]T["'`]\s*\)\s*\[\s*0\s*\]/,
+    // .toISOString().split("T")[0] — any quote style; toJSON() is the same
+    // ISO string, so it's matched too.
+    name: 'toISOString()/toJSON().split("T")[0]',
+    regex: /to(?:ISOString|JSON)\s*\(\s*\)\s*\.\s*split\s*\(\s*["'`]T["'`]\s*\)\s*\[\s*0\s*\]/,
   },
   {
     // date-fns style: format(new Date(), "yyyy-MM-dd")
@@ -130,10 +133,15 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
   // Regression fixtures: each pattern must catch the idiom it targets and
   // must NOT flag legitimate display formatting of an existing date value.
   const shouldMatch: Array<[string, string]> = [
-    ["toISOString().slice(0, 10)", "const t = new Date().toISOString().slice(0, 10);"],
-    ["toISOString().slice(0, 10)", "const t = now.toISOString().substring(0, 10);"],
-    ['toISOString().split("T")[0]', "const t = new Date().toISOString().split('T')[0];"],
-    ['toISOString().split("T")[0]', 'const t = new Date().toISOString().split("T")[0];'],
+    ["toISOString()/toJSON().slice(0, 10)", "const t = new Date().toISOString().slice(0, 10);"],
+    ["toISOString()/toJSON().slice(0, 10)", "const t = now.toISOString().substring(0, 10);"],
+    ["toISOString()/toJSON().slice(0, 10)", "const t = new Date().toJSON().slice(0, 10);"],
+    ["toISOString()/toJSON().slice(0, 10)", "const t = now.toJSON().substring(0, 10);"],
+    ["toISOString()/toJSON().slice(0, 10)", "const t = now.toJSON().substr(0, 10);"],
+    ['toISOString()/toJSON().split("T")[0]', "const t = new Date().toISOString().split('T')[0];"],
+    ['toISOString()/toJSON().split("T")[0]', 'const t = new Date().toISOString().split("T")[0];'],
+    ['toISOString()/toJSON().split("T")[0]', "const t = new Date().toJSON().split('T')[0];"],
+    ['toISOString()/toJSON().split("T")[0]', 'const t = new Date().toJSON().split("T")[0];'],
     ['format(new Date(), "yyyy-MM-dd")', "const t = format(new Date(), 'yyyy-MM-dd');"],
     ['dayjs()/moment().format("YYYY-MM-DD")', "const t = dayjs().format('YYYY-MM-DD');"],
     ['dayjs()/moment().format("YYYY-MM-DD")', "const t = moment().format('YYYY-MM-DD');"],
@@ -167,6 +175,9 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
     "d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });",
     // Full ISO timestamp kept intact:
     "const ts = new Date().toISOString();",
+    "const ts = new Date().toJSON();",
+    // toJSON on a non-Date value with unrelated arguments:
+    "const body = payload.toJSON().slice(1);",
     // Splitting something other than the ISO timestamp:
     "const parts = header.split('T')[0];",
     // Legitimate standalone getter uses — showing just the year:
