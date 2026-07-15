@@ -516,8 +516,17 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
   ]);
   const recap = computeWeeklyRecap({ users, bets: allBets, parlays: allParlays, userId, weekStart });
 
-  // Quiet week — nothing to review, nothing to generate.
-  if (recap.personal.loggedCount === 0 && recap.personal.settledCount === 0) {
+  // Quiet week or nothing graded yet (e.g. a bettor's first week with only
+  // pending bets) — no decision tape to review. Short-circuit before the AI
+  // call: no generation cost, and crucially no cache write, so the week gets
+  // its narrative later if bets from it are ever settled.
+  const factsResult = assembleRecapFacts({
+    displayName: user.displayName,
+    recap,
+    myBets: allBets,
+    myParlays: allParlays,
+  });
+  if (!factsResult.hasData) {
     res.json({ weekStart, narrative: null });
     return;
   }
@@ -561,13 +570,7 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
     let flight = narrativeFlights.get(flightKey);
     if (!flight) {
       flight = (async () => {
-        const facts = assembleRecapFacts({
-          displayName: user.displayName,
-          recap,
-          myBets: allBets,
-          myParlays: allParlays,
-        });
-        const narrative = await generateRecapNarrative(facts);
+        const narrative = await generateRecapNarrative(factsResult.facts);
         // The unique index makes sure only one row lands even across processes.
         await db
           .insert(recapNarrativesTable)

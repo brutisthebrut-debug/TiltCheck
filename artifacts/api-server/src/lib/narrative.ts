@@ -53,6 +53,16 @@ export type RecapFacts = {
   parlays: { settled: number; won: number; profit: number } | null;
 };
 
+/**
+ * Typed sentinel: a week with zero settled plays has no tape to review.
+ * Callers must check `hasData` before generating — an all-zero facts object
+ * would push the model into inventing a story about nothing, and the result
+ * would be cached forever.
+ */
+export type RecapFactsResult =
+  | { hasData: false }
+  | { hasData: true; facts: RecapFacts };
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export function assembleRecapFacts(input: {
@@ -60,7 +70,7 @@ export function assembleRecapFacts(input: {
   recap: WeeklyRecap;
   myBets: RecapBet[];
   myParlays: RecapParlay[];
-}): RecapFacts {
+}): RecapFactsResult {
   const { displayName, recap } = input;
   const p = recap.personal;
   const from = new Date(`${recap.weekStart}T00:00:00Z`).getTime();
@@ -88,6 +98,13 @@ export function assembleRecapFacts(input: {
   };
   collect(input.myBets, false);
   collect(input.myParlays, true);
+
+  // First week, nothing graded yet (or only pending/void plays): there is no
+  // decision tape to review. Return the sentinel so the caller skips the AI
+  // call entirely instead of narrating an empty week.
+  if (settled.length === 0) {
+    return { hasData: false };
+  }
 
   // Stake sizing after a loss: plays settled within 24h AFTER an earlier loss
   const byTime = [...settled].sort((a, b) => a.settledAt.getTime() - b.settledAt.getTime());
@@ -118,7 +135,7 @@ export function assembleRecapFacts(input: {
 
   const settledParlays = settled.filter((s) => s.isParlay);
 
-  return {
+  const facts: RecapFacts = {
     displayName,
     weekStart: recap.weekStart,
     weekEnd: recap.weekEnd,
@@ -158,6 +175,7 @@ export function assembleRecapFacts(input: {
           }
         : null,
   };
+  return { hasData: true, facts };
 }
 
 // ---------------------------------------------------------------------------

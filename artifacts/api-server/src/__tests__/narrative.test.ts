@@ -56,6 +56,24 @@ describe("assembleRecapFacts", () => {
       userId: 1,
       weekStart: WEEK,
     });
+    const result = assembleRecapFacts({
+      displayName: "Ari",
+      recap,
+      myBets: bets as never,
+      myParlays: parlays as never,
+    });
+    if (!result.hasData) throw new Error("expected facts");
+    return result.facts;
+  }
+
+  function factsResult(bets: ReturnType<typeof betRow>[], parlays: Record<string, unknown>[] = []) {
+    const recap = computeWeeklyRecap({
+      users,
+      bets: bets as never,
+      parlays: parlays as never,
+      userId: 1,
+      weekStart: WEEK,
+    });
     return assembleRecapFacts({
       displayName: "Ari",
       recap,
@@ -102,13 +120,16 @@ describe("assembleRecapFacts", () => {
     expect(f.sportMix.find((s) => s.sport === "MLB")?.profit).toBe(18.18);
   });
 
-  it("never counts pending plays or plays outside the week", () => {
-    const f = facts([
+  it("returns the no-data sentinel when nothing settled inside the week", () => {
+    const r = factsResult([
       betRow({ status: "pending", actualPayout: null, settledAt: null }),
       betRow({ settledAt: new Date("2026-07-20T02:00:00Z") }), // next week
     ]);
-    expect(f.playsSettled).toBe(0);
-    expect(f.stakeSizing).toBeNull();
+    expect(r.hasData).toBe(false);
+  });
+
+  it("returns the no-data sentinel for an empty week", () => {
+    expect(factsResult([]).hasData).toBe(false);
   });
 });
 
@@ -210,6 +231,35 @@ describe("GET /stats/recap/narrative", () => {
     expect(res.status).toBe(200);
     expect(res.body.narrative).toBeNull();
     expect(generateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns null without generating or caching when the week has bets but none settled", async () => {
+    const user = await createUser();
+    // A first-week bettor: bets logged inside the week, still pending.
+    await db.insert(betsTable).values({
+      userId: user.id,
+      sport: "NBA",
+      event: "Celtics @ Knicks",
+      pick: "Celtics -3",
+      betType: "spread",
+      odds: -110,
+      stake: "100",
+      potentialPayout: "190.91",
+      actualPayout: null,
+      confidenceScore: 7,
+      sportsbook: "Test",
+      gameDate: "2026-07-07",
+      status: "pending",
+      createdAt: new Date("2026-07-07T12:00:00Z"),
+      settledAt: null,
+    });
+
+    const res = await request(app).get(`/api/stats/recap/narrative?weekStart=${WEEK}`);
+    expect(res.status).toBe(200);
+    expect(res.body.narrative).toBeNull();
+    expect(generateMock).not.toHaveBeenCalled();
+    // No cache write — the week can still get its tape once bets settle.
+    expect(await db.select().from(recapNarrativesTable)).toHaveLength(0);
   });
 
   it("degrades to null when generation fails — and caches nothing", async () => {

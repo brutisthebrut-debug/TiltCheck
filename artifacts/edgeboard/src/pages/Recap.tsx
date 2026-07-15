@@ -182,6 +182,21 @@ export default function Recap() {
                 <div className="h-3 rounded bg-muted/60 animate-pulse w-4/5" />
               </CardContent>
             </Card>
+          ) : tape && tape.narrative == null && p!.settledCount === 0 ? (
+            <Card className="border-dashed border-2 border-muted" data-testid="card-recap-tape-empty">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Clapperboard className="h-4 w-4 text-muted-foreground" />
+                  <CardDescription className="uppercase tracking-wider text-[11px]">The tape</CardDescription>
+                </div>
+                <CardTitle className="text-base">No tape this week.</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Nothing graded yet — once your first bets settle, the review shows up here.
+                </p>
+              </CardContent>
+            </Card>
           ) : tape?.narrative ? (
             <Card className="border-primary/20 bg-primary/5 animate-in fade-in-50 duration-500" data-testid="card-recap-tape">
               <CardHeader className="pb-2">
