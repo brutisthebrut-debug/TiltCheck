@@ -6,6 +6,7 @@
 - [AI narrative generation](ai-narrative-generation.md) — lazy-import the AI client (import-time env throw kills boot); cache + singleflight + demo bounding for GET-triggered paid calls; mock provider in all test files.
 - [Dark mode class placement](dark-mode-class-placement.md) — `dark` must be on `<html>`, not inner divs, or inherited body color resolves light-mode vars → invisible text.
 - [Demo board isolation](demo-board-isolation.md) — every real query must scope isDemo=false; tests wipe the dev DB but the server self-seeds the demo world at boot.
+- [Demo URL rewrite scoping](demo-url-rewrite-scoping.md) — /api→/api/demo rewrite is per-QueryClient (sync-window wrap); customFetch must apply the rewrite before its first await.
 - [Recharts time axis](recharts-time-axis.md) — numeric scale="time" XAxis needs an explicit ticks array or it draws a tick per point (overlap + dup-key errors).
 - [Frontend component tests](frontend-component-tests.md) — edgeboard vitest is node-env; tsx tests need the jsdom docblock and `esbuild.jsx: "automatic"`; mock generated hooks, keep a real QueryClientProvider.
 - [Test-suite DB races](test-suite-db-races.md) — api-server suite holds a pg advisory lock (concurrent runs corrupt the shared dev DB); full user wipes must also delete invites (no cascade).

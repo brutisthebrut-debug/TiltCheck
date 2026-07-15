@@ -1,6 +1,5 @@
 export * from "./generated/api";
 export * from "./generated/api.schemas";
-export { setBaseUrl, setAuthTokenGetter, setUrlRewrite } from "./custom-fetch";
-export type { AuthTokenGetter } from "./custom-fetch";
-export * from './generated/api';
-export * from './generated/api.schemas';
+export { setBaseUrl, setAuthTokenGetter, runWithUrlRewrite } from "./custom-fetch";
+export type { AuthTokenGetter, UrlRewrite } from "./custom-fetch";
+export { UrlRewriteScopedQueryClient } from "./scoped-query-client";

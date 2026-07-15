@@ -15,18 +15,34 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 // Module-level configuration
 // ---------------------------------------------------------------------------
 
+export type UrlRewrite = (url: string) => string;
+
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
-let _urlRewrite: ((url: string) => string) | null = null;
+let _urlRewrite: UrlRewrite | null = null;
 
 /**
- * Register a rewrite function applied to every relative request URL (paths
- * starting with `/`) before the base URL is prepended. Lets an app remap the
- * generated client onto an alternate mount of the same API (e.g. the
- * read-only demo mount at `/api/demo/...`). Pass `null` to clear.
+ * Run `fn` with a URL rewrite applied to every relative request URL (paths
+ * starting with `/`) issued *synchronously* inside it, then restore the
+ * previous rewrite. Lets an app remap the generated client onto an alternate
+ * mount of the same API (e.g. the read-only demo mount at `/api/demo/...`)
+ * without a leaky module-global switch: requests issued outside the callback
+ * are never affected, so two "worlds" can coexist in one page.
+ *
+ * IMPORTANT: `fn` must call `customFetch` synchronously (before any `await`).
+ * The rewrite is applied synchronously at the top of `customFetch`, so the
+ * returned promise already targets the right URL; the rewrite is restored as
+ * soon as `fn` returns. The generated query/mutation functions satisfy this —
+ * they invoke `customFetch` immediately.
  */
-export function setUrlRewrite(rewrite: ((url: string) => string) | null): void {
+export function runWithUrlRewrite<T>(rewrite: UrlRewrite | null, fn: () => T): T {
+  const prev = _urlRewrite;
   _urlRewrite = rewrite;
+  try {
+    return fn();
+  } finally {
+    _urlRewrite = prev;
+  }
 }
 
 /**

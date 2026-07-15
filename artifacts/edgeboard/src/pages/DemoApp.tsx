@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
+import { QueryClientProvider, MutationCache } from '@tanstack/react-query';
 import { Route, Switch, Link } from 'wouter';
-import { setUrlRewrite } from '@workspace/api-client-react';
+import { UrlRewriteScopedQueryClient } from '@workspace/api-client-react';
 import { setOddsFormatServerSync } from '@/hooks/use-odds-format';
 import { setBillingServerSync } from '@/hooks/use-pro';
 import { setCrewActionsEnabled } from '@/hooks/use-crews';
@@ -31,13 +31,14 @@ const demoRewrite = (url: string) =>
 /**
  * The public demo board: the real app pages, backed by /api/demo (a seeded,
  * fictional crew, strictly read-only). No sign-in required. Gets its own
- * QueryClient so demo data can never bleed into a signed-in session's cache.
+ * QueryClient — scoped so demo data can never bleed into a signed-in
+ * session's cache, and the demo rewrite can never touch the real app's
+ * requests (the rewrite rides on this client, not a module-global switch).
  */
 export default function DemoApp() {
   // useState initializers run before the first render's queries fire, so the
-  // rewrite is in place before any hook fetches.
+  // toggles are in place before any hook fetches.
   const [queryClient] = useState(() => {
-    setUrlRewrite(demoRewrite);
     // Odds-format choice stays on this device — never PATCH the read-only
     // demo API, never let the demo persona's preference overwrite it.
     setOddsFormatServerSync(false);
@@ -46,7 +47,7 @@ export default function DemoApp() {
     setBillingServerSync(false);
     // The demo crew is sealed: visitors can see it but never create/join/switch.
     setCrewActionsEnabled(false);
-    return new QueryClient({
+    return new UrlRewriteScopedQueryClient(demoRewrite, {
       mutationCache: new MutationCache({
         onError: (_error, _variables, _context, mutation) => {
           // Background best-effort writes (like the recap "seen" marker) fire
@@ -63,12 +64,10 @@ export default function DemoApp() {
   });
 
   useEffect(() => {
-    setUrlRewrite(demoRewrite);
     setOddsFormatServerSync(false);
     setBillingServerSync(false);
     setCrewActionsEnabled(false);
     return () => {
-      setUrlRewrite(null);
       setOddsFormatServerSync(true);
       setBillingServerSync(true);
       setCrewActionsEnabled(true);
