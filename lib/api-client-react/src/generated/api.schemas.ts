@@ -561,6 +561,97 @@ export interface Transaction {
   createdAt: string;
 }
 
+export type BankrollHistoryPointType = typeof BankrollHistoryPointType[keyof typeof BankrollHistoryPointType];
+
+
+export const BankrollHistoryPointType = {
+  starting: 'starting',
+  deposit: 'deposit',
+  withdraw: 'withdraw',
+  bet_win: 'bet_win',
+  bet_loss: 'bet_loss',
+  bet_push: 'bet_push',
+  bet_void: 'bet_void',
+  adjustment: 'adjustment',
+} as const;
+
+export interface BankrollHistoryPoint {
+  /** ISO timestamp of the ledger entry */
+  date: string;
+  /** Balance after this entry */
+  balance: number;
+  type: BankrollHistoryPointType;
+  /** Signed amount of this entry (0 for the starting point) */
+  amount: number;
+}
+
+export interface BankrollHistory {
+  startingBalance: number;
+  /** Chronological ledger points, starting with the opening balance */
+  points: BankrollHistoryPoint[];
+}
+
+/**
+ * The sport losing the most money, when it has cost at least $50 over 5+ bets
+ * @nullable
+ */
+export type LeakProfileWorstSport = {
+  sport: string;
+  /** Net loss in dollars (negative number) */
+  netLoss: number;
+  bets: number;
+} | null;
+
+/**
+ * Present when 7+ confidence plays hit under 45% across 5+ samples
+ * @nullable
+ */
+export type LeakProfileOverconfidence = {
+  /** Win percentage of high-confidence (7+) settled plays */
+  winRate: number;
+  sample: number;
+} | null;
+
+/**
+ * Most common self-graded miss reason across settled losses (excluding normal variance)
+ * @nullable
+ */
+export type LeakProfileTopMissReason = {
+  reason: string;
+  count: number;
+  netLoss: number;
+} | null;
+
+export interface LeakProfile {
+  /** Settled straight bets counted toward the profile */
+  settledCount: number;
+  /**
+     * Average stake across settled straight bets (null under 5 samples)
+     * @nullable
+     */
+  avgStake: number | null;
+  /**
+     * ISO timestamp of the most recent settled loss (bet or parlay)
+     * @nullable
+     */
+  lastLossAt: string | null;
+  /**
+     * The sport losing the most money, when it has cost at least $50 over 5+ bets
+     * @nullable
+     */
+  worstSport: LeakProfileWorstSport;
+  /**
+     * Present when 7+ confidence plays hit under 45% across 5+ samples
+     * @nullable
+     */
+  overconfidence: LeakProfileOverconfidence;
+  /**
+     * Most common self-graded miss reason across settled losses (excluding normal variance)
+     * @nullable
+     */
+  topMissReason: LeakProfileTopMissReason;
+}
+
 export type TransactionInputType = typeof TransactionInputType[keyof typeof TransactionInputType];
 
 
@@ -1061,6 +1152,13 @@ userId?: number | null;
 limit?: number;
 };
 
+export type GetBankrollHistoryParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+};
+
 export type GetStatsSummaryParams = {
 /**
  * @nullable
@@ -1087,6 +1185,13 @@ userId?: number | null;
 };
 
 export type GetStatsInsightsParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+};
+
+export type GetLeakProfileParams = {
 /**
  * @nullable
  */

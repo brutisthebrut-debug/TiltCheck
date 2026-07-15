@@ -187,6 +187,26 @@ export default function ParlayDetail() {
 
   const statusLabel: Record<SettleStatus, string> = { won: 'Won ✓', lost: 'Lost ✗', push: 'Push', void: 'Void' }
 
+  // Derive the only grade the leg results allow, so the overall result can't
+  // contradict the legs (the server rejects contradictions too — this keeps
+  // the impossible buttons from being pressable in the first place).
+  // Effective status per leg: the local pick, or the already-settled status.
+  const effectiveLegStatuses = parlay.legs.map(leg =>
+    legResults[leg.id] ?? (leg.status !== 'pending' ? (leg.status as 'won' | 'lost' | 'push' | 'void') : null)
+  )
+  const anyLegLost = effectiveLegStatuses.includes('lost')
+  const allLegsMarked = effectiveLegStatuses.every(s => s !== null)
+  const derivedStatus: SettleStatus | null = anyLegLost
+    ? 'lost'
+    : allLegsMarked
+      ? effectiveLegStatuses.includes('won')
+        ? 'won'
+        : effectiveLegStatuses.every(s => s === 'void')
+          ? 'void'
+          : 'push'
+      : null
+  const gradeDisabled = (status: SettleStatus) => derivedStatus !== null && status !== derivedStatus
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
@@ -411,11 +431,19 @@ export default function ParlayDetail() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">Mark leg results above, then grade the overall parlay.</p>
+                {derivedStatus !== null && (
+                  <p className="text-xs text-primary" data-testid="text-derived-grade">
+                    {anyLegLost && !allLegsMarked
+                      ? 'A leg is down — the only honest grade left is Lost.'
+                      : `Leg results say this parlay ${derivedStatus === 'won' ? 'hit' : derivedStatus === 'lost' ? 'is toast' : derivedStatus === 'void' ? 'is a wash' : 'pushed'} — grade locked to ${statusLabel[derivedStatus]}.`}
+                  </p>
+                )}
                 <Button 
                   variant="outline" 
                   className="w-full bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20"
                   onClick={() => handleGradeClick('won')}
-                  disabled={settleParlay.isPending}
+                  disabled={settleParlay.isPending || gradeDisabled('won')}
+                  data-testid="button-grade-won"
                 >
                   <Check className="mr-2 h-4 w-4" /> Won
                 </Button>
@@ -423,7 +451,8 @@ export default function ParlayDetail() {
                   variant="outline" 
                   className="w-full bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
                   onClick={() => handleGradeClick('lost')}
-                  disabled={settleParlay.isPending}
+                  disabled={settleParlay.isPending || gradeDisabled('lost')}
+                  data-testid="button-grade-lost"
                 >
                   <X className="mr-2 h-4 w-4" /> Lost
                 </Button>
@@ -431,7 +460,8 @@ export default function ParlayDetail() {
                   variant="outline" 
                   className="w-full"
                   onClick={() => handleGradeClick('push')}
-                  disabled={settleParlay.isPending}
+                  disabled={settleParlay.isPending || gradeDisabled('push')}
+                  data-testid="button-grade-push"
                 >
                   <Minus className="mr-2 h-4 w-4" /> Push
                 </Button>
@@ -439,7 +469,8 @@ export default function ParlayDetail() {
                   variant="outline" 
                   className="w-full bg-blue-500/10 text-blue-400 border-blue-400/20 hover:bg-blue-500/20"
                   onClick={() => handleGradeClick('void')}
-                  disabled={settleParlay.isPending}
+                  disabled={settleParlay.isPending || gradeDisabled('void')}
+                  data-testid="button-grade-void"
                 >
                   <Ban className="mr-2 h-4 w-4" /> Void
                 </Button>

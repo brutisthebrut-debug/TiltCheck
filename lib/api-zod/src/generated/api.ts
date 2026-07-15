@@ -911,6 +911,25 @@ export const CreateTransactionResponse = zod.object({
 
 
 /**
+ * Returns every ledger point in chronological order so the client can chart the balance over time. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user.
+ * @summary Full bankroll balance history for the signed-in user
+ */
+export const GetBankrollHistoryQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish()
+})
+
+export const GetBankrollHistoryResponse = zod.object({
+  "startingBalance": zod.number(),
+  "points": zod.array(zod.object({
+  "date": zod.string().describe('ISO timestamp of the ledger entry'),
+  "balance": zod.number().describe('Balance after this entry'),
+  "type": zod.enum(['starting', 'deposit', 'withdraw', 'bet_win', 'bet_loss', 'bet_push', 'bet_void', 'adjustment']),
+  "amount": zod.number().describe('Signed amount of this entry (0 for the starting point)')
+})).describe('Chronological ledger points, starting with the opening balance')
+})
+
+
+/**
  * @summary Overall performance summary for a user
  */
 export const GetStatsSummaryQueryParams = zod.object({
@@ -1044,6 +1063,35 @@ export const GetStatsInsightsResponse = zod.object({
   "whatHappened": zod.string(),
   "settledAt": zod.string().nullish()
 }))
+})
+
+
+/**
+ * Aggregates the signed-in bettor's settled history into a few machine-readable leak signals (stake chasing after a loss, worst sport, overconfidence) so the bet form can warn before they repeat their most common mistake. Signals below sample-size thresholds are omitted. Always scoped to the signed-in user.
+ * @summary A bettor's recurring leak signals for pre-bet warnings
+ */
+export const GetLeakProfileQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish()
+})
+
+export const GetLeakProfileResponse = zod.object({
+  "settledCount": zod.number().describe('Settled straight bets counted toward the profile'),
+  "avgStake": zod.number().nullable().describe('Average stake across settled straight bets (null under 5 samples)'),
+  "lastLossAt": zod.string().nullable().describe('ISO timestamp of the most recent settled loss (bet or parlay)'),
+  "worstSport": zod.object({
+  "sport": zod.string(),
+  "netLoss": zod.number().describe('Net loss in dollars (negative number)'),
+  "bets": zod.number()
+}).nullable().describe('The sport losing the most money, when it has cost at least $50 over 5+ bets'),
+  "overconfidence": zod.object({
+  "winRate": zod.number().describe('Win percentage of high-confidence (7+) settled plays'),
+  "sample": zod.number()
+}).nullable().describe('Present when 7+ confidence plays hit under 45% across 5+ samples'),
+  "topMissReason": zod.object({
+  "reason": zod.string(),
+  "count": zod.number(),
+  "netLoss": zod.number()
+}).nullable().describe('Most common self-graded miss reason across settled losses (excluding normal variance)')
 })
 
 

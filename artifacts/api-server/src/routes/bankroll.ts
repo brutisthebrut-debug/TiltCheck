@@ -3,6 +3,7 @@ import { eq, desc, sum, and, inArray } from "drizzle-orm";
 import { db, transactionsTable, usersTable, betsTable, parlaysTable } from "@workspace/db";
 import {
   GetBankrollQueryParams,
+  GetBankrollHistoryQueryParams,
   ListTransactionsQueryParams,
   CreateTransactionBody,
 } from "@workspace/api-zod";
@@ -120,6 +121,56 @@ router.get("/bankroll/transactions", requireProfile, async (req, res): Promise<v
     referenceType: t.referenceType ?? null,
     createdAt: t.createdAt.toISOString(),
   })));
+});
+
+// GET /bankroll/history — full chronological ledger for charting; private,
+// scoped to the signed-in user like the rest of the bankroll surface.
+router.get("/bankroll/history", requireProfile, async (req, res): Promise<void> => {
+  const query = GetBankrollHistoryQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const self = req.currentUser!.id;
+  if (query.data.userId != null && query.data.userId !== self) {
+    res.status(403).json({ error: "You can only view your own bankroll" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, self));
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const startingBalance = Number(user.startingBankroll);
+
+  const rows = await db
+    .select()
+    .from(transactionsTable)
+    .where(eq(transactionsTable.userId, self))
+    .orderBy(transactionsTable.createdAt, transactionsTable.id);
+
+  // Anchor the starting point before the earliest ledger row — seeded or
+  // imported histories can carry transactions that predate the account row.
+  const startDate =
+    rows.length > 0 && rows[0].createdAt < user.createdAt ? rows[0].createdAt : user.createdAt;
+
+  const points = [
+    {
+      date: startDate.toISOString(),
+      balance: startingBalance,
+      type: "starting" as const,
+      amount: 0,
+    },
+    ...rows.map((t) => ({
+      date: t.createdAt.toISOString(),
+      balance: Number(t.balanceAfter),
+      type: t.type,
+      amount: Number(t.amount),
+    })),
+  ];
+
+  res.json({ startingBalance, points });
 });
 
 // POST /bankroll/transactions — always posted for the signed-in user

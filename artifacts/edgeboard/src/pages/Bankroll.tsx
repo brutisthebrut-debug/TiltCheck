@@ -1,6 +1,7 @@
 import { useUser } from "@/contexts/UserContext"
-import { useGetBankroll, useListTransactions, getGetBankrollQueryKey, getListTransactionsQueryKey, useCreateTransaction, useUpdateUser, exportTransactionsCsv } from "@workspace/api-client-react"
+import { useGetBankroll, useListTransactions, useGetBankrollHistory, getGetBankrollQueryKey, getListTransactionsQueryKey, getGetBankrollHistoryQueryKey, useCreateTransaction, useUpdateUser, exportTransactionsCsv } from "@workspace/api-client-react"
 import { useState } from "react"
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
 import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { formatCurrency, formatDate } from "@/lib/format"
@@ -34,6 +35,11 @@ export default function Bankroll() {
     { query: { enabled: !!activeUser?.id, queryKey: getListTransactionsQueryKey({ userId: activeUser?.id, limit: 20 }) } }
   )
 
+  const { data: history } = useGetBankrollHistory(
+    { userId: activeUser?.id },
+    { query: { enabled: !!activeUser?.id, queryKey: getGetBankrollHistoryQueryKey({ userId: activeUser?.id }) } }
+  )
+
   const createTx = useCreateTransaction()
   const updateUser = useUpdateUser()
 
@@ -52,6 +58,7 @@ export default function Bankroll() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
         queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey({ userId: activeUser.id, limit: 20 }) })
+        queryClient.invalidateQueries({ queryKey: getGetBankrollHistoryQueryKey({ userId: activeUser.id }) })
         setIsOpen(false)
         setAmount("")
         setNote("")
@@ -271,6 +278,94 @@ export default function Bankroll() {
           </CardContent>
         </Card>
       </div>
+
+      {history && history.points.length > 1 && (
+        <Card className="bg-card" data-testid="card-bankroll-trend">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" /> Balance Over Time
+            </CardTitle>
+            <CardDescription>
+              {bankroll.netProfitLoss >= 0
+                ? "The line only counts when it's still up at the end."
+                : "Every dip has a story. Most of yours are in the ledger below."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {(() => {
+                  const data = history.points.map((p) => ({ ...p, t: new Date(p.date).getTime() }))
+                  const t0 = data[0].t
+                  const t1 = data[data.length - 1].t
+                  const tickCount = 5
+                  const ticks =
+                    t1 > t0
+                      ? Array.from({ length: tickCount }, (_, i) => t0 + ((t1 - t0) * i) / (tickCount - 1))
+                      : [t0]
+                  return (
+                <AreaChart
+                  data={data}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="bankrollFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis
+                    dataKey="t"
+                    type="number"
+                    domain={["dataMin", "dataMax"]}
+                    scale="time"
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    ticks={ticks}
+                    tickFormatter={(t: number) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  />
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    width={70}
+                    domain={["auto", "auto"]}
+                    tickFormatter={(v: number) => `${v.toLocaleString()}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: 8,
+                      fontFamily: "inherit",
+                      fontSize: 12,
+                    }}
+                    labelFormatter={(t: number) =>
+                      new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+                    }
+                    formatter={(value: number) => [formatCurrency(value), "Balance"]}
+                  />
+                  <Area
+                    type="stepAfter"
+                    dataKey="balance"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    fill="url(#bankrollFill)"
+                    dot={false}
+                    activeDot={{ r: 4, stroke: "hsl(var(--primary))", strokeWidth: 2, fill: "hsl(var(--background))" }}
+                  />
+                </AreaChart>
+                  )
+                })()}
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="bg-card">
         <CardHeader>

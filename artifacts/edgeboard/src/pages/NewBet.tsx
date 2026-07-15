@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useLocation } from "wouter"
-import { useCreateBet, getListBetsQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
+import { useCreateBet, useGetLeakProfile, getGetLeakProfileQueryKey, getListBetsQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
@@ -22,7 +22,7 @@ import { isValidAmericanOdds, payoutFromAmerican } from "@workspace/odds"
 import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
-import { ArrowLeft, ChevronDown } from "lucide-react"
+import { ArrowLeft, ChevronDown, AlertTriangle } from "lucide-react"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 import { dayOf } from "@workspace/weeks"
 
@@ -79,6 +79,52 @@ export default function NewBet() {
   const watchOdds = form.watch("odds")
   const watchStake = form.watch("stake")
   const watchSportsbook = form.watch("sportsbook")
+  const watchSport = form.watch("sport")
+  const watchConfidence = form.watch("confidenceScore")
+
+  // The bettor's own history, turned into one pointed heads-up before they
+  // repeat their most common mistake. Never blocks the bet.
+  const { data: leakProfile } = useGetLeakProfile(
+    { userId: activeUser?.id },
+    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+  )
+
+  const leakWarning = (() => {
+    if (!leakProfile) return null
+    const stakeNum = Number(watchStake)
+    // 1) Chasing: an oversized stake shortly after taking an L
+    if (
+      leakProfile.avgStake != null &&
+      leakProfile.lastLossAt != null &&
+      Number.isFinite(stakeNum) &&
+      stakeNum >= leakProfile.avgStake * 1.5
+    ) {
+      const hoursSinceLoss = (Date.now() - new Date(leakProfile.lastLossAt).getTime()) / 3_600_000
+      if (hoursSinceLoss <= 24) {
+        const mult = (stakeNum / leakProfile.avgStake).toFixed(1)
+        const when = hoursSinceLoss < 1 ? "less than an hour ago" : `${Math.round(hoursSinceLoss)}h ago`
+        return {
+          key: "chasing",
+          text: `Your last L landed ${when} and this stake is ${mult}x your average (${formatCurrency(leakProfile.avgStake)}). There's a word for that: chasing.`,
+        }
+      }
+    }
+    // 2) Overconfidence: high confidence hasn't been earning it
+    if (leakProfile.overconfidence && watchConfidence >= 7) {
+      return {
+        key: "overconfidence",
+        text: `Your ${watchConfidence}/10 confidence plays are a leak — your 7+ picks hit just ${leakProfile.overconfidence.winRate}% over ${leakProfile.overconfidence.sample} bets.`,
+      }
+    }
+    // 3) Worst sport: this sport keeps taking their money
+    if (leakProfile.worstSport && watchSport === leakProfile.worstSport.sport) {
+      return {
+        key: "worstSport",
+        text: `${leakProfile.worstSport.sport} is your most expensive habit: ${formatCurrency(leakProfile.worstSport.netLoss)} over ${leakProfile.worstSport.bets} bets. Just so we're clear.`,
+      }
+    }
+    return null
+  })()
   
   const [oddsFormat, setOddsFormatPref] = useOddsFormat()
   const potentialPayout =
@@ -404,6 +450,15 @@ export default function NewBet() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-3 border-t bg-muted/20 px-6 py-4">
+              {leakWarning && (
+                <div
+                  className="w-full flex items-start gap-2.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-500"
+                  data-testid={`warning-leak-${leakWarning.key}`}
+                >
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{leakWarning.text}</span>
+                </div>
+              )}
               {createBet.isError && (
                 <div className="w-full rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
                   {getApiErrorMessage(createBet.error, "Couldn't log this bet. Please check the form and try again.")}

@@ -686,6 +686,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Transaction"
 
+  /bankroll/history:
+    get:
+      operationId: getBankrollHistory
+      tags: [bankroll]
+      summary: Full bankroll balance history for the signed-in user
+      description: >
+        Returns every ledger point in chronological order so the client can
+        chart the balance over time. Always scoped to the signed-in user; a
+        userId param is only accepted when it matches the session user.
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Bankroll history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankrollHistory"
+
   # ── Stats (wow endpoints) ─────────────────────────────────────────────────
   /stats/summary:
     get:
@@ -783,6 +805,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InsightsResponse"
+
+  /stats/leak-profile:
+    get:
+      operationId: getLeakProfile
+      tags: [stats]
+      summary: A bettor's recurring leak signals for pre-bet warnings
+      description: >
+        Aggregates the signed-in bettor's settled history into a few
+        machine-readable leak signals (stake chasing after a loss, worst
+        sport, overconfidence) so the bet form can warn before they repeat
+        their most common mistake. Signals below sample-size thresholds are
+        omitted. Always scoped to the signed-in user.
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Leak profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeakProfile"
 
   /stats/recap:
     get:
@@ -1552,6 +1598,82 @@ components:
         createdAt:
           type: string
       required: [id, userId, type, amount, balanceAfter, createdAt]
+
+    BankrollHistoryPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          description: ISO timestamp of the ledger entry
+        balance:
+          type: number
+          description: Balance after this entry
+        type:
+          type: string
+          enum: [starting, deposit, withdraw, bet_win, bet_loss, bet_push, bet_void, adjustment]
+        amount:
+          type: number
+          description: Signed amount of this entry (0 for the starting point)
+      required: [date, balance, type, amount]
+
+    BankrollHistory:
+      type: object
+      properties:
+        startingBalance:
+          type: number
+        points:
+          type: array
+          description: Chronological ledger points, starting with the opening balance
+          items:
+            $ref: "#/components/schemas/BankrollHistoryPoint"
+      required: [startingBalance, points]
+
+    LeakProfile:
+      type: object
+      properties:
+        settledCount:
+          type: integer
+          description: Settled straight bets counted toward the profile
+        avgStake:
+          type: ["number", "null"]
+          description: Average stake across settled straight bets (null under 5 samples)
+        lastLossAt:
+          type: ["string", "null"]
+          description: ISO timestamp of the most recent settled loss (bet or parlay)
+        worstSport:
+          type: ["object", "null"]
+          description: The sport losing the most money, when it has cost at least $50 over 5+ bets
+          properties:
+            sport:
+              type: string
+            netLoss:
+              type: number
+              description: Net loss in dollars (negative number)
+            bets:
+              type: integer
+          required: [sport, netLoss, bets]
+        overconfidence:
+          type: ["object", "null"]
+          description: Present when 7+ confidence plays hit under 45% across 5+ samples
+          properties:
+            winRate:
+              type: number
+              description: Win percentage of high-confidence (7+) settled plays
+            sample:
+              type: integer
+          required: [winRate, sample]
+        topMissReason:
+          type: ["object", "null"]
+          description: Most common self-graded miss reason across settled losses (excluding normal variance)
+          properties:
+            reason:
+              type: string
+            count:
+              type: integer
+            netLoss:
+              type: number
+          required: [reason, count, netLoss]
+      required: [settledCount, avgStake, lastLossAt, worstSport, overconfidence, topMissReason]
 
     TransactionInput:
       type: object

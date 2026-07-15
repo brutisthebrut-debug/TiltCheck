@@ -24,14 +24,17 @@ import type {
   AdminOverview,
   BadgeStatus,
   Bankroll,
+  BankrollHistory,
   Bet,
   BetInput,
   BetSettlement,
   BetUpdate,
   ClaimProfileInput,
   ConfidenceBucket,
+  GetBankrollHistoryParams,
   GetBankrollParams,
   GetConfidenceAnalysisParams,
+  GetLeakProfileParams,
   GetRecapNarrativeParams,
   GetRecentActivityParams,
   GetStatsBySportParams,
@@ -45,6 +48,7 @@ import type {
   Invite,
   InviteInput,
   LeaderboardEntry,
+  LeakProfile,
   ListBetsParams,
   ListParlaysParams,
   ListTransactionsParams,
@@ -2214,6 +2218,91 @@ export const useCreateTransaction = <TError = ErrorType<unknown>,
       return useMutation(getCreateTransactionMutationOptions(options));
     }
 
+export const getGetBankrollHistoryUrl = (params?: GetBankrollHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/bankroll/history?${stringifiedParams}` : `/api/bankroll/history`
+}
+
+/**
+ * Returns every ledger point in chronological order so the client can chart the balance over time. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user.
+ * @summary Full bankroll balance history for the signed-in user
+ */
+export const getBankrollHistory = async (params?: GetBankrollHistoryParams, options?: RequestInit): Promise<BankrollHistory> => {
+
+  return customFetch<BankrollHistory>(getGetBankrollHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBankrollHistoryQueryKey = (params?: GetBankrollHistoryParams,) => {
+    return [
+    `/api/bankroll/history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetBankrollHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getBankrollHistory>>, TError = ErrorType<unknown>>(params?: GetBankrollHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBankrollHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBankrollHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBankrollHistory>>> = ({ signal }) => getBankrollHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBankrollHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBankrollHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getBankrollHistory>>>
+export type GetBankrollHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Full bankroll balance history for the signed-in user
+ */
+
+export function useGetBankrollHistory<TData = Awaited<ReturnType<typeof getBankrollHistory>>, TError = ErrorType<unknown>>(
+ params?: GetBankrollHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBankrollHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBankrollHistoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetStatsSummaryUrl = (params?: GetStatsSummaryParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -2622,6 +2711,91 @@ export function useGetStatsInsights<TData = Awaited<ReturnType<typeof getStatsIn
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStatsInsightsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLeakProfileUrl = (params?: GetLeakProfileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stats/leak-profile?${stringifiedParams}` : `/api/stats/leak-profile`
+}
+
+/**
+ * Aggregates the signed-in bettor's settled history into a few machine-readable leak signals (stake chasing after a loss, worst sport, overconfidence) so the bet form can warn before they repeat their most common mistake. Signals below sample-size thresholds are omitted. Always scoped to the signed-in user.
+ * @summary A bettor's recurring leak signals for pre-bet warnings
+ */
+export const getLeakProfile = async (params?: GetLeakProfileParams, options?: RequestInit): Promise<LeakProfile> => {
+
+  return customFetch<LeakProfile>(getGetLeakProfileUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLeakProfileQueryKey = (params?: GetLeakProfileParams,) => {
+    return [
+    `/api/stats/leak-profile`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetLeakProfileQueryOptions = <TData = Awaited<ReturnType<typeof getLeakProfile>>, TError = ErrorType<unknown>>(params?: GetLeakProfileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeakProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLeakProfileQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeakProfile>>> = ({ signal }) => getLeakProfile(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLeakProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLeakProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getLeakProfile>>>
+export type GetLeakProfileQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary A bettor's recurring leak signals for pre-bet warnings
+ */
+
+export function useGetLeakProfile<TData = Awaited<ReturnType<typeof getLeakProfile>>, TError = ErrorType<unknown>>(
+ params?: GetLeakProfileParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLeakProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLeakProfileQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

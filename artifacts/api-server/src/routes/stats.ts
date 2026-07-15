@@ -7,6 +7,7 @@ import {
   GetRecentActivityQueryParams,
   GetConfidenceAnalysisQueryParams,
   GetStatsInsightsQueryParams,
+  GetLeakProfileQueryParams,
   GetWeeklyRecapQueryParams,
   GetRecapNarrativeQueryParams,
 } from "@workspace/api-zod";
@@ -411,6 +412,104 @@ router.get("/stats/insights", async (req, res): Promise<void> => {
     flawedReasoning: qualityStats("flawed"),
     recentNotes,
   });
+});
+
+// GET /stats/leak-profile — the signed-in bettor's recurring leak signals,
+// aggregated across their whole settled history so the bet form can warn
+// before they repeat their most common mistake. Private: this is self-audit
+// data, so a userId param is only accepted when it matches the session user.
+router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void> => {
+  const query = GetLeakProfileQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const self = req.currentUser!.id;
+  if (query.data.userId != null && query.data.userId !== self) {
+    res.status(403).json({ error: "You can only view your own leak profile" });
+    return;
+  }
+
+  const bets = await db.select().from(betsTable).where(
+    and(eq(betsTable.userId, self), inArray(betsTable.status, ["won", "lost", "push"]))
+  );
+  const parlays = await db.select().from(parlaysTable).where(
+    and(eq(parlaysTable.userId, self), inArray(parlaysTable.status, ["won", "lost", "push"]))
+  );
+
+  const settledCount = bets.length;
+
+  // Average stake across settled straight bets — the baseline for spotting
+  // an oversized "get it back" stake. Needs a real sample to mean anything.
+  const avgStake =
+    bets.length >= 5
+      ? Math.round((bets.reduce((s, b) => s + Number(b.stake), 0) / bets.length) * 100) / 100
+      : null;
+
+  // Most recent settled loss (bet or parlay) — chasing only makes sense
+  // relative to when the last L actually landed.
+  const lossTimes = [...bets, ...parlays]
+    .filter((r) => r.status === "lost" && r.settledAt != null)
+    .map((r) => r.settledAt!.getTime());
+  const lastLossAt = lossTimes.length > 0 ? new Date(Math.max(...lossTimes)).toISOString() : null;
+
+  // Worst sport by net dollars, counting only rows whose payout math is
+  // trustworthy (see hasValidOdds). Only reported once it has cost real
+  // money over a real sample.
+  const bySport: Record<string, { net: number; count: number }> = {};
+  for (const b of bets) {
+    if (!hasValidOdds(b)) continue;
+    const net = Number(b.actualPayout ?? 0) - Number(b.stake);
+    const entry = (bySport[b.sport] ??= { net: 0, count: 0 });
+    entry.net += net;
+    entry.count += 1;
+  }
+  const worstEntry = Object.entries(bySport)
+    .filter(([, v]) => v.count >= 5 && v.net <= -50)
+    .sort((a, b) => a[1].net - b[1].net)[0];
+  const worstSport = worstEntry
+    ? {
+        sport: worstEntry[0],
+        netLoss: Math.round(worstEntry[1].net * 100) / 100,
+        bets: worstEntry[1].count,
+      }
+    : null;
+
+  // Overconfidence: how 7+ confidence plays actually hit. Only reported when
+  // the sample is real and the hit rate is genuinely bad (<45%).
+  const highConf = [...bets, ...parlays].filter(
+    (r) => r.confidenceScore >= 7 && (r.status === "won" || r.status === "lost")
+  );
+  let overconfidence: { winRate: number; sample: number } | null = null;
+  if (highConf.length >= 5) {
+    const wins = highConf.filter((r) => r.status === "won").length;
+    const winRate = Math.round((wins / highConf.length) * 1000) / 10;
+    if (winRate < 45) overconfidence = { winRate, sample: highConf.length };
+  }
+
+  // Most common self-graded miss reason across losses. Normal variance is
+  // excluded — it isn't a mistake, and "na" carries no signal.
+  const reasonAgg: Record<string, { count: number; netLoss: number }> = {};
+  for (const r of [...bets, ...parlays]) {
+    if (r.status !== "lost") continue;
+    if (r.missReason == null || r.missReason === "na" || r.missReason === "normal_variance") continue;
+    const entry = (reasonAgg[r.missReason] ??= { count: 0, netLoss: 0 });
+    entry.count += 1;
+    entry.netLoss += Number(r.stake);
+  }
+  const topReasonEntry = Object.entries(reasonAgg).sort(
+    (a, b) => b[1].count - a[1].count || b[1].netLoss - a[1].netLoss
+  )[0];
+  const topMissReason =
+    topReasonEntry && topReasonEntry[1].count >= 3
+      ? {
+          reason: topReasonEntry[0],
+          count: topReasonEntry[1].count,
+          netLoss: Math.round(topReasonEntry[1].netLoss * 100) / 100,
+        }
+      : null;
+
+  res.json({ settledCount, avgStake, lastLossAt, worstSport, overconfidence, topMissReason });
 });
 
 // GET /stats/recap — one week's story: personal facts + crew highlights.
