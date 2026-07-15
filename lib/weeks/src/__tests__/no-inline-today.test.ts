@@ -64,6 +64,17 @@ const INLINE_TODAY_PATTERNS: ReadonlyArray<{ name: string; regex: RegExp }> = [
       /get(?:UTC)?FullYear\s*\(\s*\)[\s\S]{0,40}?(?:\}\s*-|["'`]\s*-|-\s*["'`])[\s\S]{0,80}?get(?:UTC)?Month\s*\(\s*\)[\s\S]{0,120}?get(?:UTC)?Date\s*\(\s*\)/,
   },
   {
+    // JSON.stringify(new Date()) yields the ISO timestamp wrapped in quotes
+    // ("2026-07-15T…"), so .slice(1, 11) / .substring(1, 11) — or the
+    // equivalent .substr(1, 10) — extracts the same YYYY-MM-DD string with
+    // the offsets shifted by one. Same hidden "today" definition, matched
+    // regardless of what's stringified (any Date-valued expression counts;
+    // one nesting level of parens like `new Date()` is handled).
+    name: "JSON.stringify(new Date()).slice(1, 11)",
+    regex:
+      /JSON\s*\.\s*stringify\s*\((?:[^()]|\([^()]*\))*\)\s*\.\s*(?:(?:slice|substring)\s*\(\s*1\s*,\s*11\s*\)|substr\s*\(\s*1\s*,\s*10\s*\))/,
+  },
+  {
     // Locale trick: en-CA and sv-SE default date formats are YYYY-MM-DD, so
     // `new Date().toLocaleDateString("en-CA")` or
     // `new Intl.DateTimeFormat("sv-SE").format(...)` are hidden `dayOf` copies.
@@ -146,6 +157,15 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
     ['dayjs()/moment().format("YYYY-MM-DD")', "const t = dayjs().format('YYYY-MM-DD');"],
     ['dayjs()/moment().format("YYYY-MM-DD")', "const t = moment().format('YYYY-MM-DD');"],
     [
+      "JSON.stringify(new Date()).slice(1, 11)",
+      "const t = JSON.stringify(new Date()).slice(1, 11);",
+    ],
+    [
+      "JSON.stringify(new Date()).slice(1, 11)",
+      "const t = JSON.stringify(now).substring(1, 11);",
+    ],
+    ["JSON.stringify(new Date()).slice(1, 11)", "const t = JSON.stringify(now).substr(1, 10);"],
+    [
       'toLocaleDateString/Intl.DateTimeFormat with "en-CA"/"sv-SE"',
       "const t = new Date().toLocaleDateString('en-CA');",
     ],
@@ -178,6 +198,12 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
     "const ts = new Date().toJSON();",
     // toJSON on a non-Date value with unrelated arguments:
     "const body = payload.toJSON().slice(1);",
+    // Ordinary JSON serialization, no date-shaped slice:
+    "const body = JSON.stringify(payload);",
+    "const body = JSON.stringify(payload, null, 2);",
+    "const preview = JSON.stringify(data).slice(0, 100);",
+    // Trimming the quotes off a stringified non-date value:
+    "const inner = JSON.stringify(key).slice(1, -1);",
     // Splitting something other than the ISO timestamp:
     "const parts = header.split('T')[0];",
     // Legitimate standalone getter uses — showing just the year:
