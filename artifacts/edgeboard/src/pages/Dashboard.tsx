@@ -23,6 +23,7 @@ import {
 } from "@workspace/api-client-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InviteCard } from "@/components/InviteCard"
+import { FirstWeekStrip } from "@/components/FirstWeekStrip"
 import { UpgradeCard } from "@/components/UpgradeCard"
 import { useProStatus } from "@/hooks/use-pro"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
@@ -318,6 +319,9 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground mt-1">Welcome back, {activeUser.displayName}. Here's your edge today.</p>
       </div>
+
+      {/* First-week tour — dismissable, ages out on its own */}
+      <FirstWeekStrip />
 
       {/* Some smaller widgets hide themselves when empty — if their data
           failed to load, say so instead of letting them vanish silently. */}

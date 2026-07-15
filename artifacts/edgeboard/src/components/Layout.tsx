@@ -15,10 +15,12 @@ import {
   Crown,
   Crosshair,
   CircleUser,
+  Newspaper,
 } from "lucide-react"
 import { Button } from "./ui/button"
 import { BadgeWatcher } from "./BadgeWatcher"
 import { CrewSwitcher } from "./CrewSwitcher"
+import { isRecapUnseen } from "@/lib/recapTeaser"
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
@@ -27,11 +29,23 @@ const navItems = [
   { name: "Bets", shortName: "Bets", href: "/bets", icon: ListOrdered },
   { name: "Parlays", shortName: "Parlays", href: "/parlays", icon: Layers },
   { name: "Stats", shortName: "Stats", href: "/stats", icon: BarChart2 },
+  { name: "Recap", shortName: "Recap", href: "/recap", icon: Newspaper },
   { name: "Lessons", shortName: "Lessons", href: "/lessons", icon: BookOpen },
   { name: "Edge Finder", shortName: "Edge", href: "/edge", icon: Crosshair },
   { name: "Workspace", shortName: "Crew", href: "/workspace", icon: Users },
   { name: "Bankroll", shortName: "Bankroll", href: "/bankroll", icon: Wallet },
 ]
+
+/** Purple pulse on the Recap nav slot while this week's tape is unopened. */
+function RecapUnreadDot({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`h-2 w-2 rounded-full bg-chart-5 shadow-[0_0_6px_hsl(var(--chart-5)/0.9)] animate-pulse ${className}`}
+      data-testid="dot-recap-unread"
+      aria-label="New weekly recap ready"
+    />
+  )
+}
 
 function NeedsSettlingBadge({ count, className = "" }: { count: number; className?: string }) {
   if (count <= 0) return null
@@ -59,6 +73,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { query: { enabled: !!activeUser, queryKey: getGetNeedsSettlingQueryKey({ tz: browserTz }) } }
   )
   const settleCount = needsSettling?.count ?? 0
+
+  // New week's tape unopened → dot on the Recap nav slot. Same server-stored
+  // marker the dashboard teaser uses, so they light up and clear together.
+  const recapUnread = !!activeUser && isRecapUnseen(activeUser.recapSeenWeek)
 
   // Founder-only page joins the sidebar nav; the mobile bottom bar keeps the
   // core six (founders can reach the dash from the desktop nav or /founder).
@@ -117,6 +135,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
                   <span className="flex-1">{item.name}</span>
                   {item.href === "/" && <NeedsSettlingBadge count={settleCount} />}
+                  {item.href === "/recap" && recapUnread && <RecapUnreadDot />}
                 </Link>
               )
             })}
@@ -225,6 +244,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]' : ''}`} />
                 {item.href === "/" && (
                   <NeedsSettlingBadge count={settleCount} className="absolute -top-1.5 -right-2.5" />
+                )}
+                {item.href === "/recap" && recapUnread && (
+                  <RecapUnreadDot className="absolute -top-0.5 -right-1" />
                 )}
               </span>
               <span className="truncate">{item.shortName ?? item.name}</span>

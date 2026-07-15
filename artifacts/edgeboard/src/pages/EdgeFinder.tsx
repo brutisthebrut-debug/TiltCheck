@@ -124,7 +124,51 @@ export default function EdgeFinder() {
             testId="card-billing-error"
           />
         ) : (
-          <UpgradeCard feature="Edge Finder" />
+          <>
+            <UpgradeCard feature="Edge Finder" />
+            {/* Honest preview: clearly-labeled sample data showing exactly
+                what the report looks like — nobody's real numbers. */}
+            <Card className="relative overflow-hidden" data-testid="card-edge-sample-preview">
+              <div className="absolute right-3 top-3 z-10 rounded-full border border-[#ff9900]/50 bg-[#ff9900]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#ff9900]">
+                Sample data
+              </div>
+              <CardHeader>
+                <CardTitle className="text-base">What you'd see here</CardTitle>
+                <CardDescription>A made-up bettor's report — yours gets cut from your own graded record.</CardDescription>
+              </CardHeader>
+              <CardContent className="opacity-60 pointer-events-none select-none">
+                <table className="w-full text-sm text-left">
+                  <caption className="sr-only">
+                    Sample Edge Finder report with fictional data — illustrates the lanes, records, and ROI you'd see for your own graded bets with Pro.
+                  </caption>
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Lane</th>
+                      <th className="px-4 py-3 font-medium text-right">Bets</th>
+                      <th className="px-4 py-3 font-medium text-right">Record</th>
+                      <th className="px-4 py-3 font-medium text-right">Net P/L</th>
+                      <th className="px-4 py-3 font-medium text-right">ROI</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {[
+                      { lane: "NBA underdogs", bets: 24, record: "15-9", pl: "+$412", roi: "+17.2%", up: true },
+                      { lane: "NFL favorites", bets: 18, record: "8-10", pl: "-$186", roi: "-10.3%", up: false },
+                      { lane: "Saturday plays", bets: 15, record: "10-5", pl: "+$240", roi: "+16.0%", up: true },
+                    ].map((r) => (
+                      <tr key={r.lane}>
+                        <td className="px-4 py-3 font-medium">{r.lane}</td>
+                        <td className="px-4 py-3 text-right font-mono">{r.bets}</td>
+                        <td className="px-4 py-3 text-right font-mono">{r.record}</td>
+                        <td className={`px-4 py-3 text-right font-mono font-bold ${r.up ? "text-chart-1" : "text-chart-2"}`}>{r.pl}</td>
+                        <td className={`px-4 py-3 text-right font-mono ${r.up ? "text-chart-1" : "text-chart-2"}`}>{r.roi}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     )

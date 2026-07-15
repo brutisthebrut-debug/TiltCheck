@@ -17,6 +17,7 @@ import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
 import { Trophy, Flame, Snowflake, Swords, Users, Crown, X, Layers } from "lucide-react"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { UpgradeCard } from "@/components/UpgradeCard"
+import { TrophyCase } from "@/components/TrophyCase"
 import { useProStatus } from "@/hooks/use-pro"
 import { useCrews, getCrewActionsEnabled } from "@/hooks/use-crews"
 import { CrewSwitcher } from "@/components/CrewSwitcher"
@@ -520,6 +521,9 @@ export default function Workspace() {
           </Card>
         </div>
       )}
+
+      {/* Every badge in the book — earned and still-locked, with the criteria */}
+      {activeUser && <TrophyCase userId={activeUser.id} />}
     </div>
   )
 }

@@ -9,7 +9,7 @@ import { useProStatus } from "@/hooks/use-pro"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
-import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight } from "lucide-react"
+import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp } from "lucide-react"
 
 const MISS_REASON_LABELS: Record<string, string> = {
   bad_read: "Bad read",
@@ -99,16 +99,33 @@ export default function Stats() {
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground mt-1">Deep dive into your betting performance.</p>
         </div>
-        <Card className="border-dashed border-2 border-muted">
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-            <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-              <BarChart2 className="h-7 w-7 text-muted-foreground" />
+        <Card className="border-dashed border-2 border-primary/20 bg-primary/5" data-testid="card-stats-empty">
+          <CardContent className="flex flex-col items-center justify-center py-16 gap-6 text-center">
+            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+              <BarChart2 className="h-7 w-7 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">No data yet</h2>
+              <h2 className="text-lg font-semibold">This page becomes your scouting report</h2>
               <p className="text-muted-foreground text-sm mt-1 max-w-sm">
-                Log and grade at least {INSIGHTS_THRESHOLD} bets to unlock sport breakdowns, confidence calibration, and ROI insights.
+                Grade {INSIGHTS_THRESHOLD} bets and the charts light up — no vibes, just your actual numbers.
               </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg">
+              <div className="flex flex-col items-center gap-1.5 p-4 rounded-lg bg-background/60 border border-border/50">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <div className="text-sm font-medium">Profit by sport</div>
+                <div className="text-xs text-muted-foreground">Which leagues pay you, which collect</div>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 p-4 rounded-lg bg-background/60 border border-border/50">
+                <Target className="h-5 w-5 text-primary" />
+                <div className="text-sm font-medium">Calibration</div>
+                <div className="text-xs text-muted-foreground">Does your confidence match reality?</div>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 p-4 rounded-lg bg-background/60 border border-border/50">
+                <Lightbulb className="h-5 w-5 text-primary" />
+                <div className="text-sm font-medium">Lessons</div>
+                <div className="text-xs text-muted-foreground">Patterns from your own post-mortems</div>
+              </div>
             </div>
             <Button asChild>
               <Link href="/bets/new"><Plus className="h-4 w-4 mr-1" />Log First Bet</Link>
