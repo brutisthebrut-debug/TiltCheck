@@ -29,6 +29,9 @@ import Recap from './pages/Recap';
 import Account from './pages/Account';
 import Founder from './pages/Founder';
 import DemoApp from './pages/DemoApp';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import { ResponsibleGamblingNote, TrustLinks } from './components/TrustFooter';
 
 const queryClient = new QueryClient();
 
@@ -115,8 +118,12 @@ function SignInPage() {
 
 function SignUpPage() {
   return (
-    <div className="dark flex min-h-[100dvh] items-center justify-center bg-background px-4 font-mono">
+    <div className="dark flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-background px-4 py-8 font-mono">
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+      <div className="w-[440px] max-w-full space-y-2 text-center">
+        <TrustLinks />
+        <ResponsibleGamblingNote />
+      </div>
     </div>
   );
 }
@@ -283,6 +290,9 @@ function ClerkProviderWithRoutes() {
           </Route>
           {/* Crew invite deep link — pre-fills the join flow through sign-up. */}
           <Route path="/join/:code">{(params) => <JoinRoute code={params.code} />}</Route>
+          {/* Trust pages — public, reachable signed-out from the sign-up screen. */}
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/terms" component={Terms} />
           <Route>
             <Show when="signed-in">
               <AuthedApp />

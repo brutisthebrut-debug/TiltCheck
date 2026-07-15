@@ -33,6 +33,13 @@ export const GetCurrentUserResponse = zod.object({
 
 
 /**
+ * Irreversible. Removes the bettor profile and everything it owns — bets, parlays and legs, bankroll ledger, badges, recap narratives, crew memberships, and any invite tied to the account's email. Crews the user owns are handed to their longest-standing remaining member; crews with no other members are shut down. Other bettors' data is never touched. The sign-in account itself is removed as well, so the email can register fresh later.
+ * @summary Permanently delete the signed-in user's account and all their data
+ */
+export const DeleteCurrentUserResponse = zod.void()
+
+
+/**
  * Stores the Monday of the most recently completed week (computed server-side, UTC) as the user's seen recap week, so the dashboard teaser stays hidden on every device once the recap is opened.
  * @summary Record that the signed-in user has seen the current week's recap
  */

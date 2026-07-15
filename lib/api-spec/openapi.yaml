@@ -59,6 +59,27 @@ paths:
         "404":
           description: Signed in but no bettor profile linked yet
 
+  /users/me/delete:
+    post:
+      operationId: deleteCurrentUser
+      tags: [users]
+      summary: Permanently delete the signed-in user's account and all their data
+      description: >-
+        Irreversible. Removes the bettor profile and everything it owns —
+        bets, parlays and legs, bankroll ledger, badges, recap narratives,
+        crew memberships, and any invite tied to the account's email. Crews
+        the user owns are handed to their longest-standing remaining member;
+        crews with no other members are shut down. Other bettors' data is
+        never touched. The sign-in account itself is removed as well, so the
+        email can register fresh later.
+      responses:
+        "204":
+          description: Account and all associated data deleted
+        "401":
+          description: Not signed in
+        "404":
+          description: Signed in but no bettor profile linked yet
+
   /users/me/recap-seen:
     post:
       operationId: markRecapSeen

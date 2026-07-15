@@ -1,11 +1,127 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import { Link } from "wouter"
+import { useClerk } from "@clerk/react"
 import { useUser } from "@/contexts/UserContext"
 import { useProStatus } from "@/hooks/use-pro"
 import { UpgradeCard } from "@/components/UpgradeCard"
+import { ResponsibleGamblingNote } from "@/components/TrustFooter"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Sparkles, ExternalLink, Crown, Check } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useDeleteCurrentUser } from "@workspace/api-client-react"
+import { getApiErrorMessage } from "@/lib/api-error"
+import { Sparkles, ExternalLink, Crown, Check, ShieldCheck, Trash2 } from "lucide-react"
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
+
+const DELETE_PHRASE = "DELETE"
+
+/** Typed-confirmation account deletion. Irreversible, so the button stays
+ * dead until the user types the phrase; on success the session is ended. */
+function DeleteAccountSection() {
+  const { signOut } = useClerk()
+  const [open, setOpen] = useState(false)
+  const [phrase, setPhrase] = useState("")
+  const deleteAccount = useDeleteCurrentUser({
+    mutation: {
+      onSuccess: () => {
+        // The server already removed the sign-in account; this clears the
+        // local session and lands on the public page.
+        signOut({ redirectUrl: basePath || "/" })
+      },
+    },
+  })
+
+  return (
+    <Card className="border-destructive/40" data-testid="card-delete-account">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Trash2 className="h-4 w-4 text-destructive" />
+          Delete my account
+        </CardTitle>
+        <CardDescription>
+          Permanently removes your profile, every bet and parlay you've logged, your bankroll
+          ledger, badges, and crew memberships. Crews you own go to their longest-standing
+          member — or shut down if you're the only one in them. There's no undo, and no
+          30-day grace period: it's gone when you confirm.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <AlertDialog
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next)
+            if (!next) {
+              setPhrase("")
+              deleteAccount.reset()
+            }
+          }}
+        >
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm" data-testid="button-delete-account">
+              Delete my account
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent data-testid="dialog-delete-account">
+            <AlertDialogHeader>
+              <AlertDialogTitle>This erases everything. Sure?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <p>Deleting your account permanently removes:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Your profile and sign-in</li>
+                    <li>Every bet, parlay, and rationale you've logged</li>
+                    <li>Your bankroll ledger and badges</li>
+                    <li>Your spot in every crew — crews you own pass to their longest-standing member, or close if it's just you</li>
+                  </ul>
+                  <p>
+                    Want your history first? Export your CSVs before you do this. Type{" "}
+                    <span className="font-bold text-foreground">{DELETE_PHRASE}</span> to confirm.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Input
+              value={phrase}
+              onChange={(e) => setPhrase(e.target.value)}
+              placeholder={DELETE_PHRASE}
+              autoComplete="off"
+              data-testid="input-delete-confirm"
+            />
+            {deleteAccount.isError && (
+              <p className="text-sm text-destructive" data-testid="text-delete-error">
+                {getApiErrorMessage(deleteAccount.error, "Couldn't delete the account — nothing was removed. Try again.")}
+              </p>
+            )}
+            <AlertDialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)} data-testid="button-delete-cancel">
+                Keep my account
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={phrase !== DELETE_PHRASE || deleteAccount.isPending}
+                onClick={() => deleteAccount.mutate()}
+                data-testid="button-delete-confirm"
+              >
+                {deleteAccount.isPending ? "Deleting…" : "Delete everything"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  )
+}
 
 const PRO_FEATURES = [
   "Your Leak — the recurring mistake costing you real money",
@@ -131,6 +247,31 @@ export default function Account() {
           </Card>
         </div>
       )}
+
+      <Card data-testid="card-trust">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            Trust &amp; fair play
+          </CardTitle>
+          <CardDescription>
+            TiltCheck is a tracker, not a sportsbook — your data is yours, and no money moves
+            through here. The short versions:{" "}
+            <Link href="/privacy" className="text-primary underline-offset-2 hover:underline" data-testid="link-privacy">
+              privacy
+            </Link>{" "}
+            ·{" "}
+            <Link href="/terms" className="text-primary underline-offset-2 hover:underline" data-testid="link-terms">
+              terms
+            </Link>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsibleGamblingNote />
+        </CardContent>
+      </Card>
+
+      <DeleteAccountSection />
     </div>
   )
 }

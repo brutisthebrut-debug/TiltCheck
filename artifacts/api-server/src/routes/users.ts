@@ -1,7 +1,18 @@
 import { Router, type IRouter } from "express";
 import { and, eq, isNull, isNotNull, asc, count, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
-import { db, usersTable, invitesTable } from "@workspace/db";
+import {
+  db,
+  usersTable,
+  invitesTable,
+  betsTable,
+  parlaysTable,
+  transactionsTable,
+  userBadgesTable,
+  crewsTable,
+  crewMembersTable,
+} from "@workspace/db";
+import { logger } from "../lib/logger";
 import { dayOf, lastCompletedWeekStart } from "../lib/recap";
 import { userScopeCondition, getSocialUsers } from "../lib/scope";
 import { isDemoRequest } from "../middlewares/demo";
@@ -295,6 +306,95 @@ router.post("/users/claim", async (req, res): Promise<void> => {
       : { status: 409, body: { error: "Could not create profile — try again" } };
   }
   res.status(outcome.status).json(outcome.body);
+});
+
+// POST /users/me/delete — irreversible self-serve account deletion. Removes
+// the bettor profile and every row it owns, transactionally, without touching
+// anyone else's data:
+//   - bets, parlays (legs cascade), bankroll ledger, badges — deleted
+//   - crew memberships & recap narratives — cascade with the user row
+//   - invites: rows they sent are detached (the invitee keeps their seat),
+//     the row matching their own email is deleted so the address is gone
+//   - crews they own: handed to the longest-standing remaining member, or
+//     shut down when they were the only member (memberships cascade)
+// The Clerk sign-in account is removed afterwards (best-effort) so the email
+// can register fresh later. Demo sessions never reach this route (the demo
+// mount is read-only and demo bettors have no sign-in to link).
+router.post("/users/me/delete", async (req, res): Promise<void> => {
+  const me = req.currentUser;
+  if (!me) {
+    res.status(404).json({ error: "No bettor profile linked to this account" });
+    return;
+  }
+  if (me.isDemo) {
+    // Defense in depth — demo bettors are fictional and must stay intact.
+    res.status(403).json({ error: "Demo accounts can't be deleted" });
+    return;
+  }
+  try {
+    await db.transaction(async (tx) => {
+      // Hand off or shut down every crew this user owns. Lock each crew row
+      // so a racing transfer/leave can't interleave with the handoff.
+      const owned = await tx
+        .select()
+        .from(crewsTable)
+        .where(eq(crewsTable.ownerId, me.id))
+        .for("update");
+      for (const crew of owned) {
+        const [heir] = await tx
+          .select({ userId: crewMembersTable.userId })
+          .from(crewMembersTable)
+          .where(and(eq(crewMembersTable.crewId, crew.id), sql`${crewMembersTable.userId} <> ${me.id}`))
+          .orderBy(asc(crewMembersTable.id))
+          .limit(1);
+        if (heir) {
+          await tx.update(crewsTable).set({ ownerId: heir.userId }).where(eq(crewsTable.id, crew.id));
+          await tx
+            .update(crewMembersTable)
+            .set({ role: "owner" })
+            .where(and(eq(crewMembersTable.crewId, crew.id), eq(crewMembersTable.userId, heir.userId)));
+        } else {
+          // Sole member — the crew dies with the account (memberships cascade).
+          await tx.delete(crewsTable).where(eq(crewsTable.id, crew.id));
+        }
+      }
+
+      // Owned rows without DB-level cascade.
+      await tx.delete(userBadgesTable).where(eq(userBadgesTable.userId, me.id));
+      await tx.delete(betsTable).where(eq(betsTable.userId, me.id));
+      await tx.delete(parlaysTable).where(eq(parlaysTable.userId, me.id)); // legs cascade
+      await tx.delete(transactionsTable).where(eq(transactionsTable.userId, me.id));
+
+      // Invites they sent stay valid for the invitee — just drop the sender
+      // reference. Their own invite row (keyed by email) is personal data.
+      await tx
+        .update(invitesTable)
+        .set({ invitedById: null })
+        .where(eq(invitesTable.invitedById, me.id));
+      if (me.email) {
+        await tx.delete(invitesTable).where(eq(invitesTable.email, me.email.trim().toLowerCase()));
+      }
+
+      // Finally the user row — crew memberships and recap narratives cascade.
+      await tx.delete(usersTable).where(eq(usersTable.id, me.id));
+    });
+  } catch (err) {
+    logger.error({ err, userId: me.id }, "users: account deletion failed");
+    res.status(500).json({ error: "Could not delete the account — nothing was removed. Try again." });
+    return;
+  }
+
+  // Best-effort: remove the sign-in account too. If this fails the bettor
+  // data is already gone; the orphaned sign-in just lands on the claim screen.
+  if (me.clerkUserId) {
+    try {
+      await clerkClient.users.deleteUser(me.clerkUserId);
+    } catch (err) {
+      logger.warn({ err, userId: me.id }, "users: clerk account removal failed after data deletion");
+    }
+  }
+
+  res.status(204).end();
 });
 
 // GET /users — crew-scoped: real sessions see their active crew's members

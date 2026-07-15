@@ -266,6 +266,78 @@ export function useGetCurrentUser<TData = Awaited<ReturnType<typeof getCurrentUs
 
 
 
+export const getDeleteCurrentUserUrl = () => {
+
+
+
+
+  return `/api/users/me/delete`
+}
+
+/**
+ * Irreversible. Removes the bettor profile and everything it owns — bets, parlays and legs, bankroll ledger, badges, recap narratives, crew memberships, and any invite tied to the account's email. Crews the user owns are handed to their longest-standing remaining member; crews with no other members are shut down. Other bettors' data is never touched. The sign-in account itself is removed as well, so the email can register fresh later.
+ * @summary Permanently delete the signed-in user's account and all their data
+ */
+export const deleteCurrentUser = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCurrentUserUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteCurrentUserMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCurrentUser>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCurrentUser>>, TError,void, TContext> => {
+
+const mutationKey = ['deleteCurrentUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCurrentUser>>, void> = () => {
+
+
+          return  deleteCurrentUser(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCurrentUserMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCurrentUser>>>
+
+    export type DeleteCurrentUserMutationError = ErrorType<void>
+
+    /**
+ * @summary Permanently delete the signed-in user's account and all their data
+ */
+export const useDeleteCurrentUser = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCurrentUser>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCurrentUser>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeleteCurrentUserMutationOptions(options));
+    }
+
 export const getMarkRecapSeenUrl = () => {
 
 
