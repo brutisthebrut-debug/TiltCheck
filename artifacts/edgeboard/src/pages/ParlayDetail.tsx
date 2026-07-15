@@ -1,4 +1,4 @@
-import { useLocation, useParams } from "wouter"
+import { Link, useLocation, useParams } from "wouter"
 import { useGetParlay, useSettleParlay, useUnsettleParlay, useUpdateParlayLeg, useRecomputeParlayOdds, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
@@ -432,6 +432,10 @@ export default function ParlayDetail() {
                         {parlay.whatHappened}
                       </p>
                     )}
+                    <Link href="/lessons" className="inline-flex items-center gap-1 text-xs text-primary hover:underline underline-offset-4" data-testid="link-parlay-lesson-library">
+                      See every lesson in the library
+                      <ArrowLeft className="h-3 w-3 rotate-180" />
+                    </Link>
                   </div>
                 )}
               </CardContent>

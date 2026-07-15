@@ -1032,6 +1032,88 @@ export interface InsightsResponse {
   recentNotes: ReviewNote[];
 }
 
+export type LessonItemType = typeof LessonItemType[keyof typeof LessonItemType];
+
+
+export const LessonItemType = {
+  bet: 'bet',
+  parlay: 'parlay',
+} as const;
+
+export type LessonItemResult = typeof LessonItemResult[keyof typeof LessonItemResult];
+
+
+export const LessonItemResult = {
+  won: 'won',
+  lost: 'lost',
+  push: 'push',
+} as const;
+
+/**
+ * @nullable
+ */
+export type LessonItemReasoningQuality = typeof LessonItemReasoningQuality[keyof typeof LessonItemReasoningQuality] | null;
+
+
+export const LessonItemReasoningQuality = {
+  sound: 'sound',
+  flawed: 'flawed',
+} as const;
+
+/**
+ * One settled play with its full post-mortem journal
+ */
+export interface LessonItem {
+  id: number;
+  type: LessonItemType;
+  title: string;
+  /**
+     * The bet's sport; null for parlays
+     * @nullable
+     */
+  sport?: string | null;
+  result: LessonItemResult;
+  stake: number;
+  odds: number;
+  /**
+     * Net dollars won/lost; null when no payout was recorded
+     * @nullable
+     */
+  profit?: number | null;
+  confidenceScore: number;
+  /** @nullable */
+  rationale?: string | null;
+  /** @nullable */
+  reasoningQuality?: LessonItemReasoningQuality;
+  /** @nullable */
+  missReason?: string | null;
+  /** @nullable */
+  whatHappened?: string | null;
+  /** True when any post-mortem field (reasoning quality, non-na miss reason, or notes) is filled in */
+  reviewed: boolean;
+  /** @nullable */
+  settledAt?: string | null;
+}
+
+export interface LessonsSummary {
+  /** Settled bets + parlays (won/lost/push) */
+  settledCount: number;
+  /** Settled plays that carry any post-mortem data */
+  reviewedCount: number;
+  soundCount: number;
+  flawedCount: number;
+  /** Counts by miss reason across losses, excluding "na", sorted by count */
+  missReasons: MissReasonBreakdown[];
+  /** The most common non-variance miss reason (needs at least 2 occurrences); null when there isn't one */
+  mostRepeatedMistake?: MissReasonBreakdown | null;
+}
+
+export interface LessonsResponse {
+  summary: LessonsSummary;
+  /** Settled plays, most recently settled first */
+  items: LessonItem[];
+}
+
 export interface Workspace {
   id: number;
   name: string;
@@ -1388,6 +1470,13 @@ userId?: number | null;
 };
 
 export type GetStatsInsightsParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+};
+
+export type GetLessonsParams = {
 /**
  * @nullable
  */

@@ -7,6 +7,7 @@ import {
   GetRecentActivityQueryParams,
   GetConfidenceAnalysisQueryParams,
   GetStatsInsightsQueryParams,
+  GetLessonsQueryParams,
   GetLeakProfileQueryParams,
   GetEdgeFinderQueryParams,
   GetWeeklyRecapQueryParams,
@@ -413,6 +414,104 @@ router.get("/stats/insights", requirePro, async (req, res): Promise<void> => {
     soundReasoning: qualityStats("sound"),
     flawedReasoning: qualityStats("flawed"),
     recentNotes,
+  });
+});
+
+// GET /stats/lessons — the Lesson Library: every settled play with its full
+// post-mortem journal, plus the summary-strip aggregates. Private self-audit
+// data like the leak profile: a userId param is only accepted when it matches
+// the session user (the demo mount browses as the demo POV member).
+router.get("/stats/lessons", requireProfile, async (req, res): Promise<void> => {
+  const query = GetLessonsQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const self = req.currentUser!.id;
+  if (query.data.userId != null && query.data.userId !== self) {
+    res.status(403).json({ error: "You can only review your own lessons" });
+    return;
+  }
+
+  const bets = await db.select().from(betsTable).where(
+    and(eq(betsTable.userId, self), inArray(betsTable.status, ["won", "lost", "push"]))
+  );
+  const parlays = await db.select().from(parlaysTable).where(
+    and(eq(parlaysTable.userId, self), inArray(parlaysTable.status, ["won", "lost", "push"]))
+  );
+
+  const isReviewed = (r: { reasoningQuality: string | null; missReason: string | null; whatHappened: string | null }) =>
+    r.reasoningQuality != null ||
+    (r.missReason != null && r.missReason !== "na") ||
+    (r.whatHappened != null && r.whatHappened.trim() !== "");
+
+  const items = [
+    ...bets.map((b) => ({
+      id: b.id,
+      type: "bet" as const,
+      title: `${b.pick} (${b.event})`,
+      sport: b.sport,
+      result: b.status as "won" | "lost" | "push",
+      stake: Number(b.stake),
+      odds: b.odds,
+      profit: b.actualPayout != null ? Math.round((Number(b.actualPayout) - Number(b.stake)) * 100) / 100 : null,
+      confidenceScore: b.confidenceScore,
+      rationale: b.rationale,
+      reasoningQuality: b.reasoningQuality as "sound" | "flawed" | null,
+      missReason: b.missReason,
+      whatHappened: b.whatHappened,
+      reviewed: isReviewed(b),
+      settledAt: b.settledAt ? b.settledAt.toISOString() : null,
+    })),
+    ...parlays.map((p) => ({
+      id: p.id,
+      type: "parlay" as const,
+      title: `Parlay: ${p.name}`,
+      sport: null,
+      result: p.status as "won" | "lost" | "push",
+      stake: Number(p.stake),
+      odds: p.odds,
+      profit: p.actualPayout != null ? Math.round((Number(p.actualPayout) - Number(p.stake)) * 100) / 100 : null,
+      confidenceScore: p.confidenceScore,
+      rationale: p.rationale,
+      reasoningQuality: p.reasoningQuality as "sound" | "flawed" | null,
+      missReason: p.missReason,
+      whatHappened: p.whatHappened,
+      reviewed: isReviewed(p),
+      settledAt: p.settledAt ? p.settledAt.toISOString() : null,
+    })),
+  ].sort((a, b) => {
+    const ta = a.settledAt ? new Date(a.settledAt).getTime() : 0;
+    const tb = b.settledAt ? new Date(b.settledAt).getTime() : 0;
+    return tb - ta;
+  });
+
+  // Miss-reason breakdown across losses (exclude "na" — it carries no signal)
+  const reasonCounts: Record<string, number> = {};
+  for (const i of items) {
+    if (i.result !== "lost") continue;
+    if (i.missReason == null || i.missReason === "na") continue;
+    reasonCounts[i.missReason] = (reasonCounts[i.missReason] ?? 0) + 1;
+  }
+  const missReasons = Object.entries(reasonCounts)
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // The most repeated *mistake* — normal variance isn't one, and a single
+  // occurrence isn't a pattern.
+  const mostRepeatedMistake =
+    missReasons.find((r) => r.reason !== "normal_variance" && r.count >= 2) ?? null;
+
+  res.json({
+    summary: {
+      settledCount: items.length,
+      reviewedCount: items.filter((i) => i.reviewed).length,
+      soundCount: items.filter((i) => i.reasoningQuality === "sound").length,
+      flawedCount: items.filter((i) => i.reasoningQuality === "flawed").length,
+      missReasons,
+      mostRepeatedMistake,
+    },
+    items,
   });
 });
 

@@ -1185,6 +1185,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/InsightsResponse"
 
+  /stats/lessons:
+    get:
+      operationId: getLessons
+      tags: [stats]
+      summary: The bettor's full post-mortem history for the Lesson Library
+      description: >
+        Every settled bet and parlay (won/lost/push) for the signed-in bettor,
+        with the journal fields that make a post-mortem — confidence,
+        rationale, reasoning quality, miss reason, and the "what happened"
+        note — plus aggregate counts for the summary strip. This is self-audit
+        data: a userId param is only accepted when it matches the session user
+        (the demo mount browses as the demo crew's point-of-view member).
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Lesson Library feed and summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LessonsResponse"
+        "401":
+          description: Not signed in
+        "403":
+          description: You can only review your own lessons
+
   /stats/leak-profile:
     get:
       operationId: getLeakProfile
@@ -2594,6 +2623,85 @@ components:
           items:
             $ref: "#/components/schemas/ReviewNote"
       required: [reviewedCount, lossesWithReason, missReasons, soundReasoning, flawedReasoning, recentNotes]
+
+    LessonItem:
+      type: object
+      description: One settled play with its full post-mortem journal
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [bet, parlay]
+        title:
+          type: string
+        sport:
+          type: ["string", "null"]
+          description: The bet's sport; null for parlays
+        result:
+          type: string
+          enum: [won, lost, push]
+        stake:
+          type: number
+        odds:
+          type: integer
+        profit:
+          type: ["number", "null"]
+          description: Net dollars won/lost; null when no payout was recorded
+        confidenceScore:
+          type: integer
+        rationale:
+          type: ["string", "null"]
+        reasoningQuality:
+          type: ["string", "null"]
+          enum: [sound, flawed, null]
+        missReason:
+          type: ["string", "null"]
+        whatHappened:
+          type: ["string", "null"]
+        reviewed:
+          type: boolean
+          description: True when any post-mortem field (reasoning quality, non-na miss reason, or notes) is filled in
+        settledAt:
+          type: ["string", "null"]
+      required: [id, type, title, result, stake, odds, confidenceScore, reviewed]
+
+    LessonsSummary:
+      type: object
+      properties:
+        settledCount:
+          type: integer
+          description: Settled bets + parlays (won/lost/push)
+        reviewedCount:
+          type: integer
+          description: Settled plays that carry any post-mortem data
+        soundCount:
+          type: integer
+        flawedCount:
+          type: integer
+        missReasons:
+          type: array
+          description: Counts by miss reason across losses, excluding "na", sorted by count
+          items:
+            $ref: "#/components/schemas/MissReasonBreakdown"
+        mostRepeatedMistake:
+          description: The most common non-variance miss reason (needs at least 2 occurrences); null when there isn't one
+          oneOf:
+            - $ref: "#/components/schemas/MissReasonBreakdown"
+            - type: "null"
+      required: [settledCount, reviewedCount, soundCount, flawedCount, missReasons]
+
+    LessonsResponse:
+      type: object
+      properties:
+        summary:
+          $ref: "#/components/schemas/LessonsSummary"
+        items:
+          type: array
+          description: Settled plays, most recently settled first
+          items:
+            $ref: "#/components/schemas/LessonItem"
+      required: [summary, items]
 
     Workspace:
       type: object

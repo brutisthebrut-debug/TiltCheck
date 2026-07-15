@@ -293,9 +293,15 @@ export default function Stats() {
 
       {/* Post-result insights feed */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-semibold tracking-tight">Lessons</h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold tracking-tight">Lessons</h2>
+          </div>
+          <Link href="/lessons" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-4" data-testid="link-stats-lesson-library">
+            Lesson Library
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
         {!isPro ? (
           isProLoading ? (

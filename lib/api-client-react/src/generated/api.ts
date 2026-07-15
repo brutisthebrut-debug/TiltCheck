@@ -44,6 +44,7 @@ import type {
   GetConfidenceAnalysisParams,
   GetEdgeFinderParams,
   GetLeakProfileParams,
+  GetLessonsParams,
   GetRecapNarrativeParams,
   GetRecentActivityParams,
   GetStatsBySportParams,
@@ -59,6 +60,7 @@ import type {
   JoinCrewInput,
   LeaderboardEntry,
   LeakProfile,
+  LessonsResponse,
   ListBetsParams,
   ListParlaysParams,
   ListTransactionsParams,
@@ -3745,6 +3747,91 @@ export function useGetStatsInsights<TData = Awaited<ReturnType<typeof getStatsIn
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStatsInsightsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLessonsUrl = (params?: GetLessonsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stats/lessons?${stringifiedParams}` : `/api/stats/lessons`
+}
+
+/**
+ * Every settled bet and parlay (won/lost/push) for the signed-in bettor, with the journal fields that make a post-mortem — confidence, rationale, reasoning quality, miss reason, and the "what happened" note — plus aggregate counts for the summary strip. This is self-audit data: a userId param is only accepted when it matches the session user (the demo mount browses as the demo crew's point-of-view member).
+ * @summary The bettor's full post-mortem history for the Lesson Library
+ */
+export const getLessons = async (params?: GetLessonsParams, options?: RequestInit): Promise<LessonsResponse> => {
+
+  return customFetch<LessonsResponse>(getGetLessonsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLessonsQueryKey = (params?: GetLessonsParams,) => {
+    return [
+    `/api/stats/lessons`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetLessonsQueryOptions = <TData = Awaited<ReturnType<typeof getLessons>>, TError = ErrorType<void>>(params?: GetLessonsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLessons>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLessonsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLessons>>> = ({ signal }) => getLessons(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLessons>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLessonsQueryResult = NonNullable<Awaited<ReturnType<typeof getLessons>>>
+export type GetLessonsQueryError = ErrorType<void>
+
+
+/**
+ * @summary The bettor's full post-mortem history for the Lesson Library
+ */
+
+export function useGetLessons<TData = Awaited<ReturnType<typeof getLessons>>, TError = ErrorType<void>>(
+ params?: GetLessonsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLessons>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLessonsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

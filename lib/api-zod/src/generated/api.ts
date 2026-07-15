@@ -1387,6 +1387,49 @@ export const GetStatsInsightsResponse = zod.object({
 
 
 /**
+ * Every settled bet and parlay (won/lost/push) for the signed-in bettor, with the journal fields that make a post-mortem — confidence, rationale, reasoning quality, miss reason, and the "what happened" note — plus aggregate counts for the summary strip. This is self-audit data: a userId param is only accepted when it matches the session user (the demo mount browses as the demo crew's point-of-view member).
+ * @summary The bettor's full post-mortem history for the Lesson Library
+ */
+export const GetLessonsQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish()
+})
+
+export const GetLessonsResponse = zod.object({
+  "summary": zod.object({
+  "settledCount": zod.number().describe('Settled bets + parlays (won\/lost\/push)'),
+  "reviewedCount": zod.number().describe('Settled plays that carry any post-mortem data'),
+  "soundCount": zod.number(),
+  "flawedCount": zod.number(),
+  "missReasons": zod.array(zod.object({
+  "reason": zod.enum(['bad_read', 'bad_price', 'lineup_injury', 'emotional', 'misunderstood_market', 'normal_variance', 'na']),
+  "count": zod.number()
+})).describe('Counts by miss reason across losses, excluding \"na\", sorted by count'),
+  "mostRepeatedMistake": zod.union([zod.object({
+  "reason": zod.enum(['bad_read', 'bad_price', 'lineup_injury', 'emotional', 'misunderstood_market', 'normal_variance', 'na']),
+  "count": zod.number()
+}),zod.null()]).optional().describe('The most common non-variance miss reason (needs at least 2 occurrences); null when there isn\'t one')
+}),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['bet', 'parlay']),
+  "title": zod.string(),
+  "sport": zod.string().nullish().describe('The bet\'s sport; null for parlays'),
+  "result": zod.enum(['won', 'lost', 'push']),
+  "stake": zod.number(),
+  "odds": zod.number(),
+  "profit": zod.number().nullish().describe('Net dollars won\/lost; null when no payout was recorded'),
+  "confidenceScore": zod.number(),
+  "rationale": zod.string().nullish(),
+  "reasoningQuality": zod.union([zod.literal('sound'),zod.literal('flawed'),zod.literal(null)]).nullish(),
+  "missReason": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "reviewed": zod.boolean().describe('True when any post-mortem field (reasoning quality, non-na miss reason, or notes) is filled in'),
+  "settledAt": zod.string().nullish()
+}).describe('One settled play with its full post-mortem journal')).describe('Settled plays, most recently settled first')
+})
+
+
+/**
  * Aggregates the signed-in bettor's settled history into a few machine-readable leak signals (stake chasing after a loss, worst sport, overconfidence) so the bet form can warn before they repeat their most common mistake. Signals below sample-size thresholds are omitted. Always scoped to the signed-in user.
  * @summary A bettor's recurring leak signals for pre-bet warnings
  */

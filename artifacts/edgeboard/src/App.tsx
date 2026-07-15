@@ -21,6 +21,7 @@ import Parlays from './pages/Parlays';
 import NewParlay from './pages/NewParlay';
 import ParlayDetail from './pages/ParlayDetail';
 import Stats from './pages/Stats';
+import Lessons from './pages/Lessons';
 import EdgeFinder from './pages/EdgeFinder';
 import Workspace from './pages/Workspace';
 import Bankroll from './pages/Bankroll';
@@ -196,6 +197,7 @@ function ProfileGate() {
         <Route path="/parlays/new" component={NewParlay} />
         <Route path="/parlays/:id" component={ParlayDetail} />
         <Route path="/stats" component={Stats} />
+        <Route path="/lessons" component={Lessons} />
         <Route path="/edge" component={EdgeFinder} />
         <Route path="/workspace" component={Workspace} />
         <Route path="/bankroll" component={Bankroll} />
