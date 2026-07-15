@@ -189,12 +189,13 @@ async function createUser(displayName = "Recap Tester") {
 
 describe("GET /stats/recap", () => {
   beforeEach(async () => {
-    const { parlayLegsTable, parlaysTable, transactionsTable, userBadgesTable } = await import("@workspace/db");
+    const { parlayLegsTable, parlaysTable, transactionsTable, userBadgesTable, invitesTable } = await import("@workspace/db");
     await db.delete(parlayLegsTable);
     await db.delete(parlaysTable);
     await db.delete(betsTable);
     await db.delete(transactionsTable);
     await db.delete(userBadgesTable);
+    await db.delete(invitesTable);
     await db.delete(usersTable);
   });
 

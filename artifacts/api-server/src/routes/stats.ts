@@ -8,6 +8,7 @@ import {
   GetConfidenceAnalysisQueryParams,
   GetStatsInsightsQueryParams,
   GetLeakProfileQueryParams,
+  GetEdgeFinderQueryParams,
   GetWeeklyRecapQueryParams,
   GetRecapNarrativeQueryParams,
 } from "@workspace/api-zod";
@@ -510,6 +511,114 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
       : null;
 
   res.json({ settledCount, avgStake, lastLossAt, worstSport, overconfidence, topMissReason });
+});
+
+// GET /stats/edge-finder — the signed-in bettor's settled straight bets
+// sliced into lanes (sport, fav/dog, odds band, day of week, stake band) so
+// the Edge Finder page can show where they actually make money. Private
+// self-audit data: a userId param is only accepted when it matches the
+// session user. Lanes below EDGE_MIN_SAMPLE are still returned — the client
+// greys them out rather than pretending small samples mean something.
+const EDGE_MIN_SAMPLE = 5;
+
+router.get("/stats/edge-finder", requireProfile, async (req, res): Promise<void> => {
+  const query = GetEdgeFinderQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const self = req.currentUser!.id;
+  if (query.data.userId != null && query.data.userId !== self) {
+    res.status(403).json({ error: "You can only view your own edge finder" });
+    return;
+  }
+
+  const bets = (
+    await db.select().from(betsTable).where(
+      and(eq(betsTable.userId, self), inArray(betsTable.status, ["won", "lost", "push"]))
+    )
+  ).filter(hasValidOdds);
+
+  const settledCount = bets.length;
+  const avgStake =
+    bets.length > 0
+      ? Math.round((bets.reduce((s, b) => s + Number(b.stake), 0) / bets.length) * 100) / 100
+      : null;
+
+  type Row = (typeof bets)[number];
+  type LaneAgg = { wins: number; losses: number; pushes: number; wagered: number; payout: number };
+
+  const aggregate = (keyOf: (b: Row) => string): Map<string, LaneAgg> => {
+    const map = new Map<string, LaneAgg>();
+    for (const b of bets) {
+      const key = keyOf(b);
+      let lane = map.get(key);
+      if (!lane) {
+        lane = { wins: 0, losses: 0, pushes: 0, wagered: 0, payout: 0 };
+        map.set(key, lane);
+      }
+      if (b.status === "won") lane.wins++;
+      else if (b.status === "lost") lane.losses++;
+      else lane.pushes++;
+      lane.wagered += Number(b.stake);
+      lane.payout += b.actualPayout != null ? Number(b.actualPayout) : 0;
+    }
+    return map;
+  };
+
+  const toLanes = (map: Map<string, LaneAgg>, order?: string[]) => {
+    const lanes = [...map.entries()].map(([key, l]) => {
+      const netProfit = l.payout - l.wagered;
+      return {
+        key,
+        wins: l.wins,
+        losses: l.losses,
+        pushes: l.pushes,
+        bets: l.wins + l.losses + l.pushes,
+        wagered: Math.round(l.wagered * 100) / 100,
+        netProfit: Math.round(netProfit * 100) / 100,
+        roi: l.wagered > 0 ? Math.round((netProfit / l.wagered) * 10000) / 100 : 0,
+      };
+    });
+    if (order) {
+      lanes.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+    } else {
+      lanes.sort((a, b) => b.netProfit - a.netProfit);
+    }
+    return lanes;
+  };
+
+  // Fav/dog and odds bands: dead-zone rows are already excluded, so every
+  // odds value here is <= -100 or >= +100.
+  const favDogKey = (b: Row) => (b.odds <= -100 ? "favorite" : "underdog");
+  const oddsBandKey = (b: Row) =>
+    b.odds <= -200 ? "heavy_fav" : b.odds <= -100 ? "fav" : b.odds < 200 ? "dog" : "long_shot";
+
+  // Day of week from the game date (UTC) — when the bet's game was played,
+  // not when it was logged.
+  const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+  const dayKey = (b: Row) => DAY_KEYS[new Date(`${b.gameDate}T00:00:00Z`).getUTCDay()];
+
+  // Stake bands are relative to the bettor's own average — a $100 play is
+  // "heavy" for a $40 bettor and "light" for a whale.
+  const stakeBandKey = (b: Row) => {
+    const stake = Number(b.stake);
+    if (avgStake == null || avgStake <= 0) return "standard";
+    if (stake < avgStake * 0.75) return "light";
+    if (stake <= avgStake * 1.5) return "standard";
+    return "heavy";
+  };
+
+  res.json({
+    settledCount,
+    minSample: EDGE_MIN_SAMPLE,
+    avgStake,
+    sport: toLanes(aggregate((b) => b.sport)),
+    favDog: toLanes(aggregate(favDogKey), ["favorite", "underdog"]),
+    oddsBand: toLanes(aggregate(oddsBandKey), ["heavy_fav", "fav", "dog", "long_shot"]),
+    dayOfWeek: toLanes(aggregate(dayKey), ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+    stakeBand: toLanes(aggregate(stakeBandKey), ["light", "standard", "heavy"]),
+  });
 });
 
 // GET /stats/recap — one week's story: personal facts + crew highlights.

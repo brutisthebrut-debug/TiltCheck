@@ -1096,6 +1096,71 @@ export const GetLeakProfileResponse = zod.object({
 
 
 /**
+ * Slices the signed-in bettor's settled straight bets (valid odds only) into lanes — by sport, favorite vs underdog, odds band, day of week, and stake size band — each with record, money wagered, net profit, and ROI, so the Edge Finder page can show where they actually make money. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user.
+ * @summary A bettor's settled history sliced into lanes to find their edge
+ */
+export const GetEdgeFinderQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish()
+})
+
+export const GetEdgeFinderResponse = zod.object({
+  "settledCount": zod.number().describe('Settled straight bets with valid odds counted toward the lanes'),
+  "minSample": zod.number().describe('Minimum bets a lane needs before its numbers mean anything'),
+  "avgStake": zod.number().nullable().describe('Average stake used to draw the stake-band boundaries (null when no settled bets)'),
+  "sport": zod.array(zod.object({
+  "key": zod.string().describe('Stable lane key within its dimension (e.g. \"NBA\", \"favorite\", \"heavy_fav\", \"mon\", \"heavy\")'),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "pushes": zod.number(),
+  "bets": zod.number().describe('Settled bets in this lane (the sample size)'),
+  "wagered": zod.number().describe('Total dollars staked in this lane'),
+  "netProfit": zod.number().describe('Net dollars won or lost in this lane'),
+  "roi": zod.number().describe('Net profit as a percentage of dollars wagered')
+})),
+  "favDog": zod.array(zod.object({
+  "key": zod.string().describe('Stable lane key within its dimension (e.g. \"NBA\", \"favorite\", \"heavy_fav\", \"mon\", \"heavy\")'),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "pushes": zod.number(),
+  "bets": zod.number().describe('Settled bets in this lane (the sample size)'),
+  "wagered": zod.number().describe('Total dollars staked in this lane'),
+  "netProfit": zod.number().describe('Net dollars won or lost in this lane'),
+  "roi": zod.number().describe('Net profit as a percentage of dollars wagered')
+})).describe('Lanes keyed \"favorite\" (odds -100 and under) and \"underdog\" (+100 and over)'),
+  "oddsBand": zod.array(zod.object({
+  "key": zod.string().describe('Stable lane key within its dimension (e.g. \"NBA\", \"favorite\", \"heavy_fav\", \"mon\", \"heavy\")'),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "pushes": zod.number(),
+  "bets": zod.number().describe('Settled bets in this lane (the sample size)'),
+  "wagered": zod.number().describe('Total dollars staked in this lane'),
+  "netProfit": zod.number().describe('Net dollars won or lost in this lane'),
+  "roi": zod.number().describe('Net profit as a percentage of dollars wagered')
+})).describe('Lanes keyed \"heavy_fav\" (-200 and under), \"fav\" (-199 to -100), \"dog\" (+100 to +199), \"long_shot\" (+200 and over)'),
+  "dayOfWeek": zod.array(zod.object({
+  "key": zod.string().describe('Stable lane key within its dimension (e.g. \"NBA\", \"favorite\", \"heavy_fav\", \"mon\", \"heavy\")'),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "pushes": zod.number(),
+  "bets": zod.number().describe('Settled bets in this lane (the sample size)'),
+  "wagered": zod.number().describe('Total dollars staked in this lane'),
+  "netProfit": zod.number().describe('Net dollars won or lost in this lane'),
+  "roi": zod.number().describe('Net profit as a percentage of dollars wagered')
+})).describe('Lanes keyed \"mon\" through \"sun\" from the game date (UTC)'),
+  "stakeBand": zod.array(zod.object({
+  "key": zod.string().describe('Stable lane key within its dimension (e.g. \"NBA\", \"favorite\", \"heavy_fav\", \"mon\", \"heavy\")'),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "pushes": zod.number(),
+  "bets": zod.number().describe('Settled bets in this lane (the sample size)'),
+  "wagered": zod.number().describe('Total dollars staked in this lane'),
+  "netProfit": zod.number().describe('Net dollars won or lost in this lane'),
+  "roi": zod.number().describe('Net profit as a percentage of dollars wagered')
+})).describe('Lanes keyed \"light\" (under 0.75x average stake), \"standard\" (0.75x to 1.5x), \"heavy\" (over 1.5x)')
+})
+
+
+/**
  * Computes recap facts for one Monday-to-Sunday week (UTC) from settled plays. Defaults to the signed-in bettor and the most recently completed week. weekStart accepts any date and snaps to its Monday; weeks after the last completed week are rejected.
  * @summary Weekly recap facts for a bettor plus the crew's highlights
  */

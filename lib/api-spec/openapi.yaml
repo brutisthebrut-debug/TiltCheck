@@ -830,6 +830,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeakProfile"
 
+  /stats/edge-finder:
+    get:
+      operationId: getEdgeFinder
+      tags: [stats]
+      summary: A bettor's settled history sliced into lanes to find their edge
+      description: >
+        Slices the signed-in bettor's settled straight bets (valid odds only)
+        into lanes — by sport, favorite vs underdog, odds band, day of week,
+        and stake size band — each with record, money wagered, net profit, and
+        ROI, so the Edge Finder page can show where they actually make money.
+        Always scoped to the signed-in user; a userId param is only accepted
+        when it matches the session user.
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Edge finder lanes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EdgeFinder"
+
   /stats/recap:
     get:
       operationId: getWeeklyRecap
@@ -1674,6 +1699,70 @@ components:
               type: number
           required: [reason, count, netLoss]
       required: [settledCount, avgStake, lastLossAt, worstSport, overconfidence, topMissReason]
+
+    EdgeFinderLane:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Stable lane key within its dimension (e.g. "NBA", "favorite", "heavy_fav", "mon", "heavy")
+        wins:
+          type: integer
+        losses:
+          type: integer
+        pushes:
+          type: integer
+        bets:
+          type: integer
+          description: Settled bets in this lane (the sample size)
+        wagered:
+          type: number
+          description: Total dollars staked in this lane
+        netProfit:
+          type: number
+          description: Net dollars won or lost in this lane
+        roi:
+          type: number
+          description: Net profit as a percentage of dollars wagered
+      required: [key, wins, losses, pushes, bets, wagered, netProfit, roi]
+
+    EdgeFinder:
+      type: object
+      properties:
+        settledCount:
+          type: integer
+          description: Settled straight bets with valid odds counted toward the lanes
+        minSample:
+          type: integer
+          description: Minimum bets a lane needs before its numbers mean anything
+        avgStake:
+          type: ["number", "null"]
+          description: Average stake used to draw the stake-band boundaries (null when no settled bets)
+        sport:
+          type: array
+          items:
+            $ref: "#/components/schemas/EdgeFinderLane"
+        favDog:
+          type: array
+          description: Lanes keyed "favorite" (odds -100 and under) and "underdog" (+100 and over)
+          items:
+            $ref: "#/components/schemas/EdgeFinderLane"
+        oddsBand:
+          type: array
+          description: Lanes keyed "heavy_fav" (-200 and under), "fav" (-199 to -100), "dog" (+100 to +199), "long_shot" (+200 and over)
+          items:
+            $ref: "#/components/schemas/EdgeFinderLane"
+        dayOfWeek:
+          type: array
+          description: Lanes keyed "mon" through "sun" from the game date (UTC)
+          items:
+            $ref: "#/components/schemas/EdgeFinderLane"
+        stakeBand:
+          type: array
+          description: Lanes keyed "light" (under 0.75x average stake), "standard" (0.75x to 1.5x), "heavy" (over 1.5x)
+          items:
+            $ref: "#/components/schemas/EdgeFinderLane"
+      required: [settledCount, minSample, avgStake, sport, favDog, oddsBand, dayOfWeek, stakeBand]
 
     TransactionInput:
       type: object

@@ -12,6 +12,7 @@ import {
   Wallet,
   LogOut,
   Crown,
+  Crosshair,
 } from "lucide-react"
 import { Button } from "./ui/button"
 import { BadgeWatcher } from "./BadgeWatcher"
@@ -19,12 +20,13 @@ import { BadgeWatcher } from "./BadgeWatcher"
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
 const navItems = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Bets", href: "/bets", icon: ListOrdered },
-  { name: "Parlays", href: "/parlays", icon: Layers },
-  { name: "Stats", href: "/stats", icon: BarChart2 },
-  { name: "Workspace", href: "/workspace", icon: Users },
-  { name: "Bankroll", href: "/bankroll", icon: Wallet },
+  { name: "Dashboard", shortName: "Home", href: "/", icon: LayoutDashboard },
+  { name: "Bets", shortName: "Bets", href: "/bets", icon: ListOrdered },
+  { name: "Parlays", shortName: "Parlays", href: "/parlays", icon: Layers },
+  { name: "Stats", shortName: "Stats", href: "/stats", icon: BarChart2 },
+  { name: "Edge Finder", shortName: "Edge", href: "/edge", icon: Crosshair },
+  { name: "Workspace", shortName: "Crew", href: "/workspace", icon: Users },
+  { name: "Bankroll", shortName: "Bankroll", href: "/bankroll", icon: Wallet },
 ]
 
 function NeedsSettlingBadge({ count, className = "" }: { count: number; className?: string }) {
@@ -190,7 +192,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border/50 bg-card/90 backdrop-blur-md md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        {navItems.slice(0, 6).map((item) => {
+        {navItems.map((item) => {
           const isActive = location === item.href || 
                            (item.href !== '/' && location.startsWith(item.href));
           return (
@@ -209,7 +211,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <NeedsSettlingBadge count={settleCount} className="absolute -top-1.5 -right-2.5" />
                 )}
               </span>
-              <span className="truncate">{item.name}</span>
+              <span className="truncate">{item.shortName ?? item.name}</span>
             </Link>
           )
         })}

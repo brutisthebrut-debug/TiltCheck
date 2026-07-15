@@ -652,6 +652,43 @@ export interface LeakProfile {
   topMissReason: LeakProfileTopMissReason;
 }
 
+export interface EdgeFinderLane {
+  /** Stable lane key within its dimension (e.g. "NBA", "favorite", "heavy_fav", "mon", "heavy") */
+  key: string;
+  wins: number;
+  losses: number;
+  pushes: number;
+  /** Settled bets in this lane (the sample size) */
+  bets: number;
+  /** Total dollars staked in this lane */
+  wagered: number;
+  /** Net dollars won or lost in this lane */
+  netProfit: number;
+  /** Net profit as a percentage of dollars wagered */
+  roi: number;
+}
+
+export interface EdgeFinder {
+  /** Settled straight bets with valid odds counted toward the lanes */
+  settledCount: number;
+  /** Minimum bets a lane needs before its numbers mean anything */
+  minSample: number;
+  /**
+     * Average stake used to draw the stake-band boundaries (null when no settled bets)
+     * @nullable
+     */
+  avgStake: number | null;
+  sport: EdgeFinderLane[];
+  /** Lanes keyed "favorite" (odds -100 and under) and "underdog" (+100 and over) */
+  favDog: EdgeFinderLane[];
+  /** Lanes keyed "heavy_fav" (-200 and under), "fav" (-199 to -100), "dog" (+100 to +199), "long_shot" (+200 and over) */
+  oddsBand: EdgeFinderLane[];
+  /** Lanes keyed "mon" through "sun" from the game date (UTC) */
+  dayOfWeek: EdgeFinderLane[];
+  /** Lanes keyed "light" (under 0.75x average stake), "standard" (0.75x to 1.5x), "heavy" (over 1.5x) */
+  stakeBand: EdgeFinderLane[];
+}
+
 export type TransactionInputType = typeof TransactionInputType[keyof typeof TransactionInputType];
 
 
@@ -1192,6 +1229,13 @@ userId?: number | null;
 };
 
 export type GetLeakProfileParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+};
+
+export type GetEdgeFinderParams = {
 /**
  * @nullable
  */

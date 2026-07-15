@@ -14,6 +14,7 @@ import BetDetail from './BetDetail';
 import Parlays from './Parlays';
 import ParlayDetail from './ParlayDetail';
 import Stats from './Stats';
+import EdgeFinder from './EdgeFinder';
 import Workspace from './Workspace';
 import Bankroll from './Bankroll';
 import Recap from './Recap';
@@ -69,6 +70,7 @@ export default function DemoApp() {
               <Route path="/parlays/new" component={DemoNudge} />
               <Route path="/parlays/:id" component={ParlayDetail} />
               <Route path="/stats" component={Stats} />
+              <Route path="/edge" component={EdgeFinder} />
               <Route path="/workspace" component={Workspace} />
               <Route path="/bankroll" component={Bankroll} />
               <Route path="/recap" component={Recap} />

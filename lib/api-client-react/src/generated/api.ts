@@ -31,9 +31,11 @@ import type {
   BetUpdate,
   ClaimProfileInput,
   ConfidenceBucket,
+  EdgeFinder,
   GetBankrollHistoryParams,
   GetBankrollParams,
   GetConfidenceAnalysisParams,
+  GetEdgeFinderParams,
   GetLeakProfileParams,
   GetRecapNarrativeParams,
   GetRecentActivityParams,
@@ -2796,6 +2798,91 @@ export function useGetLeakProfile<TData = Awaited<ReturnType<typeof getLeakProfi
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetLeakProfileQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetEdgeFinderUrl = (params?: GetEdgeFinderParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stats/edge-finder?${stringifiedParams}` : `/api/stats/edge-finder`
+}
+
+/**
+ * Slices the signed-in bettor's settled straight bets (valid odds only) into lanes — by sport, favorite vs underdog, odds band, day of week, and stake size band — each with record, money wagered, net profit, and ROI, so the Edge Finder page can show where they actually make money. Always scoped to the signed-in user; a userId param is only accepted when it matches the session user.
+ * @summary A bettor's settled history sliced into lanes to find their edge
+ */
+export const getEdgeFinder = async (params?: GetEdgeFinderParams, options?: RequestInit): Promise<EdgeFinder> => {
+
+  return customFetch<EdgeFinder>(getGetEdgeFinderUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEdgeFinderQueryKey = (params?: GetEdgeFinderParams,) => {
+    return [
+    `/api/stats/edge-finder`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetEdgeFinderQueryOptions = <TData = Awaited<ReturnType<typeof getEdgeFinder>>, TError = ErrorType<unknown>>(params?: GetEdgeFinderParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEdgeFinder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEdgeFinderQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEdgeFinder>>> = ({ signal }) => getEdgeFinder(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEdgeFinder>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEdgeFinderQueryResult = NonNullable<Awaited<ReturnType<typeof getEdgeFinder>>>
+export type GetEdgeFinderQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary A bettor's settled history sliced into lanes to find their edge
+ */
+
+export function useGetEdgeFinder<TData = Awaited<ReturnType<typeof getEdgeFinder>>, TError = ErrorType<unknown>>(
+ params?: GetEdgeFinderParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEdgeFinder>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEdgeFinderQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

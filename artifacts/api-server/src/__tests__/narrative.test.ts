@@ -176,13 +176,14 @@ describe("GET /stats/recap/narrative", () => {
     generateMock.mockResolvedValue({
       choices: [{ message: { content: "You went 1-0. Nice tape.\n\nWatch next week: your stake sizing." } }],
     });
-    const { parlayLegsTable, transactionsTable, userBadgesTable } = await import("@workspace/db");
+    const { parlayLegsTable, transactionsTable, userBadgesTable, invitesTable } = await import("@workspace/db");
     await db.delete(recapNarrativesTable);
     await db.delete(parlayLegsTable);
     await db.delete(parlaysTable);
     await db.delete(betsTable);
     await db.delete(transactionsTable);
     await db.delete(userBadgesTable);
+    await db.delete(invitesTable);
     await db.delete(usersTable);
   });
 
@@ -333,13 +334,14 @@ describe("GET /stats/recap/narrative — history generation budget", () => {
     generateMock.mockResolvedValue({
       choices: [{ message: { content: "Fresh tape. Watch next week: the budget." } }],
     });
-    const { parlayLegsTable, transactionsTable, userBadgesTable } = await import("@workspace/db");
+    const { parlayLegsTable, transactionsTable, userBadgesTable, invitesTable } = await import("@workspace/db");
     await db.delete(recapNarrativesTable);
     await db.delete(parlayLegsTable);
     await db.delete(parlaysTable);
     await db.delete(betsTable);
     await db.delete(transactionsTable);
     await db.delete(userBadgesTable);
+    await db.delete(invitesTable);
     await db.delete(usersTable);
   });
 
