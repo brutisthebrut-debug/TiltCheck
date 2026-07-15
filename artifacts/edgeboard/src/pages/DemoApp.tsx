@@ -85,15 +85,14 @@ export default function DemoApp() {
 function DemoBanner() {
   return (
     <div
-      className="sticky top-0 z-[60] flex items-center justify-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-1.5 text-center backdrop-blur"
+      className="sticky top-0 z-[60] flex items-center justify-center gap-2 border-b border-primary/50 bg-primary/10 px-3 py-2 text-center backdrop-blur-md glow-primary"
       data-testid="banner-demo"
     >
-      <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
+      <Sparkles className="h-4 w-4 shrink-0 text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.8)]" />
       <p className="text-[11px] text-foreground/90 sm:text-xs">
-        <span className="font-bold text-primary">DEMO BOARD</span>
-        <span className="text-muted-foreground"> — a fictional crew, real product. </span>
-        {/* ~ = absolute path: escapes the /demo nest back to the app root */}
-        <Link href="~/sign-up" className="font-bold text-primary underline underline-offset-2 hover:text-primary/80" data-testid="link-demo-signup">
+        <span className="font-bold text-primary text-glow-primary">DEMO BOARD</span>
+        <span className="text-muted-foreground font-medium"> — a fictional crew, real product. </span>
+        <Link href="~/sign-up" className="font-bold text-primary underline underline-offset-4 hover:text-primary/80 transition-colors" data-testid="link-demo-signup">
           Get on the board
         </Link>
       </p>

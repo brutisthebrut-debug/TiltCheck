@@ -50,8 +50,8 @@ function flavorLine(e: LeaderboardEntry): string {
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1)
     return (
-      <span className="h-8 w-8 shrink-0 rounded-full bg-yellow-500/15 border border-yellow-500/40 flex items-center justify-center">
-        <Crown className="h-4 w-4 text-yellow-500" />
+      <span className="h-8 w-8 shrink-0 rounded-full bg-yellow-500/20 border border-yellow-500 glow-amber flex items-center justify-center">
+        <Crown className="h-4 w-4 text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
       </span>
     )
   return (
@@ -170,12 +170,12 @@ export default function Workspace() {
                   disabled={!clickable}
                   onClick={() => clickable && setSelectedId(isSelected ? null : e.userId)}
                   data-testid={`row-leaderboard-${e.userId}`}
-                  className={`w-full text-left flex items-center gap-3 rounded-lg border px-3 py-3 transition-colors ${
+                  className={`w-full text-left flex items-center gap-3 rounded-lg border px-3 py-3 transition-all duration-300 ${
                     isSelected
-                      ? "border-primary bg-primary/5"
+                      ? "border-primary bg-primary/10 glow-primary scale-[1.01]"
                       : "border-border/60 bg-background/60"
-                  } ${clickable ? "hover:border-primary/50 cursor-pointer" : "cursor-default"} ${
-                    isYou ? "ring-1 ring-primary/30" : ""
+                  } ${clickable ? "hover:border-primary/50 cursor-pointer hover:bg-card" : "cursor-default"} ${
+                    isYou ? "ring-1 ring-primary/50" : ""
                   }`}
                 >
                   <RankBadge rank={e.rank} />
@@ -192,10 +192,10 @@ export default function Workspace() {
                         <Badge className="text-[9px] px-1.5 py-0 uppercase" variant="outline">You</Badge>
                       )}
                       {e.currentStreakType === "win" && e.currentStreak >= 2 && (
-                        <Flame className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                        <Flame className="h-4 w-4 text-[#ff9900] drop-shadow-[0_0_6px_rgba(255,153,0,0.8)] shrink-0" />
                       )}
                       {e.currentStreakType === "loss" && e.currentStreak >= 2 && (
-                        <Snowflake className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                        <Snowflake className="h-4 w-4 text-chart-3 drop-shadow-[0_0_6px_hsl(var(--chart-3)/0.8)] shrink-0" />
                       )}
                       {e.badges.length > 0 && (
                         <span className="flex shrink-0 items-center gap-0.5 text-sm leading-none" data-testid={`badges-user-${e.userId}`}>
@@ -216,7 +216,7 @@ export default function Workspace() {
                   <div className="text-right shrink-0 w-20">
                     <div
                       className={`font-mono text-sm font-bold ${
-                        e.profit > 0 ? "text-green-500" : e.profit < 0 ? "text-red-500" : ""
+                        e.profit > 0 ? "text-chart-1 text-glow-success" : e.profit < 0 ? "text-chart-2 text-glow-destructive" : ""
                       }`}
                     >
                       {e.profit > 0 ? "+" : ""}{formatCurrency(e.profit, false)}
@@ -241,8 +241,8 @@ export default function Workspace() {
         <div className="space-y-4" data-testid="section-head-to-head">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Swords className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold tracking-tight">You vs. {them.userName}</h2>
+              <Swords className="h-6 w-6 text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
+              <h2 className="text-2xl font-bold tracking-tight text-glow-primary">You vs. {them.userName}</h2>
             </div>
             <button
               type="button"

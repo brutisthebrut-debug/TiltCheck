@@ -228,43 +228,43 @@ export default function Bankroll() {
                 <div className="text-5xl md:text-6xl font-bold font-mono text-primary">
                   {formatCurrency(bankroll.currentBalance)}
                 </div>
-                <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium px-3 py-1 rounded-full bg-background border">
+                <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-full bg-background border border-border/80 shadow-inner">
                   <span>Net P/L:</span>
-                  <span className={bankroll.netProfitLoss > 0 ? "text-green-500" : bankroll.netProfitLoss < 0 ? "text-red-500" : ""}>
+                  <span className={bankroll.netProfitLoss > 0 ? "text-chart-1 font-bold text-glow-success" : bankroll.netProfitLoss < 0 ? "text-chart-2 font-bold text-glow-destructive" : ""}>
                     {bankroll.netProfitLoss > 0 ? '+' : ''}{formatCurrency(bankroll.netProfitLoss)}
                   </span>
                 </div>
               </div>
               
-              <div className="w-full md:w-px md:h-32 bg-border"></div>
+              <div className="w-full md:w-px md:h-32 bg-primary/20"></div>
               
               <div className="grid grid-cols-2 gap-x-8 gap-y-6 text-center md:text-left w-full md:w-auto">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <div className="text-xs text-primary/80 uppercase tracking-wider mb-1 flex items-center justify-center md:justify-start gap-1 font-bold">
                     Starting Balance
                     <button 
                       onClick={() => { setNewStartingBankroll(String(bankroll.startingBalance)); setIsEditBankrollOpen(true) }}
-                      className="text-muted-foreground/50 hover:text-muted-foreground transition-colors ml-1"
+                      className="text-primary/50 hover:text-primary transition-colors ml-1"
                       title="Edit starting bankroll"
                     >
                       <Pencil className="h-3 w-3" />
                     </button>
                   </div>
-                  <div className="text-xl font-mono font-medium">{formatCurrency(bankroll.startingBalance)}</div>
+                  <div className="text-xl font-mono font-bold text-foreground">{formatCurrency(bankroll.startingBalance)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total ROI</div>
-                  <div className={`text-xl font-mono font-bold ${bankroll.roi > 0 ? 'text-green-500' : bankroll.roi < 0 ? 'text-red-500' : ''}`}>
+                  <div className="text-xs text-primary/80 uppercase tracking-wider mb-1 font-bold">Total ROI</div>
+                  <div className={`text-xl font-mono font-bold ${bankroll.roi > 0 ? 'text-chart-1' : bankroll.roi < 0 ? 'text-chart-2' : 'text-foreground'}`}>
                     {bankroll.roi > 0 ? '+' : ''}{bankroll.roi.toFixed(1)}%
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1"><ArrowUpRight className="h-3 w-3 text-green-500"/> Deposited</div>
-                  <div className="text-lg font-mono">{formatCurrency(bankroll.totalDeposited)}</div>
+                  <div className="text-xs text-primary/80 uppercase tracking-wider mb-1 flex items-center justify-center md:justify-start gap-1 font-bold"><ArrowUpRight className="h-3 w-3 text-chart-1"/> Deposited</div>
+                  <div className="text-lg font-mono font-bold text-foreground">{formatCurrency(bankroll.totalDeposited)}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1"><ArrowDownRight className="h-3 w-3 text-red-500"/> Withdrawn</div>
-                  <div className="text-lg font-mono">{formatCurrency(bankroll.totalWithdrawn)}</div>
+                  <div className="text-xs text-primary/80 uppercase tracking-wider mb-1 flex items-center justify-center md:justify-start gap-1 font-bold"><ArrowDownRight className="h-3 w-3 text-chart-2"/> Withdrawn</div>
+                  <div className="text-lg font-mono font-bold text-foreground">{formatCurrency(bankroll.totalWithdrawn)}</div>
                 </div>
               </div>
             </div>
@@ -308,12 +308,12 @@ export default function Bankroll() {
                   <div key={tx.id} className="flex items-center justify-between py-3 border-b last:border-0 last:pb-0">
                     <div className="flex items-center gap-4">
                       <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        tx.type === 'deposit' ? 'bg-green-500/10 text-green-500' :
-                        tx.type === 'withdraw' ? 'bg-red-500/10 text-red-500' :
-                        tx.type === 'bet_win' ? 'bg-primary/10 text-primary' :
+                        tx.type === 'deposit' ? 'bg-chart-1/10 text-chart-1 ring-1 ring-chart-1/30' :
+                        tx.type === 'withdraw' ? 'bg-chart-2/10 text-chart-2 ring-1 ring-chart-2/30' :
+                        tx.type === 'bet_win' ? 'bg-primary/10 text-primary ring-1 ring-primary/30' :
                         tx.type === 'bet_loss' ? 'bg-muted text-muted-foreground' :
-                        tx.type === 'bet_void' ? 'bg-blue-500/10 text-blue-500' :
-                        'bg-blue-500/10 text-blue-500'
+                        tx.type === 'bet_void' ? 'bg-chart-3/10 text-chart-3 ring-1 ring-chart-3/30' :
+                        'bg-chart-3/10 text-chart-3 ring-1 ring-chart-3/30'
                       }`}>
                         {tx.type === 'deposit' ? <ArrowUpRight className="h-5 w-5" /> :
                          tx.type === 'withdraw' ? <ArrowDownRight className="h-5 w-5" /> :
@@ -333,7 +333,7 @@ export default function Bankroll() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className={`font-mono font-bold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                      <div className={`font-mono font-bold ${isPositive ? 'text-chart-1 text-glow-success' : 'text-chart-2 text-glow-destructive'}`}>
                         {isPositive ? '+' : tx.type === 'withdraw' || tx.type === 'bet_loss' ? '-' : ''}
                         {formatCurrency(Math.abs(Number(tx.amount)))}
                       </div>

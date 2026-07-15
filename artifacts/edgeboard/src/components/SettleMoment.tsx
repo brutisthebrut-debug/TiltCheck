@@ -51,13 +51,13 @@ export function SettleMoment({ moment, onDone }: { moment: SettleMomentData | nu
 
   const confetti = useMemo(() => {
     if (!moment || moment.kind !== "won") return []
-    return Array.from({ length: 24 }, (_, i) => ({
+    return Array.from({ length: 30 }, (_, i) => ({
       id: i,
-      x: (i / 24) * 100 + ((i * 37) % 11) - 5,
+      x: (i / 30) * 100 + ((i * 37) % 11) - 5,
       delay: ((i * 13) % 7) / 10,
       color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
       rotate: ((i * 53) % 360) - 180,
-      size: 6 + ((i * 17) % 6),
+      size: 8 + ((i * 17) % 8),
     }))
   }, [moment])
 
@@ -92,49 +92,55 @@ export function SettleMoment({ moment, onDone }: { moment: SettleMomentData | nu
           )}
 
           <motion.div
-            className="max-w-sm w-full rounded-2xl border bg-card px-6 py-8 text-center shadow-2xl"
-            style={{ borderColor: moment.kind === "won" ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.12)" }}
+            className="max-w-sm w-full rounded-2xl border bg-card px-8 py-10 text-center shadow-2xl relative overflow-hidden"
+            style={{ 
+              borderColor: moment.kind === "won" ? "hsl(var(--chart-1)/0.5)" : "hsl(var(--chart-2)/0.4)",
+              boxShadow: moment.kind === "won" ? "0 0 40px hsl(var(--chart-1)/0.3)" : "0 0 40px hsl(var(--chart-2)/0.2)"
+            }}
             initial={{ scale: 0.7, y: 24, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 24 }}
           >
+            {moment.kind === "won" && <div className="absolute inset-0 bg-gradient-to-t from-chart-1/5 to-transparent pointer-events-none" />}
+            {moment.kind === "lost" && <div className="absolute inset-0 bg-gradient-to-t from-chart-2/5 to-transparent pointer-events-none" />}
+            
             {moment.kind === "won" ? (
-              <>
+              <div className="relative z-10">
                 <motion.div
-                  className="text-5xl mb-3"
+                  className="text-6xl mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]"
                   initial={{ scale: 0 }}
-                  animate={{ scale: [0, 1.3, 1] }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
+                  animate={{ scale: [0, 1.4, 1] }}
+                  transition={{ duration: 0.6, delay: 0.1 }}
                   aria-hidden
                 >
                   💰
                 </motion.div>
-                <div className="text-xl font-bold text-green-500">{pickLine(WIN_LINES, seed)}</div>
+                <div className="text-2xl font-bold text-chart-1 text-glow-success">{pickLine(WIN_LINES, seed)}</div>
                 {typeof moment.profit === "number" && moment.profit > 0 && (
                   <motion.div
-                    className="mt-2 font-mono text-3xl font-bold text-green-500"
+                    className="mt-3 font-mono text-4xl font-bold text-chart-1 drop-shadow-[0_0_8px_hsl(var(--chart-1)/0.6)]"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
+                    transition={{ delay: 0.3 }}
                     data-testid="settle-moment-profit"
                   >
                     +{formatCurrency(moment.profit)}
                   </motion.div>
                 )}
-              </>
+              </div>
             ) : (
-              <>
-                <div className="text-3xl mb-3" aria-hidden>
+              <div className="relative z-10">
+                <div className="text-5xl mb-4 opacity-80" aria-hidden>
                   🪦
                 </div>
-                <div className="text-lg font-semibold text-muted-foreground">{pickLine(LOSS_LINES, seed)}</div>
+                <div className="text-xl font-bold text-chart-2 text-glow-destructive">{pickLine(LOSS_LINES, seed)}</div>
                 {typeof moment.lost === "number" && moment.lost > 0 && (
-                  <div className="mt-2 font-mono text-xl font-medium text-red-500/80">-{formatCurrency(moment.lost)}</div>
+                  <div className="mt-3 font-mono text-2xl font-bold text-chart-2/80 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.4)]">-{formatCurrency(moment.lost)}</div>
                 )}
-              </>
+              </div>
             )}
-            <div className="mt-4 text-[11px] uppercase tracking-wider text-muted-foreground/60">tap anywhere to continue</div>
+            <div className="relative z-10 mt-6 text-[10px] uppercase tracking-widest text-muted-foreground font-mono">tap anywhere to continue</div>
           </motion.div>
         </motion.div>
       )}

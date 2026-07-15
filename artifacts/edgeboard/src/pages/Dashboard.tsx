@@ -192,13 +192,13 @@ export default function Dashboard() {
 
       {/* Habit streaks — showing up and grading honestly, gamified */}
       {streaks && (
-        <div className="grid grid-cols-2 gap-3" data-testid="streak-strip">
-          <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-4 py-3">
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${streaks.loggingStreakDays > 0 ? 'bg-orange-500/15' : 'bg-muted'}`}>
-              <Flame className={`h-5 w-5 ${streaks.loggingStreakDays > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} />
+        <div className="grid grid-cols-2 gap-4" data-testid="streak-strip">
+          <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-all ${streaks.loggingStreakDays > 0 ? 'border-[#ff9900]/50 bg-[#ff9900]/10 glow-amber' : 'border-border/60 bg-card'}`}>
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${streaks.loggingStreakDays > 0 ? 'bg-[#ff9900]/20' : 'bg-muted'}`}>
+              <Flame className={`h-5 w-5 ${streaks.loggingStreakDays > 0 ? 'text-[#ff9900] drop-shadow-[0_0_8px_rgba(255,153,0,0.8)]' : 'text-muted-foreground'}`} />
             </div>
             <div className="min-w-0">
-              <div className="font-mono text-lg font-bold leading-tight" data-testid="text-logging-streak">
+              <div className={`font-mono text-xl font-bold leading-tight ${streaks.loggingStreakDays > 0 ? 'text-[#ff9900] text-glow-warning' : ''}`} data-testid="text-logging-streak">
                 {streaks.loggingStreakDays} {streaks.loggingStreakDays === 1 ? 'day' : 'days'}
               </div>
               <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -206,12 +206,12 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card px-4 py-3">
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${streaks.overdueCount === 0 ? 'bg-primary/15' : 'bg-amber-500/15'}`}>
-              <NotebookPen className={`h-5 w-5 ${streaks.overdueCount === 0 ? 'text-primary' : 'text-amber-500'}`} />
+          <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 transition-all ${streaks.overdueCount > 0 ? 'border-chart-2/50 bg-chart-2/10 glow-destructive' : 'border-primary/40 bg-primary/10 glow-primary'}`}>
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${streaks.overdueCount === 0 ? 'bg-primary/20' : 'bg-chart-2/20'}`}>
+              <NotebookPen className={`h-5 w-5 ${streaks.overdueCount === 0 ? 'text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]' : 'text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.6)]'}`} />
             </div>
             <div className="min-w-0">
-              <div className="font-mono text-lg font-bold leading-tight" data-testid="text-settle-streak">
+              <div className={`font-mono text-xl font-bold leading-tight ${streaks.overdueCount > 0 ? 'text-chart-2 text-glow-destructive' : 'text-primary text-glow-primary'}`} data-testid="text-settle-streak">
                 {streaks.overdueCount > 0
                   ? `${streaks.overdueCount} overdue`
                   : `${streaks.settleStreakDays} ${streaks.settleStreakDays === 1 ? 'day' : 'days'}`}
@@ -227,18 +227,19 @@ export default function Dashboard() {
       {/* Weekly recap teaser */}
       {recapUnseen && (
         <Link href="/recap" data-testid="card-recap-teaser" className="block">
-          <Card className="border-primary/30 bg-primary/5 transition-colors hover:bg-primary/10">
-            <CardContent className="flex items-center gap-3 py-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15">
-                <Newspaper className="h-5 w-5 text-primary" />
+          <Card className="border-chart-5/50 bg-chart-5/10 glow-purple transition-all duration-300 hover:scale-[1.01] hover:bg-chart-5/20 cursor-pointer relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-chart-5/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+            <CardContent className="flex items-center gap-4 py-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-chart-5/20 ring-1 ring-chart-5/50">
+                <Newspaper className="h-6 w-6 text-chart-5 drop-shadow-[0_0_8px_hsl(var(--chart-5)/0.8)]" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">Your weekly recap is ready</div>
-                <div className="text-xs text-muted-foreground truncate">
+                <div className="text-base font-bold text-glow-purple text-chart-5">Your weekly tape is ready</div>
+                <div className="text-xs text-foreground/80 mt-1">
                   Last week's wins, leaks, and the crew's highlights — plainly stated.
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
+              <ArrowRight className="h-5 w-5 shrink-0 text-chart-5" />
             </CardContent>
           </Card>
         </Link>
@@ -246,21 +247,21 @@ export default function Dashboard() {
 
       {/* Needs settling — overdue pending plays. Hidden when settled up. */}
       {needsSettling && needsSettling.count > 0 && (
-        <Card className="border-amber-500/30 bg-amber-500/5" data-testid="card-needs-settling">
+        <Card className="border-[#ff9900]/40 bg-[#ff9900]/10 glow-amber" data-testid="card-needs-settling">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <AlarmClock className="h-5 w-5 text-amber-500" />
-              <CardTitle className="text-base">
+              <AlarmClock className="h-5 w-5 text-[#ff9900] drop-shadow-[0_0_8px_rgba(255,153,0,0.8)]" />
+              <CardTitle className="text-base text-[#ff9900] text-glow-warning">
                 {needsSettling.count} {needsSettling.count === 1 ? 'play needs' : 'plays need'} settling
               </CardTitle>
             </div>
-            <CardDescription>These games are over — grade them to keep your record honest.</CardDescription>
+            <CardDescription className="text-foreground/80">These games are over — grade them to keep your record honest.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {needsSettling.bets.map((bet) => (
               <div
                 key={`bet-${bet.id}`}
-                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-background/60 border border-border/50"
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-card border border-border/80"
                 data-testid={`row-needs-settling-bet-${bet.id}`}
               >
                 <div className="min-w-0">
@@ -277,7 +278,7 @@ export default function Dashboard() {
             {needsSettling.parlays.map((parlay) => (
               <div
                 key={`parlay-${parlay.id}`}
-                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-background/60 border border-border/50"
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-card border border-border/80"
                 data-testid={`row-needs-settling-parlay-${parlay.id}`}
               >
                 <div className="min-w-0">
@@ -306,14 +307,14 @@ export default function Dashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-primary">
+            <div className="text-2xl font-bold font-mono text-primary text-glow-primary">
               {formatCurrency(bankroll?.currentBalance ?? 0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
               {stats && stats.totalProfit >= 0 ? (
-                <span className="text-green-500 flex items-center"><TrendingUp className="h-3 w-3 mr-1"/>{formatCurrency(stats.totalProfit)} all-time</span>
+                <span className="text-chart-1 flex items-center text-glow-success"><TrendingUp className="h-3 w-3 mr-1"/>{formatCurrency(stats.totalProfit)} all-time</span>
               ) : (
-                <span className="text-red-500 flex items-center"><TrendingDown className="h-3 w-3 mr-1"/>{formatCurrency(stats?.totalProfit ?? 0)} all-time</span>
+                <span className="text-chart-2 flex items-center text-glow-destructive"><TrendingDown className="h-3 w-3 mr-1"/>{formatCurrency(stats?.totalProfit ?? 0)} all-time</span>
               )}
             </p>
           </CardContent>
@@ -340,7 +341,7 @@ export default function Dashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold font-mono ${stats && stats.roi > 0 ? 'text-green-500' : stats && stats.roi < 0 ? 'text-red-500' : ''}`}>
+            <div className={`text-2xl font-bold font-mono ${stats && stats.roi > 0 ? 'text-chart-1 text-glow-success' : stats && stats.roi < 0 ? 'text-chart-2 text-glow-destructive' : ''}`}>
               {stats?.roi != null && stats.roi > 0 ? '+' : ''}{(stats?.roi ?? 0).toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -353,9 +354,9 @@ export default function Dashboard() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
             {stats?.currentStreakType === 'win' ? (
-              <Flame className="h-4 w-4 text-orange-500" />
+              <Flame className="h-4 w-4 text-[#ff9900] drop-shadow-[0_0_6px_rgba(255,153,0,0.8)]" />
             ) : stats?.currentStreakType === 'loss' ? (
-              <Snowflake className="h-4 w-4 text-blue-400" />
+              <Snowflake className="h-4 w-4 text-chart-3 drop-shadow-[0_0_6px_hsl(var(--chart-3)/0.8)]" />
             ) : (
               <Activity className="h-4 w-4 text-muted-foreground" />
             )}
@@ -398,7 +399,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
                         <span>{formatCurrency(item.stake, false)}</span>
                         {item.profit !== null && item.profit !== undefined && (
-                          <span className={item.profit > 0 ? "text-green-500" : item.profit < 0 ? "text-red-500" : ""}>
+                          <span className={item.profit > 0 ? "text-chart-1 font-bold" : item.profit < 0 ? "text-chart-2 font-bold" : ""}>
                             {item.profit > 0 ? '+' : ''}{formatCurrency(item.profit, false)}
                           </span>
                         )}
@@ -436,18 +437,18 @@ export default function Dashboard() {
               <div className="space-y-4">
                 {/* Stats row */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="flex flex-col items-center p-3 rounded-lg bg-background/60 border border-border/50 text-center">
+                  <div className="flex flex-col items-center p-3 rounded-lg bg-card border border-border/80 text-center">
                     <ClipboardList className="h-4 w-4 text-primary mb-1" />
                     <div className="text-xl font-bold font-mono">{allPending.length}</div>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Pending</div>
                   </div>
-                  <div className="flex flex-col items-center p-3 rounded-lg bg-background/60 border border-border/50 text-center">
-                    <DollarSign className="h-4 w-4 text-amber-500 mb-1" />
+                  <div className="flex flex-col items-center p-3 rounded-lg bg-card border border-border/80 text-center">
+                    <DollarSign className="h-4 w-4 text-[#ff9900] mb-1" />
                     <div className="text-lg font-bold font-mono">{formatCurrency(totalExposure, false)}</div>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Exposure</div>
                   </div>
-                  <div className="flex flex-col items-center p-3 rounded-lg bg-background/60 border border-border/50 text-center">
-                    <CalendarDays className="h-4 w-4 text-blue-400 mb-1" />
+                  <div className="flex flex-col items-center p-3 rounded-lg bg-card border border-border/80 text-center">
+                    <CalendarDays className="h-4 w-4 text-chart-3 mb-1" />
                     <div className="text-xl font-bold font-mono">{todayEvents}</div>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Today</div>
                   </div>
@@ -455,16 +456,16 @@ export default function Dashboard() {
 
                 {/* Top confidence play */}
                 {highestConf && (
-                  <div className="p-3 rounded-lg bg-background/60 border border-primary/30 space-y-1">
-                    <div className="flex items-center gap-1 text-[10px] text-primary uppercase tracking-wider font-semibold">
-                      <Star className="h-3 w-3 fill-primary" /> Top Conviction Play
+                  <div className="p-4 rounded-lg bg-primary/10 border border-primary/40 space-y-1 glow-primary transition-all">
+                    <div className="flex items-center gap-1 text-[10px] text-primary uppercase tracking-wider font-bold">
+                      <Star className="h-3.5 w-3.5 fill-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.8)]" /> Top Conviction Play
                     </div>
-                    <div className="font-semibold text-sm truncate">
+                    <div className="font-bold text-sm truncate pt-1">
                       {highestConf._type === 'bet' ? (highestConf as any).pick : (highestConf as any).name}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">{highestConf.event}</div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="font-mono text-primary">{highestConf.confidenceScore}/10 confidence</span>
+                    <div className="text-xs text-foreground/80 truncate">{highestConf.event}</div>
+                    <div className="flex items-center gap-2 text-xs mt-1">
+                      <span className="font-mono font-bold text-primary">{highestConf.confidenceScore}/10 confidence</span>
                       <span className="text-muted-foreground">·</span>
                       <span className="font-mono">{formatCurrency(Number(highestConf.stake))} at stake</span>
                     </div>
@@ -504,16 +505,16 @@ export default function Dashboard() {
                   key={b.id}
                   data-testid={`badge-${b.id}`}
                   title={b.description}
-                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 ${
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 transition-all ${
                     b.earnedAt
-                      ? 'border-primary/30 bg-primary/5'
-                      : 'border-border/50 bg-background/40 opacity-45 grayscale'
+                      ? 'border-yellow-500/50 bg-yellow-500/10 glow-amber hover:scale-105'
+                      : 'border-border/50 bg-card opacity-40 grayscale'
                   }`}
                 >
-                  <span className="text-xl leading-none">{b.emoji}</span>
+                  <span className={`text-2xl leading-none ${b.earnedAt ? 'drop-shadow-[0_0_8px_rgba(234,179,8,0.6)]' : ''}`}>{b.emoji}</span>
                   <div className="min-w-0">
-                    <div className="truncate text-xs font-semibold">{b.name}</div>
-                    <div className="truncate text-[10px] text-muted-foreground">
+                    <div className={`truncate text-sm font-bold ${b.earnedAt ? 'text-yellow-500 text-glow-warning' : ''}`}>{b.name}</div>
+                    <div className="truncate text-[10px] text-foreground/70 uppercase tracking-widest font-mono mt-0.5">
                       {b.earnedAt ? formatDate(b.earnedAt) : 'Locked'}
                     </div>
                   </div>

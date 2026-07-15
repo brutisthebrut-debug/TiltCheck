@@ -50,9 +50,10 @@ const STEPS = [
 /** Stylized, hand-built preview of the in-app dashboard (no real data). */
 function DashboardMock() {
   return (
-    <div className="w-full max-w-3xl rounded-xl border border-border/60 bg-card/80 shadow-[0_0_60px_-20px_hsl(220_90%_60%/0.35)] overflow-hidden text-left">
+    <div className="w-full max-w-3xl rounded-xl border border-primary/40 bg-card/80 shadow-[0_0_80px_-20px_hsl(var(--primary)/0.4)] overflow-hidden text-left relative">
+      <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent pointer-events-none" />
       {/* Window chrome */}
-      <div className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
+      <div className="relative z-10 flex items-center gap-2 border-b border-border/60 px-4 py-2.5 bg-background/50 backdrop-blur-sm">
         <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-green-500/70" />
@@ -155,7 +156,7 @@ export default function Landing() {
           </div>
 
           <h1 className="max-w-3xl text-4xl md:text-6xl font-bold leading-tight tracking-tight">
-            Your record says <span className="text-primary">50/50</span>.
+            Your record says <span className="text-primary text-glow-primary">50/50</span>.
             <br />
             Your reasoning knows better.
           </h1>

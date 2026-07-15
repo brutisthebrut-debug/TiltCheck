@@ -144,26 +144,29 @@ export default function Recap() {
       ) : (
         <div className="space-y-4">
           {/* Your record */}
-          <Card data-testid="card-recap-record">
+          <Card data-testid="card-recap-record" className="border-primary/30 bg-primary/10 glow-primary relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+              <Trophy className="h-32 w-32" />
+            </div>
             <CardHeader className="pb-2">
-              <CardDescription className="uppercase tracking-wider text-[11px]">Your week</CardDescription>
-              <CardTitle className="text-3xl font-mono">
+              <CardDescription className="uppercase tracking-wider text-[11px] text-primary/80 font-bold">Your week</CardDescription>
+              <CardTitle className="text-4xl font-mono text-glow-primary">
                 {p!.wins}-{p!.losses}{p!.pushes > 0 ? `-${p!.pushes}` : ""}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-3">
               <div className="flex items-baseline gap-3 flex-wrap font-mono">
-                <span className={`text-xl font-bold ${p!.profit > 0 ? "text-green-500" : p!.profit < 0 ? "text-red-500" : ""}`}>
+                <span className={`text-2xl font-bold ${p!.profit > 0 ? "text-chart-1 text-glow-success" : p!.profit < 0 ? "text-chart-2 text-glow-destructive" : ""}`}>
                   {p!.profit > 0 ? "+" : ""}{formatCurrency(p!.profit)}
                 </span>
                 {p!.settledCount > 0 && (
                   <>
-                    <span className="text-sm text-muted-foreground">{units > 0 ? "+" : ""}{units.toFixed(1)}u</span>
-                    <span className="text-sm text-muted-foreground">{p!.roi > 0 ? "+" : ""}{p!.roi.toFixed(1)}% ROI</span>
+                    <span className="text-sm text-foreground/80">{units > 0 ? "+" : ""}{units.toFixed(1)}u</span>
+                    <span className="text-sm text-foreground/80">{p!.roi > 0 ? "+" : ""}{p!.roi.toFixed(1)}% ROI</span>
                   </>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">{recordLine}</p>
+              <p className="text-sm font-medium text-foreground/90">{recordLine}</p>
             </CardContent>
           </Card>
 
@@ -231,55 +234,55 @@ export default function Recap() {
 
           {/* Best win */}
           {p!.bestWin && (
-            <Card className="border-green-500/20 bg-green-500/5" data-testid="card-recap-best-win">
+            <Card className="border-chart-1/40 bg-chart-1/10 glow-success" data-testid="card-recap-best-win">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-green-500" />
-                  <CardDescription className="uppercase tracking-wider text-[11px]">Best call</CardDescription>
+                  <Trophy className="h-5 w-5 text-chart-1 drop-shadow-[0_0_8px_hsl(var(--chart-1)/0.8)]" />
+                  <CardDescription className="uppercase tracking-wider text-[11px] font-bold text-chart-1/80">Best call</CardDescription>
                 </div>
-                <CardTitle className="text-base">{p!.bestWin.title}</CardTitle>
+                <CardTitle className="text-lg">{p!.bestWin.title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="font-mono text-lg font-bold text-green-500">+{formatCurrency(p!.bestWin.amount)}</p>
-                <p className="text-xs text-muted-foreground mt-1">At {formatOdds(p!.bestWin.odds)}. This is the one you'll bring up all month.</p>
+                <p className="font-mono text-2xl font-bold text-chart-1 text-glow-success">+{formatCurrency(p!.bestWin.amount)}</p>
+                <p className="text-xs text-foreground/80 mt-2">At {formatOdds(p!.bestWin.odds)}. This is the one you'll bring up all month.</p>
               </CardContent>
             </Card>
           )}
 
           {/* Worst beat */}
           {p!.worstBeat && (
-            <Card className="border-red-500/20 bg-red-500/5" data-testid="card-recap-worst-beat">
+            <Card className="border-chart-2/40 bg-chart-2/10 glow-destructive" data-testid="card-recap-worst-beat">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
-                  <Skull className="h-4 w-4 text-red-500" />
-                  <CardDescription className="uppercase tracking-wider text-[11px]">Worst beat</CardDescription>
+                  <Skull className="h-5 w-5 text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.8)]" />
+                  <CardDescription className="uppercase tracking-wider text-[11px] font-bold text-chart-2/80">Worst beat</CardDescription>
                 </div>
-                <CardTitle className="text-base">{p!.worstBeat.title}</CardTitle>
+                <CardTitle className="text-lg">{p!.worstBeat.title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="font-mono text-lg font-bold text-red-500">{formatCurrency(p!.worstBeat.amount)}</p>
-                <p className="text-xs text-muted-foreground mt-1">At {formatOdds(p!.worstBeat.odds)}. We don't have to talk about it. But it's staying in the record.</p>
+                <p className="font-mono text-2xl font-bold text-chart-2 text-glow-destructive">{formatCurrency(p!.worstBeat.amount)}</p>
+                <p className="text-xs text-foreground/80 mt-2">At {formatOdds(p!.worstBeat.odds)}. We don't have to talk about it. But it's staying in the record.</p>
               </CardContent>
             </Card>
           )}
 
           {/* The leak */}
           {p!.leak && (
-            <Card className="border-amber-500/20 bg-amber-500/5" data-testid="card-recap-leak">
+            <Card className="border-[#ff9900]/40 bg-[#ff9900]/10 glow-amber" data-testid="card-recap-leak">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
-                  <Droplets className="h-4 w-4 text-amber-500" />
-                  <CardDescription className="uppercase tracking-wider text-[11px]">The leak</CardDescription>
+                  <Droplets className="h-5 w-5 text-[#ff9900] drop-shadow-[0_0_8px_rgba(255,153,0,0.8)]" />
+                  <CardDescription className="uppercase tracking-wider text-[11px] font-bold text-[#ff9900]/80">The leak</CardDescription>
                 </div>
-                <CardTitle className="text-base">
+                <CardTitle className="text-lg text-glow-warning text-[#ff9900]">
                   {p!.leak.kind === "sport" && <>You lose money on {p!.leak.label}.</>}
                   {p!.leak.kind === "parlays" && <>Parlays are not your friend.</>}
                   {p!.leak.kind === "miss_reason" && <>Your money is leaking to {MISS_REASON_PHRASES[p!.leak.label] ?? p!.leak.label}.</>}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="font-mono text-lg font-bold text-amber-500">{formatCurrency(p!.leak.amount)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="font-mono text-2xl font-bold text-[#ff9900] text-glow-warning">{formatCurrency(p!.leak.amount)}</p>
+                <p className="text-xs text-foreground/80 mt-2">
                   {p!.leak.count} losing {p!.leak.count === 1 ? "play" : "plays"} this week. Plainly stated so you can't unsee it.
                 </p>
               </CardContent>
@@ -301,19 +304,19 @@ export default function Recap() {
           ) : (
             <div className="space-y-3">
               {recap.crew.winner && (
-                <Card data-testid="card-recap-crew-winner">
-                  <CardContent className="flex items-center gap-3 py-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15">
-                      <Crown className="h-5 w-5 text-primary" />
+                <Card data-testid="card-recap-crew-winner" className="border-chart-1/30 bg-chart-1/5 glow-success transition-all hover:bg-chart-1/10">
+                  <CardContent className="flex items-center gap-4 py-5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-chart-1/15 ring-1 ring-chart-1/40">
+                      <Crown className="h-6 w-6 text-chart-1 drop-shadow-[0_0_8px_hsl(var(--chart-1)/0.8)]" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold truncate">
+                      <div className="text-base font-bold truncate text-chart-1 text-glow-success">
                         {recap.crew.winner.userName} won the week
                         {recap.crew.winner.userId === activeUser.id ? " (that's you)" : ""}
                       </div>
-                      <div className="text-xs text-muted-foreground font-mono">
+                      <div className="text-xs text-foreground/80 font-mono mt-1">
                         {recap.crew.winner.wins}-{recap.crew.winner.losses} ·{" "}
-                        <span className={recap.crew.winner.profit >= 0 ? "text-green-500" : "text-red-500"}>
+                        <span className={recap.crew.winner.profit >= 0 ? "text-chart-1 font-bold" : "text-chart-2 font-bold"}>
                           {recap.crew.winner.profit > 0 ? "+" : ""}{formatCurrency(recap.crew.winner.profit)}
                         </span>
                         {recap.crew.winner.profit < 0 ? " — winning the week by losing the least" : ""}
@@ -323,34 +326,34 @@ export default function Recap() {
                 </Card>
               )}
               {recap.crew.biggestUpset && (
-                <Card data-testid="card-recap-crew-upset">
-                  <CardContent className="flex items-center gap-3 py-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-500/15">
-                      <Rocket className="h-5 w-5 text-green-500" />
+                <Card data-testid="card-recap-crew-upset" className="border-[#ff9900]/30 bg-[#ff9900]/5 glow-amber transition-all hover:bg-[#ff9900]/10">
+                  <CardContent className="flex items-center gap-4 py-5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#ff9900]/15 ring-1 ring-[#ff9900]/40">
+                      <Rocket className="h-6 w-6 text-[#ff9900] drop-shadow-[0_0_8px_rgba(255,153,0,0.8)]" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold truncate">
+                      <div className="text-base font-bold truncate text-[#ff9900] text-glow-warning">
                         {recap.crew.biggestUpset.userName} hit {formatOdds(recap.crew.biggestUpset.odds)}
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {recap.crew.biggestUpset.title} · <span className="font-mono text-green-500">+{formatCurrency(recap.crew.biggestUpset.amount)}</span>
+                      <div className="text-xs text-foreground/80 mt-1 truncate">
+                        {recap.crew.biggestUpset.title} · <span className="font-mono font-bold text-[#ff9900]">+{formatCurrency(recap.crew.biggestUpset.amount)}</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               )}
               {recap.crew.worstBeat && (
-                <Card data-testid="card-recap-crew-beat">
-                  <CardContent className="flex items-center gap-3 py-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15">
-                      <CloudRain className="h-5 w-5 text-red-500" />
+                <Card data-testid="card-recap-crew-beat" className="border-chart-2/30 bg-chart-2/5 glow-destructive transition-all hover:bg-chart-2/10">
+                  <CardContent className="flex items-center gap-4 py-5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-chart-2/15 ring-1 ring-chart-2/40">
+                      <CloudRain className="h-6 w-6 text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.8)]" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold truncate">
+                      <div className="text-base font-bold truncate text-chart-2 text-glow-destructive">
                         {recap.crew.worstBeat.userName} took the week's worst beat
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {recap.crew.worstBeat.title} · <span className="font-mono text-red-500">{formatCurrency(recap.crew.worstBeat.amount)}</span>
+                      <div className="text-xs text-foreground/80 mt-1 truncate">
+                        {recap.crew.worstBeat.title} · <span className="font-mono font-bold text-chart-2">{formatCurrency(recap.crew.worstBeat.amount)}</span>
                       </div>
                     </div>
                   </CardContent>

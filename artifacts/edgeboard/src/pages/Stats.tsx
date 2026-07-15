@@ -186,7 +186,7 @@ export default function Stats() {
             <CardTitle className="text-sm font-medium">Best Bet P/L</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-green-500">
+            <div className="text-2xl font-bold font-mono text-chart-1 text-glow-success">
               +{formatCurrency(summary.bestBetProfit)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Highest single payout</p>
@@ -360,18 +360,18 @@ export default function Stats() {
                   <>
                     <div className="rounded-md border p-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm font-medium">Sound reasoning</span>
+                        <CheckCircle2 className="h-5 w-5 text-chart-1 drop-shadow-[0_0_8px_hsl(var(--chart-1)/0.6)]" />
+                        <span className="text-sm font-bold text-chart-1 text-glow-success">Sound reasoning</span>
                       </div>
-                      <div className="text-2xl font-bold font-mono">{insights.soundReasoning.winRate.toFixed(1)}%</div>
+                      <div className="text-2xl font-bold font-mono text-foreground">{insights.soundReasoning.winRate.toFixed(1)}%</div>
                       <p className="text-xs text-muted-foreground mt-1">{insights.soundReasoning.wins} wins on {insights.soundReasoning.total} graded {insights.soundReasoning.total === 1 ? "bet" : "bets"}</p>
                     </div>
-                    <div className="rounded-md border p-4">
+                    <div className="rounded-md border p-4 bg-card hover:border-chart-2/40 transition-colors">
                       <div className="flex items-center gap-2 mb-1">
-                        <XCircle className="h-4 w-4 text-red-500" />
-                        <span className="text-sm font-medium">Flawed reasoning</span>
+                        <XCircle className="h-5 w-5 text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.6)]" />
+                        <span className="text-sm font-bold text-chart-2 text-glow-destructive">Flawed reasoning</span>
                       </div>
-                      <div className="text-2xl font-bold font-mono">{insights.flawedReasoning.winRate.toFixed(1)}%</div>
+                      <div className="text-2xl font-bold font-mono text-foreground">{insights.flawedReasoning.winRate.toFixed(1)}%</div>
                       <p className="text-xs text-muted-foreground mt-1">{insights.flawedReasoning.wins} wins on {insights.flawedReasoning.total} graded {insights.flawedReasoning.total === 1 ? "bet" : "bets"}</p>
                     </div>
                     {insights.soundReasoning.total > 0 && insights.flawedReasoning.total > 0 && insights.soundReasoning.winRate > insights.flawedReasoning.winRate && (
@@ -455,10 +455,10 @@ export default function Stats() {
                       <td className="px-4 py-3 text-right font-mono">{sport.wins}-{sport.losses}{sport.pushes > 0 ? `-${sport.pushes}` : ''}</td>
                       <td className="px-4 py-3 text-right font-mono">{sport.winRate.toFixed(1)}%</td>
                       <td className="px-4 py-3 text-right font-mono">{formatCurrency(sport.totalWagered, true)}</td>
-                      <td className={`px-4 py-3 text-right font-mono font-bold ${sport.profit > 0 ? 'text-green-500' : sport.profit < 0 ? 'text-red-500' : ''}`}>
+                      <td className={`px-4 py-3 text-right font-mono font-bold ${sport.profit > 0 ? 'text-chart-1' : sport.profit < 0 ? 'text-chart-2' : ''}`}>
                         {sport.profit > 0 ? '+' : ''}{formatCurrency(sport.profit, true)}
                       </td>
-                      <td className={`px-4 py-3 text-right font-mono ${sport.roi > 0 ? 'text-green-500' : sport.roi < 0 ? 'text-red-500' : ''}`}>
+                      <td className={`px-4 py-3 text-right font-mono ${sport.roi > 0 ? 'text-chart-1' : sport.roi < 0 ? 'text-chart-2' : ''}`}>
                         {sport.roi > 0 ? '+' : ''}{sport.roi.toFixed(1)}%
                       </td>
                     </tr>

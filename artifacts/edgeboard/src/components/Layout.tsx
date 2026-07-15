@@ -31,7 +31,7 @@ function NeedsSettlingBadge({ count, className = "" }: { count: number; classNam
   if (count <= 0) return null
   return (
     <span
-      className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-[10px] font-bold text-black leading-none ${className}`}
+      className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff9900] glow-amber text-[10px] font-bold text-black leading-none ${className}`}
       data-testid="badge-needs-settling"
       aria-label={`${count} plays need settling`}
     >
@@ -62,9 +62,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col bg-background md:flex-row dark">
       {/* Sidebar (Desktop) */}
       <aside className="hidden w-64 flex-col border-r bg-card md:flex">
-        <div className="flex h-16 items-center px-6 border-b">
-          <div className="flex items-center gap-2 font-mono font-bold tracking-tight text-primary">
-            <Layers className="h-6 w-6" />
+        <div className="flex h-16 items-center px-6 border-b border-border/50 bg-card/50 backdrop-blur-sm">
+          <div className="flex items-center gap-2 font-mono font-bold tracking-tight text-primary text-glow-primary">
+            <Layers className="h-6 w-6 drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
             <span className="text-xl">EDGEBOARD</span>
           </div>
         </div>
@@ -93,10 +93,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      ? "bg-primary/15 text-primary glow-primary border border-primary/30"
+                      : "text-muted-foreground border border-transparent hover:bg-accent hover:text-foreground"
                   }`}
                 >
                   <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
@@ -140,9 +140,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Header (Mobile) */}
-      <header className="flex h-14 items-center justify-between border-b bg-card px-4 md:hidden">
-        <div className="flex items-center gap-2 font-mono font-bold text-primary">
-          <Layers className="h-5 w-5" />
+      <header className="flex h-14 items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-md px-4 md:hidden">
+        <div className="flex items-center gap-2 font-mono font-bold text-primary text-glow-primary">
+          <Layers className="h-5 w-5 drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
           <span>EDGEBOARD</span>
         </div>
 
@@ -187,7 +187,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Bottom Nav (Mobile) — sits at the very bottom with safe-area inset */}
       <nav 
-        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t bg-card md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border/50 bg-card/90 backdrop-blur-md md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {navItems.slice(0, 6).map((item) => {
@@ -197,14 +197,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-1 pt-2 pb-1 text-[9px] font-medium transition-colors min-w-0 ${
+              className={`flex flex-col items-center gap-0.5 px-1 pt-2 pb-1 text-[9px] font-medium transition-all duration-200 min-w-0 ${
                 isActive
-                  ? "text-primary"
+                  ? "text-primary text-glow-primary"
                   : "text-muted-foreground"
               }`}
             >
               <span className="relative">
-                <item.icon className="h-5 w-5 shrink-0" />
+                <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]' : ''}`} />
                 {item.href === "/" && (
                   <NeedsSettlingBadge count={settleCount} className="absolute -top-1.5 -right-2.5" />
                 )}

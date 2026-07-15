@@ -143,50 +143,50 @@
   --elevate-1: rgba(255, 255, 255, 0.04);
   --elevate-2: rgba(255, 255, 255, 0.09);
 
-  /* Cockpit dark mode */
-  --background: 240 5% 6%;
-  --foreground: 0 0% 95%;
-  --border: 240 5% 20%;
-  --card: 240 5% 8%;
-  --card-foreground: 0 0% 95%;
-  --card-border: 240 5% 18%;
+  /* Electric/Competitive dark mode */
+  --background: 240 10% 4%;
+  --foreground: 0 0% 98%;
+  --border: 240 10% 12%;
+  --card: 240 10% 6%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 240 10% 14%;
   
-  --sidebar: 240 6% 4%;
-  --sidebar-foreground: 0 0% 95%;
-  --sidebar-border: 240 5% 12%;
-  --sidebar-primary: 220 90% 60%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 240 5% 12%;
-  --sidebar-accent-foreground: 0 0% 95%;
-  --sidebar-ring: 240 5% 20%;
+  --sidebar: 240 10% 4%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 240 10% 12%;
+  --sidebar-primary: 190 100% 50%;
+  --sidebar-primary-foreground: 240 10% 4%;
+  --sidebar-accent: 240 10% 12%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-ring: 240 10% 20%;
   
-  --popover: 240 6% 8%;
-  --popover-foreground: 0 0% 95%;
-  --popover-border: 240 5% 15%;
+  --popover: 240 10% 6%;
+  --popover-foreground: 0 0% 98%;
+  --popover-border: 240 10% 14%;
   
-  --primary: 220 90% 60%; /* Sharp blue */
-  --primary-foreground: 0 0% 100%;
+  --primary: 190 100% 50%; /* Electric Cyan */
+  --primary-foreground: 240 10% 4%;
   
-  --secondary: 240 5% 18%;
-  --secondary-foreground: 0 0% 95%;
+  --secondary: 240 10% 12%;
+  --secondary-foreground: 0 0% 98%;
   
-  --muted: 240 5% 12%;
+  --muted: 240 10% 12%;
   --muted-foreground: 240 5% 65%;
   
-  --accent: 240 5% 18%;
-  --accent-foreground: 0 0% 95%;
+  --accent: 240 10% 16%;
+  --accent-foreground: 0 0% 98%;
   
-  --destructive: 0 75% 55%;
+  --destructive: 340 100% 55%; /* Hot Pink */
   --destructive-foreground: 0 0% 100%;
   
-  --input: 240 5% 25%;
-  --ring: 220 90% 60%;
+  --input: 240 10% 12%;
+  --ring: 190 100% 50%;
   
-  --chart-1: 142 70% 45%; /* Green */
-  --chart-2: 0 75% 55%; /* Red */
-  --chart-3: 220 90% 60%; /* Blue */
-  --chart-4: 45 93% 47%; /* Orange */
-  --chart-5: 280 65% 60%; /* Purple */
+  --chart-1: 150 100% 50%; /* Neon Green */
+  --chart-2: 340 100% 55%; /* Hot Pink */
+  --chart-3: 190 100% 50%; /* Cyan */
+  --chart-4: 40 100% 50%; /* Neon Orange */
+  --chart-5: 270 100% 60%; /* Purple */
 
   --shadow-2xs: 0px 2px 0px 0px rgba(0,0,0,0.5);
   --shadow-xs: 0px 2px 0px 0px rgba(0,0,0,0.5);
@@ -266,5 +266,46 @@
   .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after {
     inset: -1px;
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.4);
+  }
+  .glow-destructive {
+    box-shadow: 0 0 15px hsl(var(--destructive) / 0.4);
+  }
+  .glow-success {
+    box-shadow: 0 0 15px hsl(var(--chart-1) / 0.4);
+  }
+  .glow-warning {
+    box-shadow: 0 0 15px hsl(var(--chart-4) / 0.4);
+  }
+  .glow-amber {
+    box-shadow: 0 0 15px hsl(40 100% 50% / 0.4);
+  }
+  
+  .text-glow-primary {
+    text-shadow: 0 0 10px hsl(var(--primary) / 0.6);
+  }
+  .text-glow-success {
+    text-shadow: 0 0 10px hsl(var(--chart-1) / 0.6);
+  }
+  .text-glow-destructive {
+    text-shadow: 0 0 10px hsl(var(--destructive) / 0.6);
+  }
+  .text-glow-warning {
+    text-shadow: 0 0 10px hsl(var(--chart-4) / 0.6);
+  }
+  .glow-purple {
+    box-shadow: 0 0 15px hsl(var(--chart-5) / 0.4);
+  }
+  .text-glow-purple {
+    text-shadow: 0 0 10px hsl(var(--chart-5) / 0.6);
+  }
+  
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
   }
 }

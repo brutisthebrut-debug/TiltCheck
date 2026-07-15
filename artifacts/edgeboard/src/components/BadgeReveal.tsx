@@ -19,7 +19,7 @@ export function BadgeReveal({ badge, onDone }: { badge: BadgeStatus | null; onDo
       {badge && (
         <motion.div
           key={badge.id}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 backdrop-blur-md"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -29,26 +29,27 @@ export function BadgeReveal({ badge, onDone }: { badge: BadgeStatus | null; onDo
           aria-live="polite"
         >
           <motion.div
-            className="mx-6 flex max-w-sm flex-col items-center gap-3 rounded-2xl border border-primary/30 bg-card px-8 py-10 text-center shadow-2xl"
+            className="mx-6 flex max-w-sm flex-col items-center gap-4 rounded-2xl border-2 border-yellow-500/50 bg-card px-8 py-10 text-center shadow-[0_0_60px_rgba(234,179,8,0.2)] glow-amber relative overflow-hidden"
             initial={{ scale: 0.7, y: 24 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 18 }}
           >
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+            <div className="absolute inset-0 bg-gradient-to-t from-yellow-500/10 to-transparent pointer-events-none" />
+            <div className="relative z-10 text-[11px] font-bold uppercase tracking-[0.2em] text-[#ff9900] text-glow-warning">
               Badge earned
             </div>
             <motion.div
-              className="text-6xl leading-none"
+              className="relative z-10 text-7xl leading-none drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]"
               initial={{ scale: 0, rotate: -20 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 12, delay: 0.15 }}
             >
               {badge.emoji}
             </motion.div>
-            <div className="text-xl font-bold">{badge.name}</div>
-            <p className="text-sm text-muted-foreground">{badge.description}</p>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+            <div className="relative z-10 text-2xl font-bold text-glow-primary">{badge.name}</div>
+            <p className="relative z-10 text-sm text-foreground/80 font-medium">{badge.description}</p>
+            <div className="relative z-10 mt-2 text-[10px] uppercase tracking-widest font-mono text-muted-foreground/60">
               Tap anywhere to dismiss
             </div>
           </motion.div>
