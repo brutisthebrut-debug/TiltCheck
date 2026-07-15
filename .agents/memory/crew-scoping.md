@@ -17,3 +17,5 @@ Related rules:
 - New signups deliberately start crewless (preserves their free slot to join a friend's crew); only the one-time bootstrap migration auto-enrolls.
 - Demo crew is isDemo=true; joins filter isDemo=false so its invite code can never link a real account.
 - Radix dropdowns in jsdom tests: open via keyDown Enter on the trigger, not click; no jest-dom matchers — use textContent/toBeTruthy.
+
+**Pro-gated routes in scope tests:** /stats/insights runs `requirePro` before any scope check — free test users get 402 regardless of target. To exercise crew-scoping on Pro routes, make the *viewer* a founder (founders pass the Pro gate).

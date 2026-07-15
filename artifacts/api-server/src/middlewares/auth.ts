@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { isConfiguredFounderEmail } from "../lib/founder";
+import { logger } from "../lib/logger";
 
 export type LocalUser = typeof usersTable.$inferSelect;
 
@@ -47,7 +48,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       .returning();
     if (promoted) {
       user = promoted;
-      console.info(`[founder] promoted user ${promoted.id} (${promoted.username}) via FOUNDER_EMAIL match`);
+      // Log the numeric id only — usernames are often derived from the email
+      // local part, so printing them would leak the address into the logs.
+      logger.info({ userId: promoted.id }, "founder: promoted via FOUNDER_EMAIL match");
     }
   }
 

@@ -567,7 +567,8 @@ export const getListUsersUrl = () => {
 }
 
 /**
- * @summary List all workspace users
+ * The bettors this session's social surfaces may show: your active crew's members (or just yourself when crewless) for real sessions, the fictional demo crew for demo sessions. Other users' startingBankroll is null — it's private to each bettor.
+ * @summary List crew-visible users
  */
 export const listUsers = async ( options?: RequestInit): Promise<User[]> => {
 
@@ -614,7 +615,7 @@ export type ListUsersQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List all workspace users
+ * @summary List crew-visible users
  */
 
 export function useListUsers<TData = Awaited<ReturnType<typeof listUsers>>, TError = ErrorType<unknown>>(

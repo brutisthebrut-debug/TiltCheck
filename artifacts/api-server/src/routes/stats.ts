@@ -20,7 +20,7 @@ import { assembleRecapFacts, generateRecapNarrative, NARRATIVE_MODEL } from "../
 import { logger } from "../lib/logger";
 import { requireProfile } from "../middlewares/auth";
 import { requirePro } from "../middlewares/billing";
-import { userScopeCondition, userInScope, userInSocialScope, getSocialUsers } from "../lib/scope";
+import { userScopeCondition, userInSocialScope, getSocialUsers } from "../lib/scope";
 import { isDemoRequest } from "../middlewares/demo";
 
 const router: IRouter = Router();
@@ -43,7 +43,9 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json(emptySummary(0)); return; }
     userId = u.id;
-  } else if (!(await userInScope(req, userId))) {
+  } else if (!(await userInSocialScope(req, userId))) {
+    // Crew scoping: another bettor's numbers are visible only within a
+    // shared crew (same policy as recap, badges, and streaks).
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -151,7 +153,9 @@ router.get("/stats/by-sport", async (req, res): Promise<void> => {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json([]); return; }
     userId = u.id;
-  } else if (!(await userInScope(req, userId))) {
+  } else if (!(await userInSocialScope(req, userId))) {
+    // Crew scoping: another bettor's numbers are visible only within a
+    // shared crew (same policy as recap, badges, and streaks).
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -265,7 +269,9 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json([]); return; }
     userId = u.id;
-  } else if (!(await userInScope(req, userId))) {
+  } else if (!(await userInSocialScope(req, userId))) {
+    // Crew scoping: another bettor's numbers are visible only within a
+    // shared crew (same policy as recap, badges, and streaks).
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -320,7 +326,9 @@ router.get("/stats/insights", requirePro, async (req, res): Promise<void> => {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
     if (!u) { res.json(emptyInsights); return; }
     userId = u.id;
-  } else if (!(await userInScope(req, userId))) {
+  } else if (!(await userInSocialScope(req, userId))) {
+    // Crew scoping: another bettor's numbers are visible only within a
+    // shared crew (same policy as recap, badges, and streaks).
     res.status(404).json({ error: "User not found" });
     return;
   }

@@ -150,7 +150,12 @@ paths:
     get:
       operationId: listUsers
       tags: [users]
-      summary: List all workspace users
+      summary: List crew-visible users
+      description: >-
+        The bettors this session's social surfaces may show: your active
+        crew's members (or just yourself when crewless) for real sessions,
+        the fictional demo crew for demo sessions. Other users'
+        startingBankroll is null — it's private to each bettor.
       responses:
         "200":
           description: List of users
@@ -1601,7 +1606,11 @@ components:
         avatarColor:
           type: string
         startingBankroll:
-          type: number
+          type: ["number", "null"]
+          description: >-
+            Starting bankroll is private — null when this row describes
+            another bettor in the user list. Always present on your own
+            profile (/users/me, claim, update) and on unclaimed profiles.
         createdAt:
           type: string
         recapSeenWeek:

@@ -24,7 +24,7 @@ export const GetCurrentUserResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
@@ -41,7 +41,7 @@ export const MarkRecapSeenResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
@@ -58,7 +58,7 @@ export const MarkLeakCelebrationSeenResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
@@ -74,7 +74,7 @@ export const ListUnclaimedUsersResponseItem = zod.object({
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
@@ -99,7 +99,7 @@ export const ClaimProfileResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
@@ -108,14 +108,15 @@ export const ClaimProfileResponse = zod.object({
 
 
 /**
- * @summary List all workspace users
+ * The bettors this session's social surfaces may show: your active crew's members (or just yourself when crewless) for real sessions, the fictional demo crew for demo sessions. Other users' startingBankroll is null — it's private to each bettor.
+ * @summary List crew-visible users
  */
 export const ListUsersResponseItem = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
@@ -148,7 +149,7 @@ export const UpdateUserResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
@@ -1673,7 +1674,7 @@ export const GetWorkspaceResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string(),
   "avatarColor": zod.string(),
-  "startingBankroll": zod.number(),
+  "startingBankroll": zod.number().nullable().describe('Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (\/users\/me, claim, update) and on unclaimed profiles.'),
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),

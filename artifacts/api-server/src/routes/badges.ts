@@ -10,7 +10,7 @@ import {
 } from "@workspace/db";
 import { GetStreaksQueryParams } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
-import { userInScope } from "../lib/scope";
+import { userInSocialScope } from "../lib/scope";
 import {
   BADGE_DEFINITIONS,
   computeQualifiedBadges,
@@ -61,9 +61,11 @@ router.get("/users/:id/badges", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid user id" });
     return;
   }
-  // World scoping: demo sessions can only open demo bettors' badge cases and
-  // real sessions never see demo profiles.
-  if (!(await userInScope(req, id))) {
+  // Crew scoping (same policy as recap and the other by-userId stats
+  // endpoints): another bettor's badge case is visible only when they share a
+  // crew with the requester; your own always works. Demo sessions cover the
+  // demo world. Outside that scope the user is reported as not found.
+  if (!(await userInSocialScope(req, id))) {
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -105,7 +107,7 @@ router.get("/stats/streaks", requireProfile, async (req, res): Promise<void> => 
     return;
   }
   const userId = query.data.userId ?? req.currentUser!.id;
-  if (query.data.userId != null && !(await userInScope(req, query.data.userId))) {
+  if (query.data.userId != null && !(await userInSocialScope(req, query.data.userId))) {
     res.status(404).json({ error: "User not found" });
     return;
   }

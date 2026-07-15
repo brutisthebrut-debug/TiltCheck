@@ -12,7 +12,11 @@ export interface User {
   username: string;
   displayName: string;
   avatarColor: string;
-  startingBankroll: number;
+  /**
+     * Starting bankroll is private — null when this row describes another bettor in the user list. Always present on your own profile (/users/me, claim, update) and on unclaimed profiles.
+     * @nullable
+     */
+  startingBankroll: number | null;
   createdAt: string;
   /**
      * Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never

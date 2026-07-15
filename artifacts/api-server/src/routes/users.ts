@@ -3,7 +3,8 @@ import { and, eq, isNull, isNotNull, asc, count, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
 import { db, usersTable, invitesTable } from "@workspace/db";
 import { dayOf, lastCompletedWeekStart } from "../lib/recap";
-import { userScopeCondition } from "../lib/scope";
+import { userScopeCondition, getSocialUsers } from "../lib/scope";
+import { isDemoRequest } from "../middlewares/demo";
 import { founderEmail } from "../lib/founder";
 import {
   MarkLeakCelebrationSeenResponse,
@@ -296,11 +297,24 @@ router.post("/users/claim", async (req, res): Promise<void> => {
   res.status(outcome.status).json(outcome.body);
 });
 
-// GET /users — scoped: real sessions see the real crew, demo sessions see the
-// fictional demo crew, never both.
+// GET /users — crew-scoped: real sessions see their active crew's members
+// (crewless bettors see only themselves), demo sessions see the fictional
+// demo crew, never both. Starting bankroll is private, so it's nulled out on
+// every row except the requester's own; the fictional demo crew keeps its
+// made-up numbers.
 router.get("/users", async (req, res): Promise<void> => {
-  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
-  res.json(ListUsersResponse.parse(users.map(formatUser)));
+  const users = await getSocialUsers(req);
+  const showAllBankrolls = isDemoRequest(req);
+  const requesterId = req.currentUser?.id ?? null;
+  res.json(
+    ListUsersResponse.parse(
+      users.map((u) => {
+        const formatted = formatUser(u);
+        if (!showAllBankrolls && u.id !== requesterId) formatted.startingBankroll = null;
+        return formatted;
+      }),
+    ),
+  );
 });
 
 // PATCH /users/:id — update own profile only
@@ -344,7 +358,17 @@ router.patch("/users/:id", async (req, res): Promise<void> => {
   res.json(formatUser(updated));
 });
 
-function formatUser(u: typeof usersTable.$inferSelect) {
+function formatUser(u: typeof usersTable.$inferSelect): {
+  id: number;
+  username: string;
+  displayName: string;
+  avatarColor: string;
+  startingBankroll: number | null;
+  createdAt: string;
+  recapSeenWeek: string | null;
+  isFounder: boolean;
+  oddsFormat: string;
+} {
   return {
     id: u.id,
     username: u.username,
