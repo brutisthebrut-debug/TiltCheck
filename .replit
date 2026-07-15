@@ -47,4 +47,4 @@ channel = "stable-25_05"
 [userenv.production]
 
 [userenv.shared]
-FOUNDER_EMAIL = "danielleemarlin@gmail.com"
+FOUNDER_EMAIL = "brutisthebrut@gmail.com"
