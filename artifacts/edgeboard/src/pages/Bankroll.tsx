@@ -1,8 +1,8 @@
 import { useUser } from "@/contexts/UserContext"
-import { useGetBankroll, useListTransactions, useGetBankrollHistory, getGetBankrollQueryKey, getListTransactionsQueryKey, getGetBankrollHistoryQueryKey, useCreateTransaction, useUpdateUser, exportTransactionsCsv } from "@workspace/api-client-react"
-import { useState } from "react"
+import { useGetBankroll, listTransactions, useGetBankrollHistory, getGetBankrollQueryKey, getListTransactionsQueryKey, getGetBankrollHistoryQueryKey, useCreateTransaction, useUpdateUser, exportTransactionsCsv } from "@workspace/api-client-react"
+import { useState, useMemo } from "react"
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQueryClient, useInfiniteQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { formatCurrency, formatDate } from "@/lib/format"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Wallet, ArrowUpRight, ArrowDownRight, Activity, Pencil } from "lucide-react"
 import { ExportCsvButton } from "@/components/ExportCsvButton"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
+
+const TX_PAGE_SIZE = 20
 
 export default function Bankroll() {
   const { activeUser, refreshUser } = useUser()
@@ -30,10 +32,27 @@ export default function Bankroll() {
     { query: { enabled: !!activeUser?.id, queryKey: getGetBankrollQueryKey({ userId: activeUser?.id }) } }
   )
 
-  const { data: transactions = [], isLoading: isTxLoading, isError: isTxError, refetch: refetchTx, isRefetching: isTxRefetching } = useListTransactions(
-    { userId: activeUser?.id, limit: 20 },
-    { query: { enabled: !!activeUser?.id, queryKey: getListTransactionsQueryKey({ userId: activeUser?.id, limit: 20 }) } }
-  )
+  const {
+    data: txData,
+    isLoading: isTxLoading,
+    isError: isTxError,
+    refetch: refetchTx,
+    isRefetching: isTxRefetching,
+    fetchNextPage: fetchNextTxPage,
+    hasNextPage: hasNextTxPage,
+    isFetchingNextPage: isFetchingNextTxPage,
+  } = useInfiniteQuery({
+    queryKey: [...getListTransactionsQueryKey({ userId: activeUser?.id }), "infinite"],
+    queryFn: ({ pageParam }) => listTransactions({ userId: activeUser?.id, limit: TX_PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === TX_PAGE_SIZE
+        ? allPages.reduce((n, p) => n + p.length, 0)
+        : undefined,
+    enabled: !!activeUser?.id,
+  })
+
+  const transactions = useMemo(() => txData?.pages.flat() ?? [], [txData])
 
   const { data: history } = useGetBankrollHistory(
     { userId: activeUser?.id },
@@ -57,7 +76,7 @@ export default function Bankroll() {
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
-        queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey({ userId: activeUser.id, limit: 20 }) })
+        queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey({ userId: activeUser.id }) })
         queryClient.invalidateQueries({ queryKey: getGetBankrollHistoryQueryKey({ userId: activeUser.id }) })
         setIsOpen(false)
         setAmount("")
@@ -253,6 +272,7 @@ export default function Bankroll() {
                       onClick={() => { setNewStartingBankroll(String(bankroll.startingBalance)); setIsEditBankrollOpen(true) }}
                       className="text-primary/50 hover:text-primary transition-colors ml-1"
                       title="Edit starting bankroll"
+                      aria-label="Edit starting bankroll"
                     >
                       <Pencil className="h-3 w-3" />
                     </button>
@@ -439,6 +459,22 @@ export default function Bankroll() {
                   </div>
                 )
               })}
+              {hasNextTxPage && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchNextTxPage()}
+                    disabled={isFetchingNextTxPage}
+                    data-testid="button-load-more-transactions"
+                  >
+                    {isFetchingNextTxPage ? "Loading…" : "Load more"}
+                  </Button>
+                </div>
+              )}
+              {!hasNextTxPage && (txData?.pages.length ?? 0) > 1 && (
+                <p className="text-center text-xs text-muted-foreground pt-2">That's the whole ledger.</p>
+              )}
             </div>
           )}
         </CardContent>

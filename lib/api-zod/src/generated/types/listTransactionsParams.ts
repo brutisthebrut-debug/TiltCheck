@@ -12,4 +12,8 @@ export type ListTransactionsParams = {
  */
 userId?: number | null;
 limit?: number;
+/**
+ * Number of transactions to skip, for paging through long ledgers
+ */
+offset?: number;
 };

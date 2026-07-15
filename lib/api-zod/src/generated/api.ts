@@ -1199,10 +1199,12 @@ export const GetBankrollResponse = zod.object({
  * @summary List bankroll transactions
  */
 export const listTransactionsQueryLimitDefault = 20;
+export const listTransactionsQueryOffsetDefault = 0;
 
 export const ListTransactionsQueryParams = zod.object({
   "userId": zod.coerce.number().nullish(),
-  "limit": zod.coerce.number().default(listTransactionsQueryLimitDefault)
+  "limit": zod.coerce.number().default(listTransactionsQueryLimitDefault),
+  "offset": zod.coerce.number().default(listTransactionsQueryOffsetDefault).describe('Number of transactions to skip, for paging through long ledgers')
 })
 
 export const ListTransactionsResponseItem = zod.object({

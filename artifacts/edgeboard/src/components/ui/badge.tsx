@@ -14,11 +14,14 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
-        won: "border-transparent bg-green-500/20 text-green-500",
-        lost: "border-transparent bg-red-500/20 text-red-500",
-        pending: "border-transparent bg-yellow-500/20 text-yellow-500",
-        push: "border-transparent bg-gray-500/20 text-gray-500",
-        void: "border-transparent bg-gray-500/20 text-gray-500",
+        // 400-series text on 500/20 tints: keeps the electric glow while
+        // clearing WCAG AA contrast on the dark card background (500-series
+        // "lost" and "push" measured 4.16:1 and 3.28:1 — below the 4.5:1 bar).
+        won: "border-transparent bg-green-500/20 text-green-400",
+        lost: "border-transparent bg-red-500/20 text-red-400",
+        pending: "border-transparent bg-yellow-500/20 text-yellow-400",
+        push: "border-transparent bg-gray-500/20 text-gray-400",
+        void: "border-transparent bg-gray-500/20 text-gray-400",
       },
     },
     defaultVariants: {

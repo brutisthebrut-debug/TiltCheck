@@ -94,7 +94,7 @@ export default function Recap() {
           <p className="text-muted-foreground mt-1">How you actually did. No spin.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" data-testid="button-recap-prev" onClick={() => setWeekStart(addDays(weekStart, -7))}>
+          <Button variant="outline" size="icon" aria-label="Previous week" data-testid="button-recap-prev" onClick={() => setWeekStart(addDays(weekStart, -7))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="font-mono text-sm min-w-[7.5rem] text-center" data-testid="text-recap-week">
@@ -103,7 +103,7 @@ export default function Recap() {
           <Button
             variant="outline"
             size="icon"
-            data-testid="button-recap-next"
+            aria-label="Next week" data-testid="button-recap-next"
             disabled={weekStart >= latest}
             onClick={() => setWeekStart(addDays(weekStart, 7))}
           >

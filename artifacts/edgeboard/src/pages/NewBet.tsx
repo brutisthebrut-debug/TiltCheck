@@ -180,7 +180,7 @@ export default function NewBet() {
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/bets")} className="rounded-full">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/bets")} className="rounded-full" aria-label="Back to bets">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>

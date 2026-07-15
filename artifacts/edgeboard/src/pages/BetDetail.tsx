@@ -156,7 +156,7 @@ export default function BetDetail() {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/bets")} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/bets")} className="rounded-full" aria-label="Back to bets">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">Bet Detail</h1>
@@ -197,7 +197,7 @@ export default function BetDetail() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/bets")} className="rounded-full">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/bets")} className="rounded-full" aria-label="Back to bets">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>

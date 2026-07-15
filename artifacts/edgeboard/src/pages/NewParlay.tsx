@@ -175,7 +175,7 @@ export default function NewParlay() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/parlays")} className="rounded-full">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/parlays")} className="rounded-full" aria-label="Back to parlays">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -374,6 +374,7 @@ export default function NewParlay() {
                       size="icon" 
                       className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => remove(index)}
+                      aria-label={`Remove leg ${index + 1}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

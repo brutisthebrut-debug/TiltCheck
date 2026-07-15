@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Layers } from "lucide-react"
 import { ListFilterBar } from "@/components/ListFilterBar"
+import { PlayListCard, PlayListCardSkeleton } from "@/components/PlayListCard"
 import { ExportCsvButton } from "@/components/ExportCsvButton"
 import { useUrlFilters, hasActiveFilters } from "@/hooks/use-url-filters"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
@@ -107,7 +108,55 @@ export default function Parlays() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden bg-card">
+        <>
+        {/* Narrow screens: stacked cards — no squeezed table, no sideways scrolling */}
+        <div className="space-y-2 sm:hidden" data-testid="list-parlays-cards">
+          {isLoading ? (
+            [1, 2, 3].map((i) => <PlayListCardSkeleton key={i} />)
+          ) : parlays.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+                <p>No parlays match the current filters.</p>
+                <button
+                  onClick={clear}
+                  className="text-primary text-sm underline-offset-2 hover:underline"
+                  data-testid="button-clear-filters-empty-mobile"
+                >
+                  Clear filters
+                </button>
+              </CardContent>
+            </Card>
+          ) : (
+            parlays.map((parlay) => (
+              <PlayListCard
+                key={parlay.id}
+                href={`/parlays/${parlay.id}`}
+                title={parlay.name}
+                subtitle={`${parlay.legs?.length || 0} legs`}
+                date={formatDate(parlay.createdAt)}
+                bettor={parlay.userName}
+                odds={formatOddsAs(parlay.odds, oddsFormat)}
+                stake={formatCurrency(parlay.stake)}
+                status={parlay.status}
+                testId={`card-parlay-${parlay.id}`}
+              />
+            ))
+          )}
+          {!isLoading && parlays.length > 0 && hasNextPage && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              data-testid="button-load-more-mobile"
+            >
+              {isFetchingNextPage ? "Loading…" : "Load more"}
+            </Button>
+          )}
+        </div>
+
+        <Card className="overflow-hidden bg-card hidden sm:block">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -170,7 +219,7 @@ export default function Parlays() {
                         <Badge variant={parlay.status as any}>{parlay.status.toUpperCase()}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button asChild variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity">
                           <Link href={`/parlays/${parlay.id}`}>View</Link>
                         </Button>
                       </TableCell>
@@ -200,6 +249,7 @@ export default function Parlays() {
             </div>
           )}
         </Card>
+        </>
       )}
     </div>
   )

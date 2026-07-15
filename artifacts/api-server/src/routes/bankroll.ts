@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { lockUserLedger } from "../lib/ledger";
+import { clampPageSize } from "../lib/search";
 
 const router: IRouter = Router();
 
@@ -97,7 +98,7 @@ router.get("/bankroll/transactions", requireProfile, async (req, res): Promise<v
     res.status(400).json({ error: query.error.message });
     return;
   }
-  const { userId, limit } = query.data;
+  const { userId, limit, offset } = query.data;
   const self = req.currentUser!.id;
   if (userId != null && userId !== self) {
     res.status(403).json({ error: "You can only view your own transactions" });
@@ -109,7 +110,8 @@ router.get("/bankroll/transactions", requireProfile, async (req, res): Promise<v
     .from(transactionsTable)
     .where(eq(transactionsTable.userId, self))
     .orderBy(desc(transactionsTable.createdAt), desc(transactionsTable.id))
-    .limit(limit ?? 20);
+    .limit(clampPageSize(limit, 20))
+    .offset(Math.max(0, offset ?? 0));
 
   res.json(rows.map((t) => ({
     id: t.id,
