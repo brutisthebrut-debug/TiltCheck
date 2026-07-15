@@ -48,6 +48,19 @@ const INLINE_TODAY_PATTERNS: ReadonlyArray<{ name: string; regex: RegExp }> = [
     regex: /\b(?:dayjs|moment)\s*\(\s*\)\s*\.\s*format\s*\(\s*["'`](?:YYYY-MM-DD|yyyy-MM-dd)["'`]/,
   },
   {
+    // Hand-built date string from parts: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+    // (template literal or string concatenation, local or UTC getters). The
+    // local-getter form is the worst offender: it uses the device's timezone,
+    // so it disagrees with the UTC `dayOf()` near midnight. We require a
+    // hyphen joiner right after getFullYear() (`}-` in a template literal or
+    // a quoted "-" in concatenation) followed by getMonth() and getDate()
+    // nearby, so legitimate standalone getter uses (e.g. showing just the
+    // year, or `new Date(y, m, d)` construction) don't match.
+    name: "hand-built `${getFullYear()}-${getMonth()+1}-${getDate()}` string",
+    regex:
+      /get(?:UTC)?FullYear\s*\(\s*\)[\s\S]{0,40}?(?:\}\s*-|["'`]\s*-|-\s*["'`])[\s\S]{0,80}?get(?:UTC)?Month\s*\(\s*\)[\s\S]{0,120}?get(?:UTC)?Date\s*\(\s*\)/,
+  },
+  {
     // Locale trick: en-CA and sv-SE default date formats are YYYY-MM-DD, so
     // `new Date().toLocaleDateString("en-CA")` or
     // `new Intl.DateTimeFormat("sv-SE").format(...)` are hidden `dayOf` copies.
@@ -132,6 +145,18 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
       'toLocaleDateString/Intl.DateTimeFormat with "en-CA"/"sv-SE"',
       "const t = new Intl.DateTimeFormat('sv-SE').format(new Date());",
     ],
+    [
+      "hand-built `${getFullYear()}-${getMonth()+1}-${getDate()}` string",
+      "const t = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;",
+    ],
+    [
+      "hand-built `${getFullYear()}-${getMonth()+1}-${getDate()}` string",
+      "const t = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());",
+    ],
+    [
+      "hand-built `${getFullYear()}-${getMonth()+1}-${getDate()}` string",
+      'const t = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;',
+    ],
   ];
 
   const shouldNotMatch: string[] = [
@@ -144,6 +169,13 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
     "const ts = new Date().toISOString();",
     // Splitting something other than the ISO timestamp:
     "const parts = header.split('T')[0];",
+    // Legitimate standalone getter uses — showing just the year:
+    "const year = d.getFullYear();",
+    "const label = `${d.getFullYear()} season`;",
+    // Constructing a Date from parts (no string assembly, comma-joined):
+    "return new Date(d.getFullYear(), d.getMonth(), d.getDate());",
+    // Arithmetic between getters (minus sign but no string joiner):
+    "const age = now.getFullYear() - birth.getFullYear();",
   ];
 
   it.each(shouldMatch)("pattern %s catches: %s", (name, snippet) => {
