@@ -54,7 +54,13 @@ export default function Recap() {
   // The narrated tape review — generated once per week server-side, then
   // cached. Purely additive: while loading or unavailable, the recap reads
   // exactly like it did before this section existed.
-  const { data: tape, isLoading: tapeLoading } = useGetRecapNarrative(
+  const {
+    data: tape,
+    isLoading: tapeLoading,
+    isError: tapeError,
+    refetch: refetchTape,
+    isRefetching: tapeRefetching,
+  } = useGetRecapNarrative(
     { userId: activeUser?.id, weekStart },
     {
       query: {
@@ -171,7 +177,32 @@ export default function Recap() {
           </Card>
 
           {/* The tape — AI-narrated decision review */}
-          {tapeLoading && !tape ? (
+          {tapeError ? (
+            <Card className="border-dashed border-2 border-muted" data-testid="card-recap-tape-error">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Clapperboard className="h-4 w-4 text-muted-foreground" />
+                  <CardDescription className="uppercase tracking-wider text-[11px]">The tape</CardDescription>
+                </div>
+                <CardTitle className="text-base">Couldn't load your review.</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  The rest of the recap made it — this part didn't. Give it another go.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-recap-tape-retry"
+                  disabled={tapeRefetching}
+                  onClick={() => refetchTape()}
+                >
+                  <RotateCw className={`h-4 w-4 mr-2 ${tapeRefetching ? "animate-spin" : ""}`} />
+                  {tapeRefetching ? "Retrying…" : "Retry"}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : tapeLoading && !tape ? (
             <Card className="border-primary/20" data-testid="card-recap-tape-loading">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
