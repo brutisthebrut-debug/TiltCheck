@@ -8,6 +8,8 @@ import {
   useGetNeedsSettling,
   useGetStreaks,
   useGetUserBadges,
+  useGetLeakProfile,
+  getGetLeakProfileQueryKey,
   getGetStreaksQueryKey,
   getGetUserBadgesQueryKey,
   getGetStatsSummaryQueryKey,
@@ -24,10 +26,18 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
 import { Link } from "wouter"
-import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy, Newspaper, ArrowRight } from "lucide-react"
+import { Activity, Flame, Snowflake, TrendingUp, TrendingDown, Target, CalendarDays, DollarSign, Star, ClipboardList, Plus, AlarmClock, Layers, NotebookPen, Trophy, Newspaper, ArrowRight, AlertTriangle } from "lucide-react"
 import { formatDate } from "@/lib/format"
 import { isRecapUnseen } from "@/lib/recapTeaser"
 import { dayOf } from "@workspace/weeks"
+
+const MISS_REASON_LABELS: Record<string, string> = {
+  bad_read: "Bad read",
+  bad_price: "Bad price",
+  lineup_injury: "Lineup / injury news",
+  emotional: "Emotional bet",
+  misunderstood_market: "Misunderstood market",
+}
 
 export default function Dashboard() {
   const { activeUser, isLoading: isUserLoading } = useUser();
@@ -71,6 +81,55 @@ export default function Dashboard() {
     { query: { enabled: !!activeUser?.id, queryKey: getGetUserBadgesQueryKey(activeUser?.id ?? 0) } }
   );
   const earnedBadges = badges.filter(b => b.earnedAt != null);
+
+  const { data: leakProfile } = useGetLeakProfile(
+    { userId: activeUser?.id },
+    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+  );
+
+  // The single most damaging qualifying leak. Mirrors the bet-form priority,
+  // minus chasing (that one only means something at bet time): worst sport by
+  // net dollars, then the repeated self-graded miss reason, then the
+  // overconfidence gap. Server thresholds decide what qualifies — anything
+  // present here is a real pattern, not noise.
+  const topLeak = (() => {
+    if (!leakProfile) return null;
+    if (leakProfile.worstSport) {
+      const { sport, netLoss, bets } = leakProfile.worstSport;
+      return {
+        key: "worst-sport",
+        label: `${sport} keeps cashing your checks`,
+        figure: formatCurrency(netLoss),
+        line: `${bets} settled ${sport} bets, and the book is still up on you. Your most expensive habit has a name.`,
+        href: `/bets?mine=1&sport=${encodeURIComponent(sport)}`,
+        cta: `See the ${sport} damage`,
+      };
+    }
+    if (leakProfile.topMissReason) {
+      const { reason, count, netLoss } = leakProfile.topMissReason;
+      const label = MISS_REASON_LABELS[reason] ?? reason;
+      return {
+        key: "miss-reason",
+        label: `"${label}" — again`,
+        figure: formatCurrency(-netLoss),
+        line: `You've graded ${count} losses "${label.toLowerCase()}". Once is a bad night. ${count} times is a pattern.`,
+        href: "/stats",
+        cta: "See the full pattern",
+      };
+    }
+    if (leakProfile.overconfidence) {
+      const { winRate, sample } = leakProfile.overconfidence;
+      return {
+        key: "overconfidence",
+        label: "Your confidence is writing checks",
+        figure: `${winRate}%`,
+        line: `That's how your 7+ confidence picks actually hit, over ${sample} of them. The swagger isn't cashing.`,
+        href: "/stats",
+        cta: "See the numbers",
+      };
+    }
+    return null;
+  })();
 
   const isLoading = isUserLoading || isStatsLoading || isActivityLoading || isBankrollLoading;
   const isError = isStatsError || isActivityError || isBankrollError;
@@ -297,6 +356,37 @@ export default function Dashboard() {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {/* Your Leak — the one recurring mistake that's costing real money.
+          Absent entirely when no signal clears the server's thresholds. */}
+      {topLeak && (
+        <Link href={topLeak.href} data-testid={`link-your-leak-${topLeak.key}`}>
+          <Card
+            className="border-chart-2/40 bg-chart-2/10 glow-destructive transition-all duration-300 hover:scale-[1.01] hover:bg-chart-2/15 cursor-pointer"
+            data-testid="card-your-leak"
+          >
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.8)]" />
+                <CardTitle className="text-base text-chart-2 text-glow-destructive">Your Leak</CardTitle>
+              </div>
+              <CardDescription className="text-foreground/80">{topLeak.label}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <div className="text-3xl font-bold font-mono text-chart-2 text-glow-destructive" data-testid="text-leak-figure">
+                  {topLeak.figure}
+                </div>
+                <p className="text-sm text-foreground/80 mt-1">{topLeak.line}</p>
+              </div>
+              <div className="shrink-0 self-end sm:self-auto flex items-center gap-1 text-xs text-chart-2 whitespace-nowrap">
+                {topLeak.cta}
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       )}
 
       {/* Stats cards */}
