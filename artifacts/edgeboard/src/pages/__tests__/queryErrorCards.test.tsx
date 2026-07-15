@@ -203,7 +203,7 @@ describe("clicking Retry", () => {
     // Success replaces the error card with the bets table.
     await waitFor(() => {
       expect(screen.queryByTestId("card-bets-error")).toBeNull()
-      expect(screen.getByText("Lakers -3.5")).toBeTruthy()
+      expect(screen.getAllByText("Lakers -3.5").length).toBeGreaterThan(0)
     })
   })
 })

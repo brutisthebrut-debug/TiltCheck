@@ -35,6 +35,9 @@ vi.mock("@workspace/api-client-react", () => ({
   // Pulled in transitively via useOddsFormat
   useUpdateUser: () => ({ mutate: vi.fn(), isPending: false }),
   getGetCurrentUserQueryKey: () => ["current-user"],
+  // Pulled in transitively via MistakeWarning
+  useGetStatsInsights: () => ({ data: undefined }),
+  getGetStatsInsightsQueryKey: () => ["stats-insights"],
 }))
 
 vi.mock("@/contexts/UserContext", () => ({
