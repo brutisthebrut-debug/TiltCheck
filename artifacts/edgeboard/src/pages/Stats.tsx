@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { dayOf, addDays } from "@workspace/weeks"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { UpgradeCard } from "@/components/UpgradeCard"
@@ -34,10 +34,44 @@ function sinceForRange(range: string): string | undefined {
   return addDays(dayOf(new Date()), -parseInt(range, 10))
 }
 
+function lessonsStorageKey(userId: string | undefined) {
+  return userId ? `edgeboard:lessons-filter:${userId}` : null
+}
+
+function readLessonsFilter(userId: string | undefined): { sport: string; range: string } {
+  const key = lessonsStorageKey(userId)
+  if (!key) return { sport: "all", range: "all" }
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return { sport: "all", range: "all" }
+    const parsed = JSON.parse(raw)
+    return {
+      sport: typeof parsed.sport === "string" ? parsed.sport : "all",
+      range: typeof parsed.range === "string" ? parsed.range : "all",
+    }
+  } catch {
+    return { sport: "all", range: "all" }
+  }
+}
+
 export default function Stats() {
   const { activeUser } = useUser()
-  const [lessonsSport, setLessonsSport] = useState<string>("all")
-  const [lessonsRange, setLessonsRange] = useState<string>("all")
+  const [lessonsSport, setLessonsSport] = useState<string>(() => readLessonsFilter(activeUser?.id).sport)
+  const [lessonsRange, setLessonsRange] = useState<string>(() => readLessonsFilter(activeUser?.id).range)
+
+  // Re-initialize from localStorage when the active user changes (e.g. account switch)
+  useEffect(() => {
+    const saved = readLessonsFilter(activeUser?.id)
+    setLessonsSport(saved.sport)
+    setLessonsRange(saved.range)
+  }, [activeUser?.id])
+
+  // Persist the current filter to localStorage whenever it changes
+  useEffect(() => {
+    const key = lessonsStorageKey(activeUser?.id)
+    if (!key) return
+    localStorage.setItem(key, JSON.stringify({ sport: lessonsSport, range: lessonsRange }))
+  }, [activeUser?.id, lessonsSport, lessonsRange])
 
   const { data: summary, isLoading: isSummaryLoading, isError: isSummaryError, refetch: refetchSummary, isRefetching: isSummaryRefetching } = useGetStatsSummary(
     { userId: activeUser?.id },
@@ -53,6 +87,16 @@ export default function Stats() {
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetConfidenceAnalysisQueryKey({ userId: activeUser?.id }) } }
   )
+
+  // If the persisted sport no longer appears in the bettor's data, fall back gracefully
+  useEffect(() => {
+    if (!isSportLoading && sportStats.length > 0 && lessonsSport !== "all") {
+      const knownSports = sportStats.map((s) => s.sport)
+      if (!knownSports.includes(lessonsSport)) {
+        setLessonsSport("all")
+      }
+    }
+  }, [isSportLoading, sportStats, lessonsSport])
 
   // Lessons are a Pro surface — keep the query off for free accounts so the
   // 402 never surfaces as an error state.
