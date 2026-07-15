@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, inArray, sum } from "drizzle-orm";
 import { db, usersTable, betsTable, parlaysTable, transactionsTable, userBadgesTable } from "@workspace/db";
-import { GetWorkspaceLeaderboardQueryParams } from "@workspace/api-zod";
+import { GetWorkspaceLeaderboardQueryParams, CompareWorkspaceMembersQueryParams } from "@workspace/api-zod";
 import { isValidAmericanOdds } from "../lib/odds";
 import { BADGE_DEFINITIONS } from "../lib/badges";
 import { requireProfile } from "../middlewares/auth";
@@ -34,25 +34,53 @@ router.get("/workspace", async (req, res): Promise<void> => {
   });
 });
 
-// GET /workspace/compare
+// GET /workspace/compare — head-to-head rows for every member.
+// Same math rules as the leaderboard so the two views can never disagree:
+// settled straight bets AND parlays (won/lost/push), dead-zone-odds rows
+// excluded, and the same settledAt window (week/month/all).
 router.get("/workspace/compare", async (req, res): Promise<void> => {
+  const query = CompareWorkspaceMembersQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const period = query.data.period ?? "all";
+  const windowStart =
+    period === "week"
+      ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      : period === "month"
+        ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        : null;
+  const inWindow = (settledAt: Date | null) =>
+    windowStart == null || (settledAt != null && settledAt >= windowStart);
+  const SETTLED = ["won", "lost", "push"];
+
   const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
 
   const comparisons = await Promise.all(
     users.map(async (user) => {
-      const bets = await db.select().from(betsTable).where(eq(betsTable.userId, user.id));
-      const settled = bets.filter((b) => ["won", "lost", "push"].includes(b.status));
-      const wins = settled.filter((b) => b.status === "won").length;
-      const losses = settled.filter((b) => b.status === "lost").length;
+      const allBets = (await db.select().from(betsTable).where(eq(betsTable.userId, user.id)))
+        .filter((b) => isValidAmericanOdds(b.odds));
+      const allParlays = (await db.select().from(parlaysTable).where(eq(parlaysTable.userId, user.id)))
+        .filter((p) => isValidAmericanOdds(p.odds));
+
+      const settledBets = allBets.filter((b) => SETTLED.includes(b.status) && inWindow(b.settledAt));
+      const settledParlays = allParlays.filter((p) => SETTLED.includes(p.status) && inWindow(p.settledAt));
+      const settled = [...settledBets, ...settledParlays];
+
+      const wins = settled.filter((i) => i.status === "won").length;
+      const losses = settled.filter((i) => i.status === "lost").length;
       const winRate = settled.length > 0 ? Math.round((wins / settled.length) * 1000) / 10 : 0;
 
-      const totalWagered = settled.reduce((acc, b) => acc + Number(b.stake), 0);
-      const totalPayout = settled.reduce((acc, b) => acc + (b.actualPayout != null ? Number(b.actualPayout) : 0), 0);
+      const totalWagered = settled.reduce((acc, i) => acc + Number(i.stake), 0);
+      const totalPayout = settled.reduce((acc, i) => acc + (i.actualPayout != null ? Number(i.actualPayout) : 0), 0);
       const profit = totalPayout - totalWagered;
       const roi = totalWagered > 0 ? Math.round((profit / totalWagered) * 10000) / 100 : 0;
-      const avgConfidence = bets.length > 0 ? Math.round(bets.reduce((acc, b) => acc + b.confidenceScore, 0) / bets.length * 10) / 10 : 0;
+      const avgConfidence = allBets.length > 0
+        ? Math.round(allBets.reduce((acc, b) => acc + b.confidenceScore, 0) / allBets.length * 10) / 10
+        : 0;
 
-      // Current bankroll
+      // Current bankroll (a "right now" number — never window-scoped)
       const txRows = await db
         .select()
         .from(transactionsTable)
@@ -61,9 +89,9 @@ router.get("/workspace/compare", async (req, res): Promise<void> => {
         .limit(1);
       const currentBankroll = txRows.length > 0 ? Number(txRows[0].balanceAfter) : Number(user.startingBankroll);
 
-      // Hot sport (most wins)
+      // Hot sport (most wins inside the window; straight bets carry the sport)
       const sportWins: Record<string, number> = {};
-      settled.filter((b) => b.status === "won").forEach((b) => {
+      settledBets.filter((b) => b.status === "won").forEach((b) => {
         sportWins[b.sport] = (sportWins[b.sport] ?? 0) + 1;
       });
       const hotSport = Object.keys(sportWins).length > 0
@@ -74,7 +102,7 @@ router.get("/workspace/compare", async (req, res): Promise<void> => {
         userId: user.id,
         userName: user.displayName,
         avatarColor: user.avatarColor,
-        totalBets: bets.length,
+        totalBets: allBets.length + allParlays.length,
         wins,
         losses,
         winRate,

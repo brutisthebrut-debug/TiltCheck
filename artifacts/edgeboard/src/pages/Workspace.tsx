@@ -71,7 +71,8 @@ export default function Workspace() {
     { query: { queryKey: getGetWorkspaceLeaderboardQueryKey({ period }) } },
   )
   const { data: comparisons = [] } = useCompareWorkspaceMembers(
-    { query: { queryKey: getCompareWorkspaceMembersQueryKey() } },
+    { period },
+    { query: { queryKey: getCompareWorkspaceMembersQueryKey({ period }) } },
   )
   const { data: friendBets = [], isLoading: isFriendBetsLoading } = useListBets(
     { userId: selectedId, limit: 5 },

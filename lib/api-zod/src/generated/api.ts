@@ -694,6 +694,48 @@ export const UpdateParlayLegResponse = zod.object({
 
 
 /**
+ * For parlays whose stored combined odds are wrong (e.g. an impossible dead-zone price) while every leg carries a valid price. Owner-only and pending-only — a settled parlay's payout is already part of the bankroll ledger. Recomputes the combined odds and potential payout from the legs exactly like a leg correction does.
+ * @summary Recompute a pending parlay's combined odds and payout from its legs
+ */
+export const RecomputeParlayOddsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RecomputeParlayOddsResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().optional(),
+  "name": zod.string(),
+  "stake": zod.number(),
+  "odds": zod.number().describe('Combined American odds'),
+  "potentialPayout": zod.number(),
+  "actualPayout": zod.number().nullish(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void']),
+  "legs": zod.array(zod.object({
+  "id": zod.number(),
+  "parlayId": zod.number(),
+  "sport": zod.string(),
+  "event": zod.string(),
+  "betType": zod.enum(['moneyline', 'spread', 'total', 'prop']),
+  "pick": zod.string(),
+  "odds": zod.number(),
+  "gameDate": zod.string(),
+  "status": zod.enum(['pending', 'won', 'lost', 'push', 'void'])
+})),
+  "confidenceScore": zod.number().describe('1-10 confidence rating'),
+  "rationale": zod.string().nullish(),
+  "postGameReview": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "settledAt": zod.string().nullish(),
+  "sportsbook": zod.string().nullish(),
+  "promoNote": zod.string().nullish(),
+  "reasoningQuality": zod.string().nullish(),
+  "whatHappened": zod.string().nullish(),
+  "missReason": zod.string().nullish()
+})
+
+
+/**
  * @summary Settle a parlay result and add review
  */
 export const SettleParlayParams = zod.object({
@@ -1291,8 +1333,15 @@ export const GetWorkspaceResponse = zod.object({
 
 
 /**
+ * Head-to-head comparison rows for every workspace member. Money math includes settled straight bets AND parlays (won/lost/push), excludes dead-zone-odds rows, and honors the same settledAt window as the leaderboard: week = last 7 days, month = last 30 days, all = everything.
  * @summary Compare bets and stats between workspace members
  */
+export const compareWorkspaceMembersQueryPeriodDefault = `all`;
+
+export const CompareWorkspaceMembersQueryParams = zod.object({
+  "period": zod.enum(['week', 'month', 'all']).default(compareWorkspaceMembersQueryPeriodDefault)
+})
+
 export const CompareWorkspaceMembersResponseItem = zod.object({
   "userId": zod.number(),
   "userName": zod.string(),

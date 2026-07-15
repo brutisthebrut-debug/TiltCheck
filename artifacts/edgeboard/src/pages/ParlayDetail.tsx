@@ -1,5 +1,5 @@
 import { useLocation, useParams } from "wouter"
-import { useGetParlay, useSettleParlay, useUpdateParlayLeg, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
+import { useGetParlay, useSettleParlay, useUpdateParlayLeg, useRecomputeParlayOdds, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -15,6 +15,7 @@ import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
 import { formatOddsAs } from "@workspace/odds"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
+import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
@@ -47,6 +48,24 @@ export default function ParlayDetail() {
   
   const settleParlay = useSettleParlay()
   const updateParlayLeg = useUpdateParlayLeg()
+  const recomputeOdds = useRecomputeParlayOdds()
+  const [recomputeError, setRecomputeError] = useState<string | null>(null)
+
+  const handleRecomputeOdds = () => {
+    setRecomputeError(null)
+    recomputeOdds.mutate({ id: parlayId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetParlayQueryKey(parlayId) })
+        queryClient.invalidateQueries({ queryKey: getListParlaysQueryKey() })
+        if (activeUser) {
+          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
+        }
+      },
+      onError: (err: unknown) => {
+        setRecomputeError(getApiErrorMessage(err, "Couldn't recompute the odds. Please try again."))
+      },
+    })
+  }
   const [legResults, setLegResults] = useState<Record<number, 'won' | 'lost' | 'push' | 'void'>>({})
 
   // Leg odds re-entry (dead-zone repair) state
@@ -240,10 +259,27 @@ export default function ParlayDetail() {
                 ? isPending
                   ? deadZoneLegs.length > 0
                     ? 'Only you know the real prices. Click "Re-enter odds" on a flagged leg below to correct it — the combined odds and payout recalculate automatically.'
-                    : 'Only you know the real prices. The legs look valid, so ask an admin to recompute the combined odds from them.'
+                    : 'Every leg carries a valid price — the stored total is the only thing wrong. Recompute it from the legs below.'
                   : 'This parlay is already settled, so its recorded payout is part of your bankroll history and the odds can no longer be edited.'
                 : `Only ${parlay.userName} knows the real prices, so only they can correct this parlay.`}
             </p>
+            {isOwner && isPending && deadZoneLegs.length === 0 && hasDeadZoneCombined && (
+              <div className="mt-3 space-y-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRecomputeOdds}
+                  disabled={recomputeOdds.isPending}
+                  className="border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/25"
+                  data-testid="button-recompute-odds"
+                >
+                  {recomputeOdds.isPending ? 'Recomputing...' : 'Recompute odds from legs'}
+                </Button>
+                {recomputeError && (
+                  <p className="text-xs text-chart-2" data-testid="text-recompute-error">{recomputeError}</p>
+                )}
+              </div>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -611,6 +647,11 @@ export default function ParlayDetail() {
             </div>
           </div>
 
+          {settleParlay.isError && (
+            <p className="text-sm text-chart-2" data-testid="text-settle-error">
+              {getApiErrorMessage(settleParlay.error, "Couldn't save this result. Nothing was recorded — try again.")}
+            </p>
+          )}
           <DialogFooter className="gap-2 flex-col sm:flex-row">
             <Button variant="outline" onClick={resetModal} className="sm:w-auto w-full">Cancel</Button>
             <Button 

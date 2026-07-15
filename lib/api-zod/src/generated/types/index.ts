@@ -29,6 +29,8 @@ export * from './betStatus';
 export * from './betUpdate';
 export * from './betUpdateBetType';
 export * from './claimProfileInput';
+export * from './compareWorkspaceMembersParams';
+export * from './compareWorkspaceMembersPeriod';
 export * from './confidenceBucket';
 export * from './edgeFinder';
 export * from './edgeFinderLane';

@@ -1273,6 +1273,19 @@ export type GetStreaksParams = {
 userId?: number | null;
 };
 
+export type CompareWorkspaceMembersParams = {
+period?: CompareWorkspaceMembersPeriod;
+};
+
+export type CompareWorkspaceMembersPeriod = typeof CompareWorkspaceMembersPeriod[keyof typeof CompareWorkspaceMembersPeriod];
+
+
+export const CompareWorkspaceMembersPeriod = {
+  week: 'week',
+  month: 'month',
+  all: 'all',
+} as const;
+
 export type GetWorkspaceLeaderboardParams = {
 period?: GetWorkspaceLeaderboardPeriod;
 };

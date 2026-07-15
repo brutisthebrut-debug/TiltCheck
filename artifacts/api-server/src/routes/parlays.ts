@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, or, ilike, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, or, ilike, inArray, isNull, sql } from "drizzle-orm";
 import { db, parlaysTable, parlayLegsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListParlaysQueryParams,
@@ -23,6 +23,7 @@ import {
   SettleParlayParams,
   SettleParlayBody,
   UpdateParlayLegParams,
+  RecomputeParlayOddsParams,
   UpdateParlayLegBody,
 } from "@workspace/api-zod";
 
@@ -360,22 +361,132 @@ router.patch("/parlays/:id/legs/:legId", requireProfile, async (req, res): Promi
   }
 
   // Update the leg and the parlay's derived numbers atomically so a crash
-  // can't leave the combined odds out of sync with the legs.
-  const updated = await db.transaction(async (tx) => {
-    await tx
-      .update(parlayLegsTable)
-      .set({ odds: newOdds })
-      .where(and(eq(parlayLegsTable.id, targetLeg.id), eq(parlayLegsTable.parlayId, params.data.id)));
-    const [updatedParlay] = await tx
-      .update(parlaysTable)
-      .set({
-        odds: combinedOdds,
-        potentialPayout: String(payout.toFixed(2)),
-      })
-      .where(eq(parlaysTable.id, params.data.id))
-      .returning();
-    return updatedParlay;
-  });
+  // can't leave the combined odds out of sync with the legs. The parlay
+  // write re-checks pending status so a settle landing mid-request can't
+  // have its ledger-recorded numbers overwritten (no row -> rollback).
+  let updated: typeof parlaysTable.$inferSelect;
+  try {
+    updated = await db.transaction(async (tx) => {
+      await tx
+        .update(parlayLegsTable)
+        .set({ odds: newOdds })
+        .where(and(eq(parlayLegsTable.id, targetLeg.id), eq(parlayLegsTable.parlayId, params.data.id)));
+      const [updatedParlay] = await tx
+        .update(parlaysTable)
+        .set({
+          odds: combinedOdds,
+          potentialPayout: String(payout.toFixed(2)),
+        })
+        .where(
+          and(
+            eq(parlaysTable.id, params.data.id),
+            eq(parlaysTable.status, "pending"),
+            isNull(parlaysTable.settledAt),
+          ),
+        )
+        .returning();
+      if (!updatedParlay) {
+        throw Object.assign(
+          new Error(
+            "This parlay was settled while the correction was in flight — its recorded payout is part of the bankroll ledger and can no longer change.",
+          ),
+          { statusCode: 409 },
+        );
+      }
+      return updatedParlay;
+    });
+  } catch (err) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    if (statusCode === 409) {
+      res.status(409).json({ error: (err as Error).message });
+      return;
+    }
+    throw err;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
+  res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
+});
+
+// POST /parlays/:id/recompute-odds — for parlays whose stored combined odds
+// are wrong (e.g. a dead-zone price) while every leg is valid. Owner-only,
+// pending-only; recomputes exactly like a leg correction does.
+router.post("/parlays/:id/recompute-odds", requireProfile, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = RecomputeParlayOddsParams.safeParse({ id: parseInt(raw, 10) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [parlay] = await db.select().from(parlaysTable).where(eq(parlaysTable.id, params.data.id));
+  if (!parlay) {
+    res.status(404).json({ error: "Parlay not found" });
+    return;
+  }
+  if (parlay.userId !== req.currentUser!.id) {
+    res.status(403).json({ error: "You can only edit your own parlays" });
+    return;
+  }
+  if (parlay.status !== "pending" || parlay.settledAt != null) {
+    res.status(409).json({
+      error:
+        "This parlay is already settled, so its odds can't be recomputed — the recorded payout is part of the bankroll ledger.",
+    });
+    return;
+  }
+
+  const legs = await db
+    .select()
+    .from(parlayLegsTable)
+    .where(eq(parlayLegsTable.parlayId, params.data.id));
+  if (legs.length === 0) {
+    res.status(400).json({ error: "This parlay has no legs to recompute from." });
+    return;
+  }
+  const invalidLegs = legs.filter((l) => !isValidAmericanOdds(l.odds));
+  if (invalidLegs.length > 0) {
+    res.status(400).json({
+      error: `${invalidLegs.length === 1 ? "One leg still carries" : `${invalidLegs.length} legs still carry`} odds that aren't a real American price. Correct the flagged legs first — the combined odds recompute automatically with each correction.`,
+    });
+    return;
+  }
+
+  const legOddsArr = legs.map((l) => l.odds);
+  const combinedOdds = combineAmerican(legOddsArr);
+  const combinedDecimal = combineDecimalExact(legOddsArr);
+  const payout = calcParlayPayout(combinedDecimal, Number(parlay.stake));
+
+  // Same storage bounds as POST /parlays (int4 odds, numeric(12,2) payout).
+  const INT4_MAX = 2147483647;
+  const MAX_PAYOUT = 9_999_999_999.99;
+  if (!Number.isFinite(combinedOdds) || Math.abs(combinedOdds) > INT4_MAX || payout > MAX_PAYOUT) {
+    res.status(400).json({
+      error: "The recomputed combined odds are too large to store. Double-check the leg prices.",
+    });
+    return;
+  }
+
+  // Enforce pending-only in the write itself, not just the pre-check — a
+  // settle landing between the read and this update must not overwrite a
+  // now-settled parlay's numbers (they're part of the bankroll ledger).
+  const [updated] = await db
+    .update(parlaysTable)
+    .set({ odds: combinedOdds, potentialPayout: String(payout.toFixed(2)) })
+    .where(
+      and(
+        eq(parlaysTable.id, params.data.id),
+        eq(parlaysTable.status, "pending"),
+        isNull(parlaysTable.settledAt),
+      ),
+    )
+    .returning();
+  if (!updated) {
+    res.status(409).json({
+      error:
+        "This parlay was settled while the recompute was in flight — its recorded payout is part of the bankroll ledger and can no longer change.",
+    });
+    return;
+  }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
   res.json(await formatParlay(updated, user?.displayName ?? "Unknown"));
@@ -549,6 +660,8 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
   let updated: typeof parlaysTable.$inferSelect;
   try {
     updated = await db.transaction(async (tx) => {
+    // The write re-checks pending status so two concurrent settles can never
+    // both land (a double ledger entry would corrupt the bankroll).
     const [updatedParlay] = await tx
       .update(parlaysTable)
       .set({
@@ -560,8 +673,11 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
         missReason: missReason ?? null,
         settledAt: new Date(),
       })
-      .where(eq(parlaysTable.id, params.data.id))
+      .where(and(eq(parlaysTable.id, params.data.id), eq(parlaysTable.status, "pending"), isNull(parlaysTable.settledAt)))
       .returning();
+    if (!updatedParlay) {
+      throw Object.assign(new Error("Parlay was already settled by another request."), { statusCode: 409 });
+    }
 
     // Update leg statuses if provided
     if (legResults && legResults.length > 0) {
@@ -617,8 +733,8 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
     });
   } catch (err) {
     const statusCode = (err as { statusCode?: number }).statusCode;
-    if (statusCode === 400) {
-      res.status(400).json({ error: (err as Error).message });
+    if (statusCode === 400 || statusCode === 409) {
+      res.status(statusCode).json({ error: (err as Error).message });
       return;
     }
     throw err;

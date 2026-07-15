@@ -30,6 +30,7 @@ import type {
   BetSettlement,
   BetUpdate,
   ClaimProfileInput,
+  CompareWorkspaceMembersParams,
   ConfidenceBucket,
   EdgeFinder,
   GetBankrollHistoryParams,
@@ -1595,6 +1596,78 @@ export const useUpdateParlayLeg = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateParlayLegMutationOptions(options));
+    }
+
+export const getRecomputeParlayOddsUrl = (id: number,) => {
+
+
+
+
+  return `/api/parlays/${id}/recompute-odds`
+}
+
+/**
+ * For parlays whose stored combined odds are wrong (e.g. an impossible dead-zone price) while every leg carries a valid price. Owner-only and pending-only — a settled parlay's payout is already part of the bankroll ledger. Recomputes the combined odds and potential payout from the legs exactly like a leg correction does.
+ * @summary Recompute a pending parlay's combined odds and payout from its legs
+ */
+export const recomputeParlayOdds = async (id: number, options?: RequestInit): Promise<Parlay> => {
+
+  return customFetch<Parlay>(getRecomputeParlayOddsUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRecomputeParlayOddsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recomputeParlayOdds>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recomputeParlayOdds>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['recomputeParlayOdds'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recomputeParlayOdds>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  recomputeParlayOdds(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecomputeParlayOddsMutationResult = NonNullable<Awaited<ReturnType<typeof recomputeParlayOdds>>>
+
+    export type RecomputeParlayOddsMutationError = ErrorType<void>
+
+    /**
+ * @summary Recompute a pending parlay's combined odds and payout from its legs
+ */
+export const useRecomputeParlayOdds = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recomputeParlayOdds>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recomputeParlayOdds>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRecomputeParlayOddsMutationOptions(options));
     }
 
 export const getSettleParlayUrl = (id: number,) => {
@@ -3226,20 +3299,28 @@ export function useGetWorkspace<TData = Awaited<ReturnType<typeof getWorkspace>>
 
 
 
-export const getCompareWorkspaceMembersUrl = () => {
+export const getCompareWorkspaceMembersUrl = (params?: CompareWorkspaceMembersParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/workspace/compare`
+  return stringifiedParams.length > 0 ? `/api/workspace/compare?${stringifiedParams}` : `/api/workspace/compare`
 }
 
 /**
+ * Head-to-head comparison rows for every workspace member. Money math includes settled straight bets AND parlays (won/lost/push), excludes dead-zone-odds rows, and honors the same settledAt window as the leaderboard: week = last 7 days, month = last 30 days, all = everything.
  * @summary Compare bets and stats between workspace members
  */
-export const compareWorkspaceMembers = async ( options?: RequestInit): Promise<MemberComparison[]> => {
+export const compareWorkspaceMembers = async (params?: CompareWorkspaceMembersParams, options?: RequestInit): Promise<MemberComparison[]> => {
 
-  return customFetch<MemberComparison[]>(getCompareWorkspaceMembersUrl(),
+  return customFetch<MemberComparison[]>(getCompareWorkspaceMembersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3252,23 +3333,23 @@ export const compareWorkspaceMembers = async ( options?: RequestInit): Promise<M
 
 
 
-export const getCompareWorkspaceMembersQueryKey = () => {
+export const getCompareWorkspaceMembersQueryKey = (params?: CompareWorkspaceMembersParams,) => {
     return [
-    `/api/workspace/compare`
+    `/api/workspace/compare`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getCompareWorkspaceMembersQueryOptions = <TData = Awaited<ReturnType<typeof compareWorkspaceMembers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareWorkspaceMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getCompareWorkspaceMembersQueryOptions = <TData = Awaited<ReturnType<typeof compareWorkspaceMembers>>, TError = ErrorType<unknown>>(params?: CompareWorkspaceMembersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareWorkspaceMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getCompareWorkspaceMembersQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getCompareWorkspaceMembersQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof compareWorkspaceMembers>>> = ({ signal }) => compareWorkspaceMembers({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof compareWorkspaceMembers>>> = ({ signal }) => compareWorkspaceMembers(params, { signal, ...requestOptions });
 
 
 
@@ -3286,11 +3367,11 @@ export type CompareWorkspaceMembersQueryError = ErrorType<unknown>
  */
 
 export function useCompareWorkspaceMembers<TData = Awaited<ReturnType<typeof compareWorkspaceMembers>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareWorkspaceMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: CompareWorkspaceMembersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof compareWorkspaceMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getCompareWorkspaceMembersQueryOptions(options)
+  const queryOptions = getCompareWorkspaceMembersQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

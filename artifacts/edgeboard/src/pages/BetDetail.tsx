@@ -15,6 +15,7 @@ import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
 import { formatOddsAs } from "@workspace/odds"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
+import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
@@ -486,6 +487,11 @@ export default function BetDetail() {
             </div>
           </div>
 
+          {settleBet.isError && (
+            <p className="text-sm text-chart-2" data-testid="text-settle-error">
+              {getApiErrorMessage(settleBet.error, "Couldn't save this result. Nothing was recorded — try again.")}
+            </p>
+          )}
           <DialogFooter className="gap-2 flex-col sm:flex-row">
             <Button variant="outline" onClick={resetModal} className="sm:w-auto w-full">Cancel</Button>
             <Button 

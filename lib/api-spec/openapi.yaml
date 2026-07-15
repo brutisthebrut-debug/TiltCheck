@@ -516,6 +516,37 @@ paths:
         "409":
           description: Parlay is already settled — its payout is part of the bankroll ledger and legs cannot be edited
 
+  /parlays/{id}/recompute-odds:
+    post:
+      operationId: recomputeParlayOdds
+      tags: [parlays]
+      summary: Recompute a pending parlay's combined odds and payout from its legs
+      description: >
+        For parlays whose stored combined odds are wrong (e.g. an impossible
+        dead-zone price) while every leg carries a valid price. Owner-only and
+        pending-only — a settled parlay's payout is already part of the
+        bankroll ledger. Recomputes the combined odds and potential payout
+        from the legs exactly like a leg correction does.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Parlay with recomputed combined odds and payout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parlay"
+        "400":
+          description: One or more legs still carry invalid odds — correct the legs first
+        "404":
+          description: Parlay not found
+        "409":
+          description: Parlay is already settled — its payout is part of the bankroll ledger
+
   /parlays/{id}/settle:
     patch:
       operationId: settleParlay
@@ -953,6 +984,18 @@ paths:
       operationId: compareWorkspaceMembers
       tags: [workspace]
       summary: Compare bets and stats between workspace members
+      description: >
+        Head-to-head comparison rows for every workspace member. Money math
+        includes settled straight bets AND parlays (won/lost/push), excludes
+        dead-zone-odds rows, and honors the same settledAt window as the
+        leaderboard: week = last 7 days, month = last 30 days, all = everything.
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, all]
+            default: all
       responses:
         "200":
           description: Member comparison data

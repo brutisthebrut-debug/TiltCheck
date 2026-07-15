@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, or, gte, lte, ilike } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, ilike, isNull } from "drizzle-orm";
 import { db, betsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListBetsQueryParams,
@@ -344,7 +344,11 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
 
   // Perform the bet update and the bankroll ledger insert atomically so a
   // mid-settle crash can't leave the bet settled without the balance moving.
-  const updated = await db.transaction(async (tx) => {
+  // The write re-checks pending status so two concurrent settles can never
+  // both land (a double ledger entry would corrupt the bankroll).
+  let updated: typeof betsTable.$inferSelect;
+  try {
+    updated = await db.transaction(async (tx) => {
     const [updatedBet] = await tx
       .update(betsTable)
       .set({
@@ -356,8 +360,11 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
         missReason: missReason ?? null,
         settledAt: new Date(),
       })
-      .where(eq(betsTable.id, params.data.id))
+      .where(and(eq(betsTable.id, params.data.id), eq(betsTable.status, "pending"), isNull(betsTable.settledAt)))
       .returning();
+    if (!updatedBet) {
+      throw Object.assign(new Error("Bet was already settled by another request."), { statusCode: 409 });
+    }
 
     // Get current balance for transaction
     const txRows = await tx
@@ -393,7 +400,15 @@ router.patch("/bets/:id/settle", requireProfile, async (req, res): Promise<void>
     });
 
     return updatedBet;
-  });
+    });
+  } catch (err) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    if (statusCode === 409) {
+      res.status(409).json({ error: (err as Error).message });
+      return;
+    }
+    throw err;
+  }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, updated.userId));
   res.json(formatBet(updated, user?.displayName ?? "Unknown"));

@@ -780,10 +780,30 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
       flight = (async () => {
         const narrative = await generateRecapNarrative(factsResult.facts);
         // The unique index makes sure only one row lands even across processes.
-        await db
-          .insert(recapNarrativesTable)
-          .values({ userId, weekStart, narrative, model: NARRATIVE_MODEL })
-          .onConflictDoNothing();
+        // A failed save must never throw away the paid-for narrative: the
+        // generation already happened, so deliver it regardless. Retry the
+        // insert once (transient DB hiccups are the common case), then log
+        // loudly — the worst outcome is a re-generation on a later request,
+        // never a blank tape for this one.
+        const persist = () =>
+          db
+            .insert(recapNarrativesTable)
+            .values({ userId, weekStart, narrative, model: NARRATIVE_MODEL })
+            .onConflictDoNothing();
+        try {
+          await persist();
+        } catch (saveErr) {
+          logger.warn({ err: saveErr, userId, weekStart }, "Recap narrative save failed — retrying once");
+          try {
+            await new Promise((r) => setTimeout(r, 250));
+            await persist();
+          } catch (retryErr) {
+            logger.error(
+              { err: retryErr, userId, weekStart },
+              "Recap narrative save failed twice — returning unsaved narrative (will regenerate next time)",
+            );
+          }
+        }
         return narrative;
       })();
       narrativeFlights.set(flightKey, flight);
