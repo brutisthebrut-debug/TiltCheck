@@ -11,6 +11,7 @@ export interface SportStats {
   wins: number;
   losses: number;
   pushes: number;
+  /** Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately. */
   winRate: number;
   totalWagered: number;
   profit: number;

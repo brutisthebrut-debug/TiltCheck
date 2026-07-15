@@ -16,6 +16,7 @@ export {
   decimalToAmerican,
   combineAmerican,
   combineDecimalExact,
+  activeLegOdds,
 } from "@workspace/odds";
 
 export const INVALID_ODDS_MESSAGE =

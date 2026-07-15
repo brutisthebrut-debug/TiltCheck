@@ -11,6 +11,7 @@ export interface ConfidenceBucket {
   confidenceRange: string;
   totalBets: number;
   wins: number;
+  /** Percentage of decided bets in the bucket won — wins ÷ (wins + losses); pushes excluded. */
   winRate: number;
   avgOdds: number;
 }

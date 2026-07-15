@@ -62,6 +62,19 @@ export function parlayPayoutExact(americanLegs: number[], stake: number): number
   return combineDecimalExact(americanLegs) * stake;
 }
 
+/**
+ * Odds of the legs that still count after pushed/voided legs are removed.
+ *
+ * Books settle a parlay with a pushed (or voided) leg by dropping that leg
+ * and recombining the rest — the ticket pays like a shorter parlay. Legs in
+ * any other state (won, lost, pending) keep their price in the combination.
+ * An empty result means every leg was removed: the parlay reduces to a
+ * stake refund (push), never a win.
+ */
+export function activeLegOdds(legs: Array<{ odds: number; status: string }>): number[] {
+  return legs.filter((l) => l.status !== "push" && l.status !== "void").map((l) => l.odds);
+}
+
 /** Total payout (stake included) for a single American price. */
 export function payoutFromAmerican(american: number, stake: number): number {
   return americanToDecimal(american) * stake;

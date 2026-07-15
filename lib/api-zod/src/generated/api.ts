@@ -972,6 +972,7 @@ export const RecomputeParlayOddsResponse = zod.object({
 
 
 /**
+ * Settles the parlay and moves the bankroll. Pushed or voided legs are removed from the ticket the way books settle it: a parlay graded "won" pays from the combined odds of the remaining legs only, not the original full-ticket odds. If every leg pushed or voided, the parlay cannot be "won" — settle it as push (stake refunded). `actualPayoutOverride` still wins when provided (promo boosts).
  * @summary Settle a parlay result and add review
  */
 export const SettleParlayParams = zod.object({
@@ -1073,9 +1074,17 @@ export const UnsettleParlayResponse = zod.object({
 
 
 /**
- * Returns pending straight bets whose game date is before today, and pending parlays whose every leg's game date is before today, for the signed-in user only. Used to nudge bettors to settle finished games.
+ * Returns pending straight bets whose game date is before today, and pending parlays whose every leg's game date is before today, for the signed-in user only. Used to nudge bettors to settle finished games. "Today" is evaluated in the bettor's own timezone when `tz` is provided (an IANA timezone like "America/Los_Angeles"), so a bet stops counting as unsettled only after its game date has actually ended for the user — not at UTC midnight. An invalid or missing `tz` falls back to UTC.
  * @summary List the signed-in user's pending bets and parlays whose games are already over
  */
+export const getNeedsSettlingQueryTzMax = 64;
+
+
+
+export const GetNeedsSettlingQueryParams = zod.object({
+  "tz": zod.coerce.string().max(getNeedsSettlingQueryTzMax).nullish().describe('IANA timezone of the bettor\'s browser (e.g. \"America\/Los_Angeles\"). Invalid values fall back to UTC.')
+})
+
 export const GetNeedsSettlingResponse = zod.object({
   "count": zod.number().describe('Total number of bets + parlays awaiting settlement'),
   "bets": zod.array(zod.object({
@@ -1263,7 +1272,7 @@ export const GetStatsSummaryResponse = zod.object({
   "losses": zod.number(),
   "pushes": zod.number(),
   "pending": zod.number(),
-  "winRate": zod.number(),
+  "winRate": zod.number().describe('Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately in the record.'),
   "totalWagered": zod.number(),
   "totalProfit": zod.number(),
   "roi": zod.number(),
@@ -1300,7 +1309,7 @@ export const GetStatsBySportResponseItem = zod.object({
   "wins": zod.number(),
   "losses": zod.number(),
   "pushes": zod.number(),
-  "winRate": zod.number(),
+  "winRate": zod.number().describe('Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately.'),
   "totalWagered": zod.number(),
   "profit": zod.number(),
   "roi": zod.number(),
@@ -1345,7 +1354,7 @@ export const GetConfidenceAnalysisResponseItem = zod.object({
   "confidenceRange": zod.string().describe('e.g. \"1-3\", \"4-6\", \"7-10\"'),
   "totalBets": zod.number(),
   "wins": zod.number(),
-  "winRate": zod.number(),
+  "winRate": zod.number().describe('Percentage of decided bets in the bucket won — wins ÷ (wins + losses); pushes excluded.'),
   "avgOdds": zod.number()
 })
 export const GetConfidenceAnalysisResponse = zod.array(GetConfidenceAnalysisResponseItem)
@@ -1692,7 +1701,7 @@ export const CompareWorkspaceMembersResponseItem = zod.object({
   "totalBets": zod.number(),
   "wins": zod.number(),
   "losses": zod.number(),
-  "winRate": zod.number(),
+  "winRate": zod.number().describe('Percentage of decided plays won — wins ÷ (wins + losses). Pushes are excluded from the denominator.'),
   "roi": zod.number(),
   "totalProfit": zod.number(),
   "currentBankroll": zod.number(),

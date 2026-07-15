@@ -13,6 +13,7 @@ export interface MemberComparison {
   totalBets: number;
   wins: number;
   losses: number;
+  /** Percentage of decided plays won — wins ÷ (wins + losses). Pushes are excluded from the denominator. */
   winRate: number;
   roi: number;
   totalProfit: number;

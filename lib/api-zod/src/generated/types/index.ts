@@ -50,6 +50,7 @@ export * from './getEdgeFinderParams';
 export * from './getEdgeFinderPeriod';
 export * from './getLeakProfileParams';
 export * from './getLessonsParams';
+export * from './getNeedsSettlingParams';
 export * from './getRecapNarrativeParams';
 export * from './getRecentActivityParams';
 export * from './getStatsBySportParams';

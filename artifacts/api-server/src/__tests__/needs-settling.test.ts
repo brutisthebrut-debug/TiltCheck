@@ -29,6 +29,8 @@ vi.mock("@clerk/express", () => ({
 }));
 
 import app from "../app";
+import { todayInTimeZone } from "../lib/dates";
+import { addDays } from "@workspace/weeks";
 import {
   db,
   pool,
@@ -161,5 +163,61 @@ describe("GET /api/settlement/needs-settling", () => {
     currentClerkUserId = `clerk_missing_${Date.now()}`;
     const res = await request(app).get("/api/settlement/needs-settling");
     expect(res.status).toBe(403);
+  });
+
+  it("judges 'today' in the bettor's timezone when tz is provided", async () => {
+    const { clerkUserId } = await createUser();
+    currentClerkUserId = clerkUserId;
+
+    // A bet dated "today" in the requested zone is still in progress there
+    // and must not be nagged; a bet dated the day before must be.
+    const tz = "America/Los_Angeles";
+    const todayThere = todayInTimeZone(tz);
+    const yesterdayThere = addDays(todayThere, -1);
+
+    const me = createdUserIds[createdUserIds.length - 1];
+    await db.insert(betsTable).values([
+      makeBet(me, { event: "Game day still running", gameDate: todayThere }),
+      makeBet(me, { event: "Finished yesterday", gameDate: yesterdayThere }),
+    ]);
+
+    const res = await request(app).get(`/api/settlement/needs-settling?tz=${encodeURIComponent(tz)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.bets.map((b: { event: string }) => b.event)).toEqual(["Finished yesterday"]);
+    // Parlay legs use the same clock: a leg dated today-there keeps the
+    // parlay out of the list.
+    await createParlayWithLegs(me, "Leg still running locally", [yesterdayThere, todayThere]);
+    const res2 = await request(app).get(`/api/settlement/needs-settling?tz=${encodeURIComponent(tz)}`);
+    expect(res2.body.parlays).toHaveLength(0);
+  });
+
+  it("an unknown tz falls back to UTC instead of failing", async () => {
+    const { clerkUserId } = await createUser();
+    currentClerkUserId = clerkUserId;
+    const res = await request(app).get("/api/settlement/needs-settling?tz=Not/AZone");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ count: 0, bets: [], parlays: [] });
+  });
+});
+
+describe("todayInTimeZone", () => {
+  it("west-of-UTC evening: UTC has rolled to tomorrow but the bettor's day hasn't ended", async () => {
+    // 2026-07-15T03:00Z is still the evening of July 14 in Los Angeles.
+    const instant = new Date("2026-07-15T03:00:00Z");
+    expect(todayInTimeZone("America/Los_Angeles", instant)).toBe("2026-07-14");
+    expect(todayInTimeZone(undefined, instant)).toBe("2026-07-15");
+  });
+
+  it("east-of-UTC morning: the bettor's day is already tomorrow", async () => {
+    // 2026-07-14T22:00Z is already July 15 in Tokyo.
+    const instant = new Date("2026-07-14T22:00:00Z");
+    expect(todayInTimeZone("Asia/Tokyo", instant)).toBe("2026-07-15");
+  });
+
+  it("invalid or empty tz falls back to UTC", async () => {
+    const instant = new Date("2026-07-15T03:00:00Z");
+    expect(todayInTimeZone("Not/AZone", instant)).toBe("2026-07-15");
+    expect(todayInTimeZone(null, instant)).toBe("2026-07-15");
+    expect(todayInTimeZone("", instant)).toBe("2026-07-15");
   });
 });

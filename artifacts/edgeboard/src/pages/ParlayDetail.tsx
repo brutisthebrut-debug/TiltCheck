@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
-import { formatOddsAs } from "@workspace/odds"
+import { formatOddsAs, combineAmerican, parlayPayoutExact } from "@workspace/odds"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { getApiErrorMessage } from "@/lib/api-error"
@@ -142,6 +142,25 @@ export default function ParlayDetail() {
     setPendingStatus(status)
   }
 
+  // When any leg is marked push/void, the ticket settles like a shorter
+  // parlay: pushed legs come off and the remaining legs recombine. This
+  // mirrors the server's math exactly so the preview matches the payout.
+  const getReducedPreview = () => {
+    if (!parlay) return null
+    const eff = parlay.legs.map(leg =>
+      legResults[leg.id] ?? (leg.status !== 'pending' ? leg.status : null)
+    )
+    const activeLegs = parlay.legs.filter((_, i) => eff[i] !== 'push' && eff[i] !== 'void')
+    if (activeLegs.length === parlay.legs.length) return null
+    const activeOdds = activeLegs.map(l => l.odds)
+    return {
+      removed: parlay.legs.length - activeLegs.length,
+      remaining: activeLegs.length,
+      odds: activeOdds.length > 0 ? combineAmerican(activeOdds) : null,
+      payout: activeOdds.length > 0 ? parlayPayoutExact(activeOdds, parlay.stake) : parlay.stake,
+    }
+  }
+
   const handleSubmitReview = () => {
     if (!parlay || !pendingStatus) return
     const formattedLegResults: LegResult[] = Object.entries(legResults).map(([legId, status]) => ({
@@ -173,7 +192,7 @@ export default function ParlayDetail() {
         queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
         // The result is saved — this is just the moment. Skippable, never blocking.
         if (pendingStatus === 'won') {
-          const payout = actualPayoutOverride ? Number(actualPayoutOverride) : parlay.potentialPayout
+          const payout = actualPayoutOverride ? Number(actualPayoutOverride) : (getReducedPreview()?.payout ?? parlay.potentialPayout)
           setMoment({ kind: 'won', profit: Math.max(0, payout - parlay.stake) })
         } else if (pendingStatus === 'lost') {
           setMoment({ kind: 'lost', lost: parlay.stake })
@@ -647,24 +666,38 @@ export default function ParlayDetail() {
               )}
             </div>
 
-            {pendingStatus === 'won' && (
-              <div className="space-y-2">
-                <Label>
-                  Actual Payout Override 
-                  <span className="text-muted-foreground font-normal"> (optional — use for promo boosts)</span>
-                </Label>
-                <Input 
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder={`Default: ${formatCurrency(parlay.potentialPayout)}`}
-                  value={actualPayoutOverride}
-                  onChange={e => setActualPayoutOverride(e.target.value)}
-                  className="bg-background"
-                />
-                <p className="text-xs text-muted-foreground">Leave blank to use calculated payout.</p>
-              </div>
-            )}
+            {pendingStatus === 'won' && (() => {
+              const reduced = getReducedPreview()
+              const defaultPayout = reduced?.payout ?? parlay.potentialPayout
+              return (
+                <div className="space-y-2">
+                  {reduced && (
+                    <div className="rounded-md border border-blue-400/30 bg-blue-400/5 px-3 py-2.5 text-sm" data-testid="text-reduced-payout">
+                      <span className="font-medium text-blue-400">
+                        {reduced.removed === 1 ? '1 leg comes off the ticket' : `${reduced.removed} legs come off the ticket`}
+                      </span>
+                      {' '}— pushed and voided legs don't count, so this pays like a {reduced.remaining}-leg parlay
+                      {reduced.odds != null && <> at <span className="font-mono">{formatOddsAs(reduced.odds, oddsFormat)}</span></>}:
+                      {' '}<span className="font-mono font-medium">{formatCurrency(reduced.payout)}</span> instead of {formatCurrency(parlay.potentialPayout)}.
+                    </div>
+                  )}
+                  <Label>
+                    Actual Payout Override 
+                    <span className="text-muted-foreground font-normal"> (optional — use for promo boosts)</span>
+                  </Label>
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder={`Default: ${formatCurrency(defaultPayout)}`}
+                    value={actualPayoutOverride}
+                    onChange={e => setActualPayoutOverride(e.target.value)}
+                    className="bg-background"
+                  />
+                  <p className="text-xs text-muted-foreground">Leave blank to use calculated payout.</p>
+                </div>
+              )
+            })()}
 
             <div className="space-y-2">
               <Label>Was your reasoning sound?</Label>

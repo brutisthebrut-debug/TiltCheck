@@ -322,12 +322,22 @@ export async function seedDemoBoard(opts: { force: boolean }): Promise<DemoSeedR
           const stake = pick(persona.stakes);
           const combined = combineAmerican(legs.map((l) => l.odds));
           const potentialPayout = round2(parlayPayoutExact(legs.map((l) => l.odds), stake));
-          // Each leg wins ~72% ⇒ realistic parlay hit rates by leg count.
-          const legStatuses = legs.map(() => (chance(0.72) ? "won" : "lost"));
-          const won = legStatuses.every((s) => s === "won");
-          const status = won ? "won" : "lost";
+          // Each leg wins ~65%, pushes ~7% ⇒ realistic parlay hit rates by
+          // leg count, with the occasional pushed leg reducing the ticket.
+          const legStatuses = legs.map(() => (chance(0.72) ? (chance(0.1) ? "push" : "won") : "lost"));
+          const anyLost = legStatuses.includes("lost");
+          const anyWon = legStatuses.includes("won");
+          const status = anyLost ? "lost" : anyWon ? "won" : "push";
+          const won = status === "won";
           const settledAt = new Date(lastGameDay.getTime() + DAY);
-          const actualPayout = won ? potentialPayout : 0;
+          // Pushed legs come off the ticket: a won parlay pays from the
+          // combined odds of the remaining legs only; all-push refunds.
+          const remainingOdds = legs.filter((_, li) => legStatuses[li] !== "push").map((l) => l.odds);
+          const actualPayout = won
+            ? round2(parlayPayoutExact(remainingOdds, stake))
+            : status === "push"
+              ? stake
+              : 0;
           const reviewed = chance(0.55);
 
           const [parlay] = await tx
@@ -344,7 +354,7 @@ export async function seedDemoBoard(opts: { force: boolean }): Promise<DemoSeedR
               rationale: chance(0.5) ? pick(RATIONALES) : null,
               sportsbook: pick(SPORTSBOOKS),
               reasoningQuality: reviewed ? (chance(0.6) ? "sound" : "flawed") : null,
-              missReason: !won && reviewed ? pick(MISS_REASONS) : null,
+              missReason: status === "lost" && reviewed ? pick(MISS_REASONS) : null,
               whatHappened: reviewed && chance(0.5) ? pick(WHAT_HAPPENED) : null,
               createdAt: new Date(lastGameDay.getTime() - randInt(24, 72) * 60 * 60 * 1000),
               settledAt,
@@ -357,11 +367,11 @@ export async function seedDemoBoard(opts: { force: boolean }): Promise<DemoSeedR
 
           ledger.push({
             at: settledAt,
-            type: won ? "bet_win" : "bet_loss",
+            type: won ? "bet_win" : status === "push" ? "bet_push" : "bet_loss",
             amount: round2(actualPayout - stake),
             referenceId: parlay.id,
             referenceType: "parlay",
-            note: `${won ? "Won" : "Lost"}: Parlay ${parlay.name}`,
+            note: `${won ? "Won" : status === "push" ? "Push" : "Lost"}: Parlay ${parlay.name}`,
           });
         }
       }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeLegOdds,
   americanToDecimal,
   americanToFractional,
   bookDecimal,
@@ -147,5 +148,56 @@ describe("display", () => {
   it("americanToFractional reduces", () => {
     expect(americanToFractional(-250)).toBe("2/5");
     expect(americanToFractional(600)).toBe("6/1");
+  });
+});
+
+describe("activeLegOdds — pushed/voided legs come off the ticket", () => {
+  it("drops pushed and voided legs, keeps everything else", () => {
+    const legs = [
+      { odds: 100, status: "won" },
+      { odds: -110, status: "push" },
+      { odds: 150, status: "void" },
+      { odds: -200, status: "pending" },
+    ];
+    expect(activeLegOdds(legs)).toEqual([100, -200]);
+  });
+
+  it("mixed push reduces a parlay's combined price and payout", () => {
+    // Two +100 legs: full ticket pays 4.0x. One pushes -> pays like a
+    // single +100 bet: 2.0x.
+    const legs = [
+      { odds: 100, status: "won" },
+      { odds: 100, status: "push" },
+    ];
+    const remaining = activeLegOdds(legs);
+    expect(combineDecimalExact(remaining)).toBeCloseTo(2.0, 10);
+    expect(parlayPayoutExact(remaining, 50)).toBeCloseTo(100, 2);
+  });
+
+  it("single remaining leg keeps its own price", () => {
+    const remaining = activeLegOdds([
+      { odds: -110, status: "won" },
+      { odds: 130, status: "void" },
+    ]);
+    expect(remaining).toEqual([-110]);
+    expect(combineAmerican(remaining)).toBe(-110);
+  });
+
+  it("all legs pushed leaves nothing to combine — the ticket is a refund", () => {
+    expect(
+      activeLegOdds([
+        { odds: 100, status: "push" },
+        { odds: -110, status: "push" },
+      ])
+    ).toEqual([]);
+  });
+
+  it("no pushes leaves the ticket untouched", () => {
+    expect(
+      activeLegOdds([
+        { odds: 100, status: "won" },
+        { odds: -110, status: "won" },
+      ])
+    ).toEqual([100, -110]);
   });
 });

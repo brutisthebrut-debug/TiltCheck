@@ -51,8 +51,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { activeUser } = useUser()
   const { signOut } = useClerk()
 
+  // "Needs settling" is judged against the bettor's own day, not UTC —
+  // otherwise the nag fires at UTC midnight, mid-evening for US bettors.
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
   const { data: needsSettling } = useGetNeedsSettling(
-    { query: { enabled: !!activeUser, queryKey: getGetNeedsSettlingQueryKey() } }
+    { tz: browserTz },
+    { query: { enabled: !!activeUser, queryKey: getGetNeedsSettlingQueryKey({ tz: browserTz }) } }
   )
   const settleCount = needsSettling?.count ?? 0
 

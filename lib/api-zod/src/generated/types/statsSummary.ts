@@ -15,6 +15,7 @@ export interface StatsSummary {
   losses: number;
   pushes: number;
   pending: number;
+  /** Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately in the record. */
   winRate: number;
   totalWagered: number;
   totalProfit: number;

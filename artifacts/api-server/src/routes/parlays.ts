@@ -15,6 +15,7 @@ import {
   INVALID_ODDS_MESSAGE,
   combineAmerican,
   combineDecimalExact,
+  activeLegOdds,
 } from "../lib/odds";
 import {
   GetParlayParams,
@@ -600,13 +601,16 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
     return;
   }
 
+  // Full legs are needed twice: to validate legResults ownership, and to
+  // work out which legs still count toward the payout after pushes/voids.
+  const ownLegs = await db
+    .select()
+    .from(parlayLegsTable)
+    .where(eq(parlayLegsTable.parlayId, params.data.id));
+
   // Verify every legId in legResults belongs to this parlay before touching
   // anything — a stray legId must never mutate another parlay's legs.
   if (legResults && legResults.length > 0) {
-    const ownLegs = await db
-      .select({ id: parlayLegsTable.id })
-      .from(parlayLegsTable)
-      .where(eq(parlayLegsTable.parlayId, params.data.id));
     const ownLegIds = new Set(ownLegs.map((l) => l.id));
     const foreignLegIds = (legResults as Array<{ legId: number }>)
       .map((lr) => lr.legId)
@@ -654,7 +658,34 @@ router.patch("/parlays/:id/settle", requireProfile, async (req, res): Promise<vo
 
   let actualPayout: number;
   if (status === "won") {
-    actualPayout = actualPayoutOverride != null ? actualPayoutOverride : Number(existing.potentialPayout);
+    // Pushed/voided legs come off the ticket the way books settle it: the
+    // parlay pays from the combined odds of the remaining legs only. Legs
+    // not listed in legResults keep their stored status (pending counts as
+    // still on the ticket — a won parlay implies its unlisted legs won).
+    const resultByLegId = new Map(
+      ((legResults ?? []) as Array<{ legId: number; status: string }>).map((lr) => [lr.legId, lr.status]),
+    );
+    const effectiveLegs = ownLegs.map((l) => ({
+      odds: l.odds,
+      status: resultByLegId.get(l.id) ?? l.status,
+    }));
+    const remainingOdds = activeLegOdds(effectiveLegs);
+    if (remainingOdds.length === 0) {
+      res.status(400).json({
+        error:
+          'Every leg pushed or voided, so there is nothing left to win — settle this parlay as "push" to get the stake back.',
+      });
+      return;
+    }
+    const reduced = remainingOdds.length < effectiveLegs.length;
+    if (actualPayoutOverride != null) {
+      actualPayout = actualPayoutOverride;
+    } else if (reduced) {
+      actualPayout = calcParlayPayout(combineDecimalExact(remainingOdds), Number(existing.stake));
+    } else {
+      // No legs removed — keep the stored payout exactly as quoted at bet time.
+      actualPayout = Number(existing.potentialPayout);
+    }
   } else if (status === "push" || status === "void") {
     actualPayout = Number(existing.stake);
   } else {

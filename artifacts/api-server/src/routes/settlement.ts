@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, lt, gte, inArray, notInArray } from "drizzle-orm";
 import { db, betsTable, parlaysTable, parlayLegsTable, usersTable } from "@workspace/db";
-import { dayOf } from "@workspace/weeks";
+import { GetNeedsSettlingQueryParams } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
+import { todayInTimeZone } from "../lib/dates";
 import { formatBet } from "./bets";
 import { formatParlay } from "./parlays";
 
@@ -13,10 +14,20 @@ const router: IRouter = Router();
 // A straight bet needs settling when its game date is strictly before today.
 // A parlay needs settling only when EVERY leg's game date is before today —
 // a parlay can't be graded while any leg is still upcoming.
+//
+// "Today" is the bettor's local day when the client supplies its timezone —
+// otherwise the nag would flip at UTC midnight, hours before a west-of-UTC
+// bettor's game day has actually ended.
 router.get("/settlement/needs-settling", requireProfile, async (req, res): Promise<void> => {
+  const query = GetNeedsSettlingQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
   const userId = req.currentUser!.id;
-  // Today's date (UTC) as YYYY-MM-DD — game dates are stored as plain dates.
-  const today = dayOf(new Date());
+  // Today's date as YYYY-MM-DD in the bettor's timezone (UTC fallback) —
+  // game dates are stored as plain dates.
+  const today = todayInTimeZone(query.data.tz);
 
   const betRows = await db
     .select({ bet: betsTable, user: usersTable })

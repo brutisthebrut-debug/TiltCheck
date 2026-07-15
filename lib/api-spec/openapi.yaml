@@ -870,6 +870,13 @@ paths:
       operationId: settleParlay
       tags: [parlays]
       summary: Settle a parlay result and add review
+      description: >
+        Settles the parlay and moves the bankroll. Pushed or voided legs are
+        removed from the ticket the way books settle it: a parlay graded
+        "won" pays from the combined odds of the remaining legs only, not
+        the original full-ticket odds. If every leg pushed or voided, the
+        parlay cannot be "won" — settle it as push (stake refunded).
+        `actualPayoutOverride` still wins when provided (promo boosts).
       parameters:
         - name: id
           in: path
@@ -929,6 +936,19 @@ paths:
         Returns pending straight bets whose game date is before today, and
         pending parlays whose every leg's game date is before today, for the
         signed-in user only. Used to nudge bettors to settle finished games.
+        "Today" is evaluated in the bettor's own timezone when `tz` is
+        provided (an IANA timezone like "America/Los_Angeles"), so a bet
+        stops counting as unsettled only after its game date has actually
+        ended for the user — not at UTC midnight. An invalid or missing `tz`
+        falls back to UTC.
+      parameters:
+        - name: tz
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+            maxLength: 64
+          description: IANA timezone of the bettor's browser (e.g. "America/Los_Angeles"). Invalid values fall back to UTC.
       responses:
         "200":
           description: Items awaiting settlement
@@ -2453,6 +2473,7 @@ components:
           type: integer
         winRate:
           type: number
+          description: Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately in the record.
         totalWagered:
           type: number
         totalProfit:
@@ -2506,6 +2527,7 @@ components:
           type: integer
         winRate:
           type: number
+          description: Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately.
         totalWagered:
           type: number
         profit:
@@ -2557,6 +2579,7 @@ components:
           type: integer
         winRate:
           type: number
+          description: Percentage of decided bets in the bucket won — wins ÷ (wins + losses); pushes excluded.
         avgOdds:
           type: number
       required: [confidenceRange, totalBets, wins, winRate, avgOdds]
@@ -2737,6 +2760,7 @@ components:
           type: integer
         winRate:
           type: number
+          description: Percentage of decided plays won — wins ÷ (wins + losses). Pushes are excluded from the denominator.
         roi:
           type: number
         totalProfit:

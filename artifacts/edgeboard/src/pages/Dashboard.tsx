@@ -71,8 +71,11 @@ export default function Dashboard() {
     { query: { enabled: !!activeUser?.id, queryKey: [...getListParlaysQueryKey({ userId: activeUser?.id }), 'pending'] } }
   );
 
+  // Judge "the game is over" by the bettor's own day, not UTC midnight.
+  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data: needsSettling, isError: isNeedsSettlingError, refetch: refetchNeedsSettling, isRefetching: isNeedsSettlingRefetching } = useGetNeedsSettling(
-    { query: { enabled: !!activeUser?.id, queryKey: getGetNeedsSettlingQueryKey() } }
+    { tz: browserTz },
+    { query: { enabled: !!activeUser?.id, queryKey: getGetNeedsSettlingQueryKey({ tz: browserTz }) } }
   );
 
   const { data: streaks, isError: isStreaksError, refetch: refetchStreaks, isRefetching: isStreaksRefetching } = useGetStreaks(

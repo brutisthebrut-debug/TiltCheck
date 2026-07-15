@@ -130,7 +130,8 @@ router.get("/workspace/compare", requirePro, async (req, res): Promise<void> => 
 
       const wins = settled.filter((i) => i.status === "won").length;
       const losses = settled.filter((i) => i.status === "lost").length;
-      const winRate = settled.length > 0 ? Math.round((wins / settled.length) * 1000) / 10 : 0;
+      // Wins ÷ (wins + losses): pushes are money back, not losses.
+      const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 1000) / 10 : 0;
 
       const totalWagered = settled.reduce((acc, i) => acc + Number(i.stake), 0);
       const totalPayout = settled.reduce((acc, i) => acc + (i.actualPayout != null ? Number(i.actualPayout) : 0), 0);

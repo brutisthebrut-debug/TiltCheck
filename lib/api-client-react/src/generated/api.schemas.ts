@@ -898,6 +898,7 @@ export interface StatsSummary {
   losses: number;
   pushes: number;
   pending: number;
+  /** Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately in the record. */
   winRate: number;
   totalWagered: number;
   totalProfit: number;
@@ -919,6 +920,7 @@ export interface SportStats {
   wins: number;
   losses: number;
   pushes: number;
+  /** Percentage of decided bets won — wins ÷ (wins + losses). Pushes are excluded from the denominator and reported separately. */
   winRate: number;
   totalWagered: number;
   profit: number;
@@ -965,6 +967,7 @@ export interface ConfidenceBucket {
   confidenceRange: string;
   totalBets: number;
   wins: number;
+  /** Percentage of decided bets in the bucket won — wins ÷ (wins + losses); pushes excluded. */
   winRate: number;
   avgOdds: number;
 }
@@ -1129,6 +1132,7 @@ export interface MemberComparison {
   totalBets: number;
   wins: number;
   losses: number;
+  /** Percentage of decided plays won — wins ÷ (wins + losses). Pushes are excluded from the denominator. */
   winRate: number;
   roi: number;
   totalProfit: number;
@@ -1468,6 +1472,15 @@ export const ListParlaysStatus = {
   push: 'push',
   void: 'void',
 } as const;
+
+export type GetNeedsSettlingParams = {
+/**
+ * IANA timezone of the bettor's browser (e.g. "America/Los_Angeles"). Invalid values fall back to UTC.
+ * @maxLength 64
+ * @nullable
+ */
+tz?: string | null;
+};
 
 export type GetBankrollParams = {
 /**

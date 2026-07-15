@@ -107,7 +107,9 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
     losses,
     pushes,
     pending,
-    winRate: settled.length > 0 ? Math.round((wins / settled.length) * 1000) / 10 : 0,
+    // Win rate is wins ÷ (wins + losses): a push is money back, not a loss,
+    // so it must not drag the rate down. Pushes stay visible in the record.
+    winRate: wins + losses > 0 ? Math.round((wins / (wins + losses)) * 1000) / 10 : 0,
     totalWagered: Math.round(totalWagered * 100) / 100,
     totalProfit: Math.round(totalProfit * 100) / 100,
     roi: Math.round(roi * 100) / 100,
@@ -173,14 +175,15 @@ router.get("/stats/by-sport", async (req, res): Promise<void> => {
   }
 
   const result = Object.entries(sportMap).map(([sport, s]) => {
-    const total = s.wins + s.losses + s.pushes;
+    // Decided bets only — pushes are money back, not losses.
+    const decided = s.wins + s.losses;
     const profit = s.payout - s.wagered;
     return {
       sport,
       wins: s.wins,
       losses: s.losses,
       pushes: s.pushes,
-      winRate: total > 0 ? Math.round((s.wins / total) * 1000) / 10 : 0,
+      winRate: decided > 0 ? Math.round((s.wins / decided) * 1000) / 10 : 0,
       totalWagered: Math.round(s.wagered * 100) / 100,
       profit: Math.round(profit * 100) / 100,
       roi: s.wagered > 0 ? Math.round((profit / s.wagered) * 10000) / 100 : 0,
@@ -282,12 +285,14 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
   const result = buckets.map(({ range, min, max }) => {
     const inBucket = bets.filter((b) => b.confidenceScore >= min && b.confidenceScore <= max);
     const wins = inBucket.filter((b) => b.status === "won").length;
+    // Decided bets only — a push proves nothing about the read.
+    const decided = inBucket.filter((b) => b.status === "won" || b.status === "lost").length;
     const avgOdds = inBucket.length > 0 ? inBucket.reduce((acc, b) => acc + b.odds, 0) / inBucket.length : 0;
     return {
       confidenceRange: range,
       totalBets: inBucket.length,
       wins,
-      winRate: inBucket.length > 0 ? Math.round((wins / inBucket.length) * 1000) / 10 : 0,
+      winRate: decided > 0 ? Math.round((wins / decided) * 1000) / 10 : 0,
       avgOdds: Math.round(avgOdds),
     };
   });

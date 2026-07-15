@@ -45,6 +45,7 @@ import type {
   GetEdgeFinderParams,
   GetLeakProfileParams,
   GetLessonsParams,
+  GetNeedsSettlingParams,
   GetRecapNarrativeParams,
   GetRecentActivityParams,
   GetStatsBySportParams,
@@ -2568,6 +2569,7 @@ export const getSettleParlayUrl = (id: number,) => {
 }
 
 /**
+ * Settles the parlay and moves the bankroll. Pushed or voided legs are removed from the ticket the way books settle it: a parlay graded "won" pays from the combined odds of the remaining legs only, not the original full-ticket odds. If every leg pushed or voided, the parlay cannot be "won" — settle it as push (stake refunded). `actualPayoutOverride` still wins when provided (promo boosts).
  * @summary Settle a parlay result and add review
  */
 export const settleParlay = async (id: number,
@@ -2703,21 +2705,28 @@ export const useUnsettleParlay = <TError = ErrorType<void>,
       return useMutation(getUnsettleParlayMutationOptions(options));
     }
 
-export const getGetNeedsSettlingUrl = () => {
+export const getGetNeedsSettlingUrl = (params?: GetNeedsSettlingParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/settlement/needs-settling`
+  return stringifiedParams.length > 0 ? `/api/settlement/needs-settling?${stringifiedParams}` : `/api/settlement/needs-settling`
 }
 
 /**
- * Returns pending straight bets whose game date is before today, and pending parlays whose every leg's game date is before today, for the signed-in user only. Used to nudge bettors to settle finished games.
+ * Returns pending straight bets whose game date is before today, and pending parlays whose every leg's game date is before today, for the signed-in user only. Used to nudge bettors to settle finished games. "Today" is evaluated in the bettor's own timezone when `tz` is provided (an IANA timezone like "America/Los_Angeles"), so a bet stops counting as unsettled only after its game date has actually ended for the user — not at UTC midnight. An invalid or missing `tz` falls back to UTC.
  * @summary List the signed-in user's pending bets and parlays whose games are already over
  */
-export const getNeedsSettling = async ( options?: RequestInit): Promise<NeedsSettling> => {
+export const getNeedsSettling = async (params?: GetNeedsSettlingParams, options?: RequestInit): Promise<NeedsSettling> => {
 
-  return customFetch<NeedsSettling>(getGetNeedsSettlingUrl(),
+  return customFetch<NeedsSettling>(getGetNeedsSettlingUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2730,23 +2739,23 @@ export const getNeedsSettling = async ( options?: RequestInit): Promise<NeedsSet
 
 
 
-export const getGetNeedsSettlingQueryKey = () => {
+export const getGetNeedsSettlingQueryKey = (params?: GetNeedsSettlingParams,) => {
     return [
-    `/api/settlement/needs-settling`
+    `/api/settlement/needs-settling`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetNeedsSettlingQueryOptions = <TData = Awaited<ReturnType<typeof getNeedsSettling>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNeedsSettling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetNeedsSettlingQueryOptions = <TData = Awaited<ReturnType<typeof getNeedsSettling>>, TError = ErrorType<void>>(params?: GetNeedsSettlingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNeedsSettling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetNeedsSettlingQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetNeedsSettlingQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNeedsSettling>>> = ({ signal }) => getNeedsSettling({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNeedsSettling>>> = ({ signal }) => getNeedsSettling(params, { signal, ...requestOptions });
 
 
 
@@ -2764,11 +2773,11 @@ export type GetNeedsSettlingQueryError = ErrorType<void>
  */
 
 export function useGetNeedsSettling<TData = Awaited<ReturnType<typeof getNeedsSettling>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNeedsSettling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetNeedsSettlingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNeedsSettling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetNeedsSettlingQueryOptions(options)
+  const queryOptions = getGetNeedsSettlingQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

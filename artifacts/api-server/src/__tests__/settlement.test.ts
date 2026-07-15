@@ -697,15 +697,17 @@ describe("PATCH /api/parlays/:id/settle", () => {
     expect(bankroll.currentBalance).toBeCloseTo(950, 2);
   });
 
-  it("allows won with legs marked push/void alongside won", async () => {
+  it("won with a pushed leg: pushed leg comes off the ticket and the payout reduces automatically", async () => {
     const user = await createUser(1000);
+    // Two +100 legs -> full ticket pays 4x (200). One push -> pays like a
+    // single +100 bet: 2x (100).
     const parlay = await createParlay(user.id, 50);
+    expect(parlay.potentialPayout).toBeCloseTo(200, 2);
 
     const res = await request(app)
       .patch(`/api/parlays/${parlay.id}/settle`)
       .send({
         status: "won",
-        actualPayoutOverride: 100, // pushed leg reduces the payout
         legResults: [
           { legId: parlay.legs[0].id, status: "won" },
           { legId: parlay.legs[1].id, status: "push" },
@@ -714,6 +716,102 @@ describe("PATCH /api/parlays/:id/settle", () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("won");
     expect(res.body.actualPayout).toBeCloseTo(100, 2);
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1050, 2);
+    expect(bankroll.netProfitLoss).toBeCloseTo(50, 2);
+  });
+
+  it("won with a voided leg reduces the same way as a push", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        legResults: [
+          { legId: parlay.legs[0].id, status: "won" },
+          { legId: parlay.legs[1].id, status: "void" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.actualPayout).toBeCloseTo(100, 2);
+  });
+
+  it("won with a pushed leg: an explicit actualPayoutOverride still wins (promo boosts)", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        actualPayoutOverride: 120,
+        legResults: [
+          { legId: parlay.legs[0].id, status: "won" },
+          { legId: parlay.legs[1].id, status: "push" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.actualPayout).toBeCloseTo(120, 2);
+  });
+
+  it("rejects won when every leg pushed or voided — nothing is left to win", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "won",
+        legResults: [
+          { legId: parlay.legs[0].id, status: "push" },
+          { legId: parlay.legs[1].id, status: "void" },
+        ],
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/settle this parlay as "push"/i);
+
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.status).toBe("pending");
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
+  });
+
+  it("all legs pushed settled as push: stake refunded, bankroll unchanged", async () => {
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({
+        status: "push",
+        legResults: [
+          { legId: parlay.legs[0].id, status: "push" },
+          { legId: parlay.legs[1].id, status: "push" },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.actualPayout).toBeCloseTo(50, 2);
+
+    const bankroll = await getBankroll(user.id);
+    expect(bankroll.currentBalance).toBeCloseTo(1000, 2);
+  });
+
+  it("already-settled parlays are untouched by the push-reduction rule (unsettle keeps history intact)", async () => {
+    // A parlay settled won at full price before the rule change keeps its
+    // recorded payout — the new math only applies at settle time.
+    const user = await createUser(1000);
+    const parlay = await createParlay(user.id, 50);
+    const res = await request(app)
+      .patch(`/api/parlays/${parlay.id}/settle`)
+      .send({ status: "won", legResults: parlay.legs.map((l) => ({ legId: l.id, status: "won" })) });
+    expect(res.status).toBe(200);
+    expect(res.body.actualPayout).toBeCloseTo(200, 2);
+
+    const after = await request(app).get(`/api/parlays/${parlay.id}`);
+    expect(after.body.actualPayout).toBeCloseTo(200, 2);
   });
 
   it("rejects duplicate legIds in legResults with 400", async () => {
