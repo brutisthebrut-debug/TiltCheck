@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
+import { isConfiguredFounderEmail } from "../lib/founder";
 
 export type LocalUser = typeof usersTable.$inferSelect;
 
@@ -27,11 +28,29 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
   req.clerkUserId = clerkUserId;
-  const [user] = await db
+  let [user] = await db
     .select()
     .from(usersTable)
     .where(eq(usersTable.clerkUserId, clerkUserId))
     .limit(1);
+
+  // Founder self-heal: an account whose email matches FOUNDER_EMAIL is
+  // promoted to founder even if it linked before the founder feature existed
+  // (or before the env var was set). Deliberately promote-only: changing
+  // FOUNDER_EMAIL later never demotes an existing founder — demotion is a
+  // manual decision, not something a config edit should do silently.
+  if (user && !user.isFounder && isConfiguredFounderEmail(user.email)) {
+    const [promoted] = await db
+      .update(usersTable)
+      .set({ isFounder: true })
+      .where(eq(usersTable.id, user.id))
+      .returning();
+    if (promoted) {
+      user = promoted;
+      console.info(`[founder] promoted user ${promoted.id} (${promoted.username}) via FOUNDER_EMAIL match`);
+    }
+  }
+
   req.currentUser = user ?? null;
   next();
 }

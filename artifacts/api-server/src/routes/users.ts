@@ -3,6 +3,7 @@ import { and, eq, isNull, isNotNull, asc, count, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
 import { db, usersTable, invitesTable } from "@workspace/db";
 import { dayOf, lastCompletedWeekStart } from "../lib/recap";
+import { founderEmail } from "../lib/founder";
 import {
   MarkRecapSeenResponse,
   ClaimProfileBody,
@@ -49,15 +50,6 @@ function allowedEmailSet(): Set<string> | null {
   return set.size > 0 ? set : null;
 }
 
-// Authoritative founder control. When FOUNDER_EMAIL is set, the account with
-// that email (case-insensitive) becomes founder on claim, is always allowed
-// through the invite gate, and first-claim auto-assignment is disabled — so a
-// stranger can never grab the founder seat on a fresh database by signing in
-// first. Unset: the first account to link becomes founder (fine for dev, but
-// set FOUNDER_EMAIL in production).
-function founderEmail(): string | null {
-  return process.env.FOUNDER_EMAIL?.trim().toLowerCase() || null;
-}
 
 // The beta gate combines two invite sources: the founder-managed invites table
 // and the optional BETA_ALLOWED_EMAILS env var. The gate is open (no

@@ -206,6 +206,39 @@ describe("FOUNDER_EMAIL control", () => {
   });
 });
 
+describe("FOUNDER_EMAIL self-heal for already-linked accounts", () => {
+  it("promotes a pre-existing linked account whose email matches FOUNDER_EMAIL on its next request", async () => {
+    // Simulates an account that claimed BEFORE the founder feature / env var
+    // existed: linked, matching email, but isFounder=false.
+    const user = await createLinkedUser();
+    process.env.FOUNDER_EMAIL = ` ${user.email.toUpperCase()} `;
+    try {
+      currentClerkUserId = user.clerkUserId;
+      const res = await request(app).get("/api/users/me");
+      expect(res.status).toBe(200);
+      expect(res.body.isFounder).toBe(true);
+      // Persisted, and founder-only routes now open
+      const overview = await request(app).get("/api/admin/overview");
+      expect(overview.status).toBe(200);
+    } finally {
+      delete process.env.FOUNDER_EMAIL;
+    }
+  });
+
+  it("never promotes accounts with a different email", async () => {
+    const user = await createLinkedUser();
+    process.env.FOUNDER_EMAIL = "someone-else@example.com";
+    try {
+      currentClerkUserId = user.clerkUserId;
+      const res = await request(app).get("/api/users/me");
+      expect(res.status).toBe(200);
+      expect(res.body.isFounder).toBe(false);
+    } finally {
+      delete process.env.FOUNDER_EMAIL;
+    }
+  });
+});
+
 describe("founder auto-assignment", () => {
   it("exposes isFounder on /users/me", async () => {
     const founder = await createLinkedUser({ isFounder: true });
