@@ -17,6 +17,7 @@ import Dashboard from "../Dashboard"
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockUseGetLeakProfile = vi.fn()
+const mockMarkLeakCelebrationSeen = vi.fn()
 
 vi.mock("@workspace/api-client-react", () => ({
   useGetStatsSummary: () => queryResult(statsWithData),
@@ -28,6 +29,7 @@ vi.mock("@workspace/api-client-react", () => ({
   useGetStreaks: () => queryResult(undefined),
   useGetUserBadges: () => queryResult([]),
   useGetLeakProfile: (...args: unknown[]) => mockUseGetLeakProfile(...args),
+  useMarkLeakCelebrationSeen: () => ({ mutate: mockMarkLeakCelebrationSeen }),
   getGetLeakProfileQueryKey: () => ["leak-profile"],
   getGetStreaksQueryKey: () => ["streaks"],
   getGetUserBadgesQueryKey: () => ["user-badges"],

@@ -233,7 +233,7 @@ describe("GET /stats/leak-profile", () => {
       expect(row.leakTrendCelebratedAt).toBeNull();
     });
 
-    it("fires exactly once when the worst sport's recent window goes non-negative", async () => {
+    it("reports the flip without consuming it — only the explicit ack burns the celebration", async () => {
       const { user, clerkUserId } = await createLinkedUser();
       currentClerkUserId = clerkUserId;
       const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
@@ -248,13 +248,37 @@ describe("GET /stats/leak-profile", () => {
       expect(first.body.worstSport.recentNet).toBeGreaterThanOrEqual(0);
       expect(first.body.trendFlip).toBe(true);
 
-      // Persisted per user — the second visit doesn't repeat the celebration
+      // Reading the profile again (e.g. a background fetch from the bet form)
+      // must NOT burn the celebration — it stays available until acknowledged.
       const second = await request(app).get("/api/stats/leak-profile");
       expect(second.status).toBe(200);
-      expect(second.body.trendFlip).toBe(false);
+      expect(second.body.trendFlip).toBe(true);
+      const [unburned] = await db.select().from(usersTable).where(inArray(usersTable.id, [user.id]));
+      expect(unburned.leakTrendCelebratedAt).toBeNull();
+
+      // The client acks once the celebratory card actually rendered
+      const ack = await request(app).post("/api/users/me/leak-celebration-seen");
+      expect(ack.status).toBe(200);
 
       const [row] = await db.select().from(usersTable).where(inArray(usersTable.id, [user.id]));
       expect(row.leakTrendCelebratedAt).not.toBeNull();
+
+      // After the ack the celebration never repeats
+      const third = await request(app).get("/api/stats/leak-profile");
+      expect(third.status).toBe(200);
+      expect(third.body.trendFlip).toBe(false);
+
+      // Repeat acks are no-ops that preserve the original timestamp
+      const again = await request(app).post("/api/users/me/leak-celebration-seen");
+      expect(again.status).toBe(200);
+      const [after] = await db.select().from(usersTable).where(inArray(usersTable.id, [user.id]));
+      expect(after.leakTrendCelebratedAt?.getTime()).toBe(row.leakTrendCelebratedAt?.getTime());
+    });
+
+    it("rejects unauthenticated acknowledgements", async () => {
+      currentClerkUserId = null;
+      const res = await request(app).post("/api/users/me/leak-celebration-seen");
+      expect(res.status).toBe(401);
     });
 
     it("fires when the top miss reason's recent losses hit zero", async () => {

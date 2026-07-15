@@ -327,6 +327,78 @@ export const useMarkRecapSeen = <TError = ErrorType<void>,
       return useMutation(getMarkRecapSeenMutationOptions(options));
     }
 
+export const getMarkLeakCelebrationSeenUrl = () => {
+
+
+
+
+  return `/api/users/me/leak-celebration-seen`
+}
+
+/**
+ * Consumes the one-time "trend flipped" celebration. Clients must call this only after the celebratory card actually rendered, so a background fetch of the leak profile (e.g. from the bet form) can never silently burn the celebration. Idempotent — the first call records the timestamp, later calls are no-ops.
+ * @summary Record that the signed-in user has seen the one-time leak trend-flip celebration
+ */
+export const markLeakCelebrationSeen = async ( options?: RequestInit): Promise<User> => {
+
+  return customFetch<User>(getMarkLeakCelebrationSeenUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkLeakCelebrationSeenMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markLeakCelebrationSeen>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markLeakCelebrationSeen>>, TError,void, TContext> => {
+
+const mutationKey = ['markLeakCelebrationSeen'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markLeakCelebrationSeen>>, void> = () => {
+
+
+          return  markLeakCelebrationSeen(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkLeakCelebrationSeenMutationResult = NonNullable<Awaited<ReturnType<typeof markLeakCelebrationSeen>>>
+
+    export type MarkLeakCelebrationSeenMutationError = ErrorType<void>
+
+    /**
+ * @summary Record that the signed-in user has seen the one-time leak trend-flip celebration
+ */
+export const useMarkLeakCelebrationSeen = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markLeakCelebrationSeen>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markLeakCelebrationSeen>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMarkLeakCelebrationSeenMutationOptions(options));
+    }
+
 export const getListUnclaimedUsersUrl = () => {
 
 

@@ -6,6 +6,7 @@ import { dayOf, lastCompletedWeekStart } from "../lib/recap";
 import { userScopeCondition } from "../lib/scope";
 import { founderEmail } from "../lib/founder";
 import {
+  MarkLeakCelebrationSeenResponse,
   MarkRecapSeenResponse,
   ClaimProfileBody,
   ClaimProfileResponse,
@@ -104,6 +105,32 @@ router.post("/users/me/recap-seen", async (req, res): Promise<void> => {
     return;
   }
   res.json(MarkRecapSeenResponse.parse(formatUser(updated)));
+});
+
+// POST /users/me/leak-celebration-seen — consume the one-time leak trend-flip
+// celebration. Called by the client only after the celebratory card actually
+// rendered, so a background fetch of GET /stats/leak-profile can never burn
+// the celebration unseen. The IS NULL guard keeps the first timestamp under
+// concurrent acknowledgements; repeat calls are harmless no-ops.
+router.post("/users/me/leak-celebration-seen", async (req, res): Promise<void> => {
+  if (!req.currentUser) {
+    res.status(404).json({ error: "No bettor profile linked to this account" });
+    return;
+  }
+  await db
+    .update(usersTable)
+    .set({ leakTrendCelebratedAt: new Date() })
+    .where(and(eq(usersTable.id, req.currentUser.id), isNull(usersTable.leakTrendCelebratedAt)));
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.currentUser.id))
+    .limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json(MarkLeakCelebrationSeenResponse.parse(formatUser(user)));
 });
 
 // GET /users/unclaimed — profiles not yet linked to a sign-in account.

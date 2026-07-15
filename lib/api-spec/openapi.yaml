@@ -76,6 +76,29 @@ paths:
         "404":
           description: Signed in but no bettor profile linked yet
 
+  /users/me/leak-celebration-seen:
+    post:
+      operationId: markLeakCelebrationSeen
+      tags: [users]
+      summary: Record that the signed-in user has seen the one-time leak trend-flip celebration
+      description: >
+        Consumes the one-time "trend flipped" celebration. Clients must call
+        this only after the celebratory card actually rendered, so a
+        background fetch of the leak profile (e.g. from the bet form) can
+        never silently burn the celebration. Idempotent — the first call
+        records the timestamp, later calls are no-ops.
+      responses:
+        "200":
+          description: Updated user with the celebration recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not signed in
+        "404":
+          description: Signed in but no bettor profile linked yet
+
   /users/unclaimed:
     get:
       operationId: listUnclaimedUsers
@@ -1765,10 +1788,12 @@ components:
         trendFlip:
           type: boolean
           description: >-
-            True only on the first response where the reported leak's trend has
-            flipped from bleeding to non-negative — a one-time celebratory
-            acknowledgement. The flip is recorded per user server-side, so
-            later responses return false and the celebration never repeats.
+            True while the one-time "trend flipped" celebration is available:
+            the reported leak's trend reads non-negative and the user has not
+            yet seen the celebratory card. Reading this endpoint never
+            consumes the celebration — clients that render the card must POST
+            /users/me/leak-celebration-seen, after which responses return
+            false and the celebration never repeats.
       required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason, trendFlip]
 
     EdgeFinderLane:

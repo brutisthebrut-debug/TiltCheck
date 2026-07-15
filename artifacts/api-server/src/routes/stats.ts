@@ -540,10 +540,12 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
 
   // One-time trend-flip celebration. The reported leak is the same priority
   // order the dashboard uses (worst sport > miss reason > overconfidence),
-  // and "improving" mirrors its trend rules exactly. The first time the
-  // reported leak's trend reads non-negative, record it on the user so the
-  // acknowledgement never repeats — later responses return trendFlip: false.
-  // Demo requests never write (the demo mount is read-only) and never flip.
+  // and "improving" mirrors its trend rules exactly. This GET only *reports*
+  // that the celebration is available — it is consumed by
+  // POST /users/me/leak-celebration-seen, which the client calls only after
+  // the celebratory card actually rendered. That way other consumers of this
+  // endpoint (e.g. the bet form's pre-bet warning) can never silently burn
+  // the one-time celebration. Demo requests never flip.
   const topLeakImproving = worstSport
     ? worstSport.recentBets === 0 || worstSport.recentNet >= 0
     : topMissReason
@@ -553,17 +555,8 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
           overconfidence.recentWinRate == null ||
           overconfidence.recentWinRate > overconfidence.winRate
         : false;
-  let trendFlip = false;
-  if (topLeakImproving && !isDemoRequest(req) && req.currentUser!.leakTrendCelebratedAt == null) {
-    // Guard the null state in the WHERE so two concurrent fetches can't both
-    // claim the one-time celebration.
-    const updated = await db
-      .update(usersTable)
-      .set({ leakTrendCelebratedAt: new Date() })
-      .where(and(eq(usersTable.id, self), sql`${usersTable.leakTrendCelebratedAt} IS NULL`))
-      .returning({ id: usersTable.id });
-    trendFlip = updated.length > 0;
-  }
+  const trendFlip =
+    topLeakImproving && !isDemoRequest(req) && req.currentUser!.leakTrendCelebratedAt == null;
 
   res.json({
     settledCount,

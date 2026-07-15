@@ -39,6 +39,6 @@ export interface LeakProfile {
      * @nullable
      */
   topMissReason: LeakProfileTopMissReason;
-  /** True only on the first response where the reported leak's trend has flipped from bleeding to non-negative — a one-time celebratory acknowledgement. The flip is recorded per user server-side, so later responses return false and the celebration never repeats. */
+  /** True while the one-time "trend flipped" celebration is available: the reported leak's trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST /users/me/leak-celebration-seen, after which responses return false and the celebration never repeats. */
   trendFlip: boolean;
 }

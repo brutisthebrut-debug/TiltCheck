@@ -10,3 +10,4 @@
 - [Frontend component tests](frontend-component-tests.md) — edgeboard vitest is node-env; tsx tests need the jsdom docblock and `esbuild.jsx: "automatic"`; mock generated hooks, keep a real QueryClientProvider.
 - [Test-suite DB races](test-suite-db-races.md) — api-server suite holds a pg advisory lock (concurrent runs corrupt the shared dev DB); full user wipes must also delete invites (no cascade).
 - [Ledger write guards](ledger-write-guards.md) — settle/correct mutations must enforce pending-state in the UPDATE's WHERE (409 on no row); pre-read checks alone are a race.
+- [Dev DB schema drift](dev-db-schema-drift.md) — mass 42703 "column does not exist" test failures mean the dev DB lags the drizzle schema; run the db push before blaming your change.

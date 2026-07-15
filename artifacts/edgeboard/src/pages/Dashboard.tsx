@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { useUser } from "@/contexts/UserContext"
 import { 
   useGetStatsSummary, 
@@ -9,6 +10,7 @@ import {
   useGetStreaks,
   useGetUserBadges,
   useGetLeakProfile,
+  useMarkLeakCelebrationSeen,
   getGetLeakProfileQueryKey,
   getGetStreaksQueryKey,
   getGetUserBadgesQueryKey,
@@ -154,10 +156,15 @@ export default function Dashboard() {
     return null;
   })();
 
-  // One-time trend-flip celebration: the server sets trendFlip on the single
-  // response where the reported leak's trend first reads non-negative, and
-  // records it per user so it never repeats on later visits.
-  const leakCelebrating = !!leakProfile?.trendFlip && !!topLeak?.trend.improving;
+  // One-time trend-flip celebration: the server reports trendFlip while the
+  // celebration is still unseen, and we consume it with an explicit POST only
+  // once the celebratory card actually renders — so other leak-profile
+  // consumers (like the bet form) can never burn it silently. Latched in
+  // state so the card stays celebratory for this visit even after the ack
+  // makes later responses report false.
+  const trendFlipAvailable = !!leakProfile?.trendFlip && !!topLeak?.trend.improving;
+  const [leakCelebrating, setLeakCelebrating] = useState(false);
+  const { mutate: markLeakCelebrationSeen } = useMarkLeakCelebrationSeen();
 
   const isLoading = isUserLoading || isStatsLoading || isActivityLoading || isBankrollLoading;
   const isError = isStatsError || isActivityError || isBankrollError;
@@ -186,6 +193,16 @@ export default function Dashboard() {
   // Weekly recap teaser — shows once per week until the recap is opened.
   // Seen state comes from the server (per user), so it holds across devices.
   const recapUnseen = !!activeUser && isRecapUnseen(activeUser.recapSeenWeek);
+
+  // Ack the trend-flip celebration only when the celebratory card is actually
+  // on screen (not during loading/error/empty states, which never render it).
+  const leakCardOnScreen = !!topLeak && !!activeUser && !isLoading && !isError && hasData;
+  useEffect(() => {
+    if (trendFlipAvailable && leakCardOnScreen && !leakCelebrating) {
+      setLeakCelebrating(true);
+      markLeakCelebrationSeen();
+    }
+  }, [trendFlipAvailable, leakCardOnScreen, leakCelebrating, markLeakCelebrationSeen]);
 
   if (isError) {
     return (

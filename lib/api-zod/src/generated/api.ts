@@ -48,6 +48,22 @@ export const MarkRecapSeenResponse = zod.object({
 
 
 /**
+ * Consumes the one-time "trend flipped" celebration. Clients must call this only after the celebratory card actually rendered, so a background fetch of the leak profile (e.g. from the bet form) can never silently burn the celebration. Idempotent — the first call records the timestamp, later calls are no-ops.
+ * @summary Record that the signed-in user has seen the one-time leak trend-flip celebration
+ */
+export const MarkLeakCelebrationSeenResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "avatarColor": zod.string(),
+  "startingBankroll": zod.number(),
+  "createdAt": zod.string(),
+  "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
+  "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard')
+})
+
+
+/**
  * @summary List bettor profiles not yet linked to a sign-in account
  */
 export const ListUnclaimedUsersResponseItem = zod.object({
@@ -1141,7 +1157,7 @@ export const GetLeakProfileResponse = zod.object({
   "recentCount": zod.number().describe('Losses graded with this reason inside the recent window'),
   "recentNetLoss": zod.number().describe('Dollars lost to this reason inside the recent window')
 }).nullable().describe('Most common self-graded miss reason across settled losses (excluding normal variance)'),
-  "trendFlip": zod.boolean().describe('True only on the first response where the reported leak\'s trend has flipped from bleeding to non-negative — a one-time celebratory acknowledgement. The flip is recorded per user server-side, so later responses return false and the celebration never repeats.')
+  "trendFlip": zod.boolean().describe('True while the one-time \"trend flipped\" celebration is available: the reported leak\'s trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST \/users\/me\/leak-celebration-seen, after which responses return false and the celebration never repeats.')
 })
 
 
