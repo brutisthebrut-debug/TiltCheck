@@ -14,7 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
-import { Trophy, Flame, Snowflake, Swords, Users, Crown, X, Layers } from "lucide-react"
+import { Trophy, Flame, Snowflake, Swords, Users, Crown, X, Layers, Link2 } from "lucide-react"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { UpgradeCard } from "@/components/UpgradeCard"
 import { TrophyCase } from "@/components/TrophyCase"
@@ -126,6 +126,20 @@ export default function Workspace() {
   const { crews, activeCrew } = useCrews()
   const crewActionsEnabled = getCrewActionsEnabled()
 
+  // Full one-tap invite link: real origin + base path + /join/CODE. BASE_URL
+  // always carries a trailing slash, so trim it before appending the route.
+  const inviteLink = activeCrew
+    ? `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/join/${activeCrew.inviteCode}`
+    : null
+
+  const copyInviteLink = () => {
+    if (!activeCrew || !inviteLink) return
+    navigator.clipboard?.writeText(inviteLink).then(
+      () => toast({ title: "Invite link copied", description: "One tap and they're in. Send it to whoever's brave enough to be ranked." }),
+      () => toast({ title: "Couldn't copy", description: `The link is ${inviteLink} — grab it by hand.`, variant: "destructive" }),
+    )
+  }
+
   const copyInviteCode = () => {
     if (!activeCrew) return
     navigator.clipboard?.writeText(activeCrew.inviteCode).then(
@@ -175,16 +189,28 @@ export default function Workspace() {
               : "Who's up, who's down, who should stop betting parlays."}
           </p>
           {activeCrew && crewActionsEnabled && (
-            <button
-              type="button"
-              onClick={copyInviteCode}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground hover:border-primary/40"
-              data-testid="button-copy-invite-code"
-              aria-label="Copy crew invite code"
-            >
-              <Copy className="h-3 w-3" />
-              Invite code: <span className="font-bold tracking-widest text-primary">{activeCrew.inviteCode}</span>
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={copyInviteLink}
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary/50 bg-primary/10 px-2 py-1 font-mono text-xs font-bold text-primary transition-colors hover:bg-primary/20 hover:border-primary"
+                data-testid="button-copy-invite-link"
+                aria-label="Copy crew invite link"
+              >
+                <Link2 className="h-3 w-3" />
+                Copy invite link
+              </button>
+              <button
+                type="button"
+                onClick={copyInviteCode}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground hover:border-primary/40"
+                data-testid="button-copy-invite-code"
+                aria-label="Copy crew invite code"
+              >
+                <Copy className="h-3 w-3" />
+                Code: <span className="font-bold tracking-widest text-primary">{activeCrew.inviteCode}</span>
+              </button>
+            </div>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
