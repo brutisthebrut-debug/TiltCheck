@@ -18,6 +18,11 @@ import { Trophy, Flame, Snowflake, Swords, Users, Crown, X, Layers } from "lucid
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { UpgradeCard } from "@/components/UpgradeCard"
 import { useProStatus } from "@/hooks/use-pro"
+import { useCrews, getCrewActionsEnabled } from "@/hooks/use-crews"
+import { CrewSwitcher } from "@/components/CrewSwitcher"
+import { Button } from "@/components/ui/button"
+import { Copy } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 type Period = "week" | "month" | "all"
 
@@ -100,6 +105,17 @@ export default function Workspace() {
     .slice(0, 5)
   const isFriendPlaysLoading = isFriendBetsLoading || isFriendParlaysLoading
 
+  const { crews, activeCrew } = useCrews()
+  const crewActionsEnabled = getCrewActionsEnabled()
+
+  const copyInviteCode = () => {
+    if (!activeCrew) return
+    navigator.clipboard?.writeText(activeCrew.inviteCode).then(
+      () => toast({ title: "Invite code copied", description: "Send it to whoever's brave enough to be ranked." }),
+      () => toast({ title: "Couldn't copy", description: `The code is ${activeCrew.inviteCode} — grab it by hand.`, variant: "destructive" }),
+    )
+  }
+
   const me = comparisons.find((c) => c.userId === activeUser?.id)
   const them = comparisons.find((c) => c.userId === selectedId)
   const selectedEntry = board.find((e) => e.userId === selectedId)
@@ -135,7 +151,23 @@ export default function Workspace() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
-          <p className="text-muted-foreground mt-1">Who's up, who's down, who should stop betting parlays.</p>
+          <p className="text-muted-foreground mt-1">
+            {activeCrew
+              ? <>Who's up, who's down, who should stop betting parlays — <span className="text-foreground font-medium" data-testid="text-active-crew-name">{activeCrew.name}</span> edition.</>
+              : "Who's up, who's down, who should stop betting parlays."}
+          </p>
+          {activeCrew && crewActionsEnabled && (
+            <button
+              type="button"
+              onClick={copyInviteCode}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground hover:border-primary/40"
+              data-testid="button-copy-invite-code"
+              aria-label="Copy crew invite code"
+            >
+              <Copy className="h-3 w-3" />
+              Invite code: <span className="font-bold tracking-widest text-primary">{activeCrew.inviteCode}</span>
+            </button>
+          )}
         </div>
         <div className="flex rounded-lg border border-border/60 bg-card p-1" role="tablist" aria-label="Time period">
           {PERIODS.map((p) => (
@@ -156,6 +188,28 @@ export default function Workspace() {
           ))}
         </div>
       </div>
+
+      {/* Mobile has no sidebar — the crew picker gets a home on the Crew tab. */}
+      <CrewSwitcher className="md:hidden" />
+
+      {crews.length === 0 && crewActionsEnabled && (
+        <Card className="border-primary/40 bg-primary/5" data-testid="card-no-crew">
+          <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Users className="h-8 w-8 shrink-0 text-primary" />
+              <div>
+                <h2 className="font-semibold">You're not running with a crew yet</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Start one and drag your friends in, or join theirs with an invite code. Until then this board is just you talking to yourself.
+                </p>
+              </div>
+            </div>
+            <div className="w-full sm:w-56 shrink-0">
+              <CrewSwitcher />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {!hasAnyData ? (
         <Card className="border-dashed border-2 border-muted">

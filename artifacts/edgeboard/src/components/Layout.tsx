@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { Button } from "./ui/button"
 import { BadgeWatcher } from "./BadgeWatcher"
+import { CrewSwitcher } from "./CrewSwitcher"
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
@@ -76,6 +77,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 p-4">
+          {/* Which crew's board you're on — leaderboard, head-to-head, recap. */}
+          <CrewSwitcher className="mb-4" />
           <div className="mb-6 space-y-2">
             <Button asChild className="w-full justify-start gap-2" variant="default">
               <Link href="/bets/new">

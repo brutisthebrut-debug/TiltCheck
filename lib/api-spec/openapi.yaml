@@ -24,6 +24,8 @@ tags:
     description: User operations
   - name: billing
     description: TiltCheck Pro subscription operations
+  - name: crews
+    description: Crew membership and switching operations
 
 paths:
   /healthz:
@@ -214,6 +216,133 @@ paths:
                   $ref: "#/components/schemas/BadgeStatus"
         "404":
           description: User not found
+
+  # ── Crews ─────────────────────────────────────────────────────────────────
+  /crews:
+    get:
+      operationId: listCrews
+      tags: [crews]
+      summary: List the signed-in user's crews
+      description: >
+        Every crew this bettor belongs to, with their role, the shareable
+        invite code, member count, and which crew is currently active (the one
+        the leaderboard, head-to-head, and recap highlights cover).
+      responses:
+        "200":
+          description: The user's crews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Crew"
+        "403":
+          description: No bettor profile linked yet
+    post:
+      operationId: createCrew
+      tags: [crews]
+      summary: Create a new crew
+      description: >
+        Creates a crew owned by the signed-in user and switches them to it.
+        The first crew is free; creating another while already in one is part
+        of the Pro layer (402 `pro_required` for free accounts — founder and
+        live subscriptions pass).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCrewInput"
+      responses:
+        "201":
+          description: Created crew
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "402":
+          description: Free accounts live in one crew — running more is Pro (`error` is `pro_required`)
+        "403":
+          description: No bettor profile linked yet
+
+  /crews/join:
+    post:
+      operationId: joinCrew
+      tags: [crews]
+      summary: Join a crew with an invite code
+      description: >
+        Joins the crew behind the invite code and switches to it. Joining your
+        first crew is free; joining another while already in one is part of
+        the Pro layer (402 `pro_required` for free accounts).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinCrewInput"
+      responses:
+        "200":
+          description: Joined crew
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "402":
+          description: Free accounts live in one crew — running more is Pro (`error` is `pro_required`)
+        "404":
+          description: No crew matches that invite code
+        "409":
+          description: Already a member of this crew (`error` is `already_in_crew`)
+
+  /crews/{id}/activate:
+    post:
+      operationId: activateCrew
+      tags: [crews]
+      summary: Switch the active crew
+      description: >
+        Makes this crew the one whose leaderboard, head-to-head, and recap
+        highlights the user sees. Must be a member.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The now-active crew
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "404":
+          description: Not a member of this crew
+
+  /crews/{id}/invite-code:
+    post:
+      operationId: rotateCrewInviteCode
+      tags: [crews]
+      summary: Rotate the crew's invite code
+      description: >
+        Owner only. Replaces the invite code so an old shared link stops
+        working. Existing members are unaffected.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Crew with the fresh invite code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "403":
+          description: Only the crew owner can rotate the code
+        "404":
+          description: Not a member of this crew
 
   # ── Bets ──────────────────────────────────────────────────────────────────
   /bets:
@@ -1333,6 +1462,49 @@ components:
           type: string
           description: Whop hosted checkout URL to send the buyer to
       required: [checkoutUrl]
+
+    Crew:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+          enum: [owner, member]
+          description: The signed-in user's role in this crew
+        inviteCode:
+          type: string
+          description: Shareable join code — sharing it is free, joining may need Pro
+        memberCount:
+          type: integer
+        isActive:
+          type: boolean
+          description: Whether this is the crew the user's social views currently cover
+        createdAt:
+          type: string
+      required: [id, name, role, inviteCode, memberCount, isActive, createdAt]
+
+    CreateCrewInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: Crew name shown on the leaderboard header and switcher
+      required: [name]
+
+    JoinCrewInput:
+      type: object
+      properties:
+        inviteCode:
+          type: string
+          minLength: 4
+          maxLength: 16
+          description: Invite code shared by a crew member (case-insensitive)
+      required: [inviteCode]
 
     Invite:
       type: object

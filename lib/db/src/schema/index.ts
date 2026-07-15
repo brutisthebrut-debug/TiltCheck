@@ -4,4 +4,5 @@ export * from "./parlays";
 export * from "./transactions";
 export * from "./badges";
 export * from "./invites";
+export * from "./crews";
 export * from "./recapNarratives";

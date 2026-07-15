@@ -35,6 +35,8 @@ import type {
   ClaimProfileInput,
   CompareWorkspaceMembersParams,
   ConfidenceBucket,
+  CreateCrewInput,
+  Crew,
   EdgeFinder,
   GetBankrollHistoryParams,
   GetBankrollParams,
@@ -53,6 +55,7 @@ import type {
   InsightsResponse,
   Invite,
   InviteInput,
+  JoinCrewInput,
   LeaderboardEntry,
   LeakProfile,
   ListBetsParams,
@@ -776,6 +779,372 @@ export function useGetUserBadges<TData = Awaited<ReturnType<typeof getUserBadges
 
 
 
+
+export const getListCrewsUrl = () => {
+
+
+
+
+  return `/api/crews`
+}
+
+/**
+ * Every crew this bettor belongs to, with their role, the shareable invite code, member count, and which crew is currently active (the one the leaderboard, head-to-head, and recap highlights cover).
+ * @summary List the signed-in user's crews
+ */
+export const listCrews = async ( options?: RequestInit): Promise<Crew[]> => {
+
+  return customFetch<Crew[]>(getListCrewsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCrewsQueryKey = () => {
+    return [
+    `/api/crews`
+    ] as const;
+    }
+
+
+export const getListCrewsQueryOptions = <TData = Awaited<ReturnType<typeof listCrews>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCrews>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCrewsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCrews>>> = ({ signal }) => listCrews({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCrews>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCrewsQueryResult = NonNullable<Awaited<ReturnType<typeof listCrews>>>
+export type ListCrewsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the signed-in user's crews
+ */
+
+export function useListCrews<TData = Awaited<ReturnType<typeof listCrews>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCrews>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCrewsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateCrewUrl = () => {
+
+
+
+
+  return `/api/crews`
+}
+
+/**
+ * Creates a crew owned by the signed-in user and switches them to it. The first crew is free; creating another while already in one is part of the Pro layer (402 `pro_required` for free accounts — founder and live subscriptions pass).
+ * @summary Create a new crew
+ */
+export const createCrew = async (createCrewInput: CreateCrewInput, options?: RequestInit): Promise<Crew> => {
+
+  return customFetch<Crew>(getCreateCrewUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createCrewInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCrewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCrew>>, TError,{data: BodyType<CreateCrewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCrew>>, TError,{data: BodyType<CreateCrewInput>}, TContext> => {
+
+const mutationKey = ['createCrew'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCrew>>, {data: BodyType<CreateCrewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCrew(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCrewMutationResult = NonNullable<Awaited<ReturnType<typeof createCrew>>>
+    export type CreateCrewMutationBody = BodyType<CreateCrewInput>
+    export type CreateCrewMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a new crew
+ */
+export const useCreateCrew = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCrew>>, TError,{data: BodyType<CreateCrewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCrew>>,
+        TError,
+        {data: BodyType<CreateCrewInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCrewMutationOptions(options));
+    }
+
+export const getJoinCrewUrl = () => {
+
+
+
+
+  return `/api/crews/join`
+}
+
+/**
+ * Joins the crew behind the invite code and switches to it. Joining your first crew is free; joining another while already in one is part of the Pro layer (402 `pro_required` for free accounts).
+ * @summary Join a crew with an invite code
+ */
+export const joinCrew = async (joinCrewInput: JoinCrewInput, options?: RequestInit): Promise<Crew> => {
+
+  return customFetch<Crew>(getJoinCrewUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(joinCrewInput)
+  }
+);}
+
+
+
+
+
+export const getJoinCrewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinCrew>>, TError,{data: BodyType<JoinCrewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinCrew>>, TError,{data: BodyType<JoinCrewInput>}, TContext> => {
+
+const mutationKey = ['joinCrew'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinCrew>>, {data: BodyType<JoinCrewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  joinCrew(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinCrewMutationResult = NonNullable<Awaited<ReturnType<typeof joinCrew>>>
+    export type JoinCrewMutationBody = BodyType<JoinCrewInput>
+    export type JoinCrewMutationError = ErrorType<void>
+
+    /**
+ * @summary Join a crew with an invite code
+ */
+export const useJoinCrew = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinCrew>>, TError,{data: BodyType<JoinCrewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinCrew>>,
+        TError,
+        {data: BodyType<JoinCrewInput>},
+        TContext
+      > => {
+      return useMutation(getJoinCrewMutationOptions(options));
+    }
+
+export const getActivateCrewUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/activate`
+}
+
+/**
+ * Makes this crew the one whose leaderboard, head-to-head, and recap highlights the user sees. Must be a member.
+ * @summary Switch the active crew
+ */
+export const activateCrew = async (id: number, options?: RequestInit): Promise<Crew> => {
+
+  return customFetch<Crew>(getActivateCrewUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getActivateCrewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateCrew>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof activateCrew>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['activateCrew'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof activateCrew>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  activateCrew(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ActivateCrewMutationResult = NonNullable<Awaited<ReturnType<typeof activateCrew>>>
+
+    export type ActivateCrewMutationError = ErrorType<void>
+
+    /**
+ * @summary Switch the active crew
+ */
+export const useActivateCrew = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof activateCrew>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof activateCrew>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getActivateCrewMutationOptions(options));
+    }
+
+export const getRotateCrewInviteCodeUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/invite-code`
+}
+
+/**
+ * Owner only. Replaces the invite code so an old shared link stops working. Existing members are unaffected.
+ * @summary Rotate the crew's invite code
+ */
+export const rotateCrewInviteCode = async (id: number, options?: RequestInit): Promise<Crew> => {
+
+  return customFetch<Crew>(getRotateCrewInviteCodeUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRotateCrewInviteCodeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rotateCrewInviteCode>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rotateCrewInviteCode>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['rotateCrewInviteCode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rotateCrewInviteCode>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  rotateCrewInviteCode(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RotateCrewInviteCodeMutationResult = NonNullable<Awaited<ReturnType<typeof rotateCrewInviteCode>>>
+
+    export type RotateCrewInviteCodeMutationError = ErrorType<void>
+
+    /**
+ * @summary Rotate the crew's invite code
+ */
+export const useRotateCrewInviteCode = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rotateCrewInviteCode>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rotateCrewInviteCode>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRotateCrewInviteCodeMutationOptions(options));
+    }
 
 export const getListBetsUrl = (params?: ListBetsParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -175,6 +175,107 @@ export const GetUserBadgesResponse = zod.array(GetUserBadgesResponseItem)
 
 
 /**
+ * Every crew this bettor belongs to, with their role, the shareable invite code, member count, and which crew is currently active (the one the leaderboard, head-to-head, and recap highlights cover).
+ * @summary List the signed-in user's crews
+ */
+export const ListCrewsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'member']).describe('The signed-in user\'s role in this crew'),
+  "inviteCode": zod.string().describe('Shareable join code — sharing it is free, joining may need Pro'),
+  "memberCount": zod.number(),
+  "isActive": zod.boolean().describe('Whether this is the crew the user\'s social views currently cover'),
+  "createdAt": zod.string()
+})
+export const ListCrewsResponse = zod.array(ListCrewsResponseItem)
+
+
+/**
+ * Creates a crew owned by the signed-in user and switches them to it. The first crew is free; creating another while already in one is part of the Pro layer (402 `pro_required` for free accounts — founder and live subscriptions pass).
+ * @summary Create a new crew
+ */
+export const createCrewBodyNameMax = 40;
+
+
+
+export const CreateCrewBody = zod.object({
+  "name": zod.string().min(1).max(createCrewBodyNameMax).describe('Crew name shown on the leaderboard header and switcher')
+})
+
+export const CreateCrewResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'member']).describe('The signed-in user\'s role in this crew'),
+  "inviteCode": zod.string().describe('Shareable join code — sharing it is free, joining may need Pro'),
+  "memberCount": zod.number(),
+  "isActive": zod.boolean().describe('Whether this is the crew the user\'s social views currently cover'),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * Joins the crew behind the invite code and switches to it. Joining your first crew is free; joining another while already in one is part of the Pro layer (402 `pro_required` for free accounts).
+ * @summary Join a crew with an invite code
+ */
+export const joinCrewBodyInviteCodeMin = 4;
+export const joinCrewBodyInviteCodeMax = 16;
+
+
+
+export const JoinCrewBody = zod.object({
+  "inviteCode": zod.string().min(joinCrewBodyInviteCodeMin).max(joinCrewBodyInviteCodeMax).describe('Invite code shared by a crew member (case-insensitive)')
+})
+
+export const JoinCrewResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'member']).describe('The signed-in user\'s role in this crew'),
+  "inviteCode": zod.string().describe('Shareable join code — sharing it is free, joining may need Pro'),
+  "memberCount": zod.number(),
+  "isActive": zod.boolean().describe('Whether this is the crew the user\'s social views currently cover'),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * Makes this crew the one whose leaderboard, head-to-head, and recap highlights the user sees. Must be a member.
+ * @summary Switch the active crew
+ */
+export const ActivateCrewParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ActivateCrewResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'member']).describe('The signed-in user\'s role in this crew'),
+  "inviteCode": zod.string().describe('Shareable join code — sharing it is free, joining may need Pro'),
+  "memberCount": zod.number(),
+  "isActive": zod.boolean().describe('Whether this is the crew the user\'s social views currently cover'),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * Owner only. Replaces the invite code so an old shared link stops working. Existing members are unaffected.
+ * @summary Rotate the crew's invite code
+ */
+export const RotateCrewInviteCodeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RotateCrewInviteCodeResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'member']).describe('The signed-in user\'s role in this crew'),
+  "inviteCode": zod.string().describe('Shareable join code — sharing it is free, joining may need Pro'),
+  "memberCount": zod.number(),
+  "isActive": zod.boolean().describe('Whether this is the crew the user\'s social views currently cover'),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary List straight bets
  */
 export const listBetsQueryLimitDefault = 50;

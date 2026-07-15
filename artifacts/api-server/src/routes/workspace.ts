@@ -6,18 +6,22 @@ import { GetWorkspaceLeaderboardQueryParams, CompareWorkspaceMembersQueryParams 
 import { isValidAmericanOdds } from "../lib/odds";
 import { BADGE_DEFINITIONS } from "../lib/badges";
 import { requireProfile } from "../middlewares/auth";
-import { userScopeCondition } from "../lib/scope";
+import { userScopeCondition, getSocialUsers } from "../lib/scope";
 
 const router: IRouter = Router();
 
 // GET /workspace
 router.get("/workspace", async (req, res): Promise<void> => {
-  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
-  const betCount = await db
-    .select({ count: betsTable.id })
-    .from(betsTable)
-    .innerJoin(usersTable, eq(betsTable.userId, usersTable.id))
-    .where(userScopeCondition(req));
+  // Crew-scoped: members are the viewer's active crew, not the whole world.
+  const users = await getSocialUsers(req);
+  const memberIds = users.map((u) => u.id);
+  const betCount =
+    memberIds.length === 0
+      ? []
+      : await db
+          .select({ count: betsTable.id })
+          .from(betsTable)
+          .where(inArray(betsTable.userId, memberIds));
 
   res.json({
     id: 1,
@@ -56,7 +60,8 @@ router.get("/workspace/compare", requirePro, async (req, res): Promise<void> => 
     windowStart == null || (settledAt != null && settledAt >= windowStart);
   const SETTLED = ["won", "lost", "push"];
 
-  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
+  // Crew-scoped: the head-to-head only ever covers the active crew.
+  const users = await getSocialUsers(req);
 
   const comparisons = await Promise.all(
     users.map(async (user) => {
@@ -136,7 +141,8 @@ router.get("/workspace/leaderboard", requireProfile, async (req, res): Promise<v
         ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         : null;
 
-  const users = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id);
+  // Crew-scoped: the board ranks the viewer's active crew only.
+  const users = await getSocialUsers(req);
   const scopedIds = new Set(users.map((u) => u.id));
   const allBets = (await db.select().from(betsTable)).filter(
     (b) => isValidAmericanOdds(b.odds) && scopedIds.has(b.userId),

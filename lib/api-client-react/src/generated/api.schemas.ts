@@ -73,6 +73,48 @@ export interface BillingCheckout {
   checkoutUrl: string;
 }
 
+/**
+ * The signed-in user's role in this crew
+ */
+export type CrewRole = typeof CrewRole[keyof typeof CrewRole];
+
+
+export const CrewRole = {
+  owner: 'owner',
+  member: 'member',
+} as const;
+
+export interface Crew {
+  id: number;
+  name: string;
+  /** The signed-in user's role in this crew */
+  role: CrewRole;
+  /** Shareable join code — sharing it is free, joining may need Pro */
+  inviteCode: string;
+  memberCount: number;
+  /** Whether this is the crew the user's social views currently cover */
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CreateCrewInput {
+  /**
+     * Crew name shown on the leaderboard header and switcher
+     * @minLength 1
+     * @maxLength 40
+     */
+  name: string;
+}
+
+export interface JoinCrewInput {
+  /**
+     * Invite code shared by a crew member (case-insensitive)
+     * @minLength 4
+     * @maxLength 16
+     */
+  inviteCode: string;
+}
+
 export interface Invite {
   id: number;
   email: string;

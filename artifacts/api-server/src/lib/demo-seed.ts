@@ -27,6 +27,7 @@ import {
 } from "@workspace/db";
 import { payoutFromAmerican, combineAmerican, parlayPayoutExact } from "@workspace/odds";
 import { dayOf } from "@workspace/weeks";
+import { ensureCrewsBootstrapped } from "./crews";
 
 // ---------------------------------------------------------------------------
 // Deterministic PRNG (mulberry32)
@@ -406,5 +407,10 @@ export async function seedDemoBoard(opts: { force: boolean }): Promise<DemoSeedR
     .from(usersTable)
     .where(eq(usersTable.isDemo, true))
     .orderBy(asc(usersTable.id));
+
+  // A force-reseed wiped the old demo users, which cascades away the old demo
+  // crew — rebuild it right away so the demo board never runs crewless.
+  await ensureCrewsBootstrapped();
+
   return { seeded: true, users: seededUsers.length };
 }

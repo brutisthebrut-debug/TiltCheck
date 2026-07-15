@@ -11,6 +11,7 @@ import badgesRouter from "./badges";
 import workspaceRouter from "./workspace";
 import adminRouter from "./admin";
 import billingRouter from "./billing";
+import crewsRouter from "./crews";
 import { requireAuth } from "../middlewares/auth";
 import { demoReadOnly, demoSession } from "../middlewares/demo";
 
@@ -35,6 +36,9 @@ demoRouter.use(bankrollRouter);
 demoRouter.use(statsRouter);
 demoRouter.use(badgesRouter);
 demoRouter.use(workspaceRouter);
+// Crews on the demo mount are read-only by demoReadOnly: the switcher can
+// list the sealed demo crew, but create/join/switch writes are rejected.
+demoRouter.use(crewsRouter);
 router.use("/demo", demoRouter);
 
 // Everything below requires a signed-in session
@@ -52,5 +56,6 @@ router.use(adminRouter);
 // Billing is deliberately NOT mounted on the demo router — the demo world
 // reports Pro via its own bypass in requirePro, never through checkout.
 router.use(billingRouter);
+router.use(crewsRouter);
 
 export default router;

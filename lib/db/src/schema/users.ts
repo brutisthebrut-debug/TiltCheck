@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -31,6 +31,11 @@ export const usersTable = pgTable("users", {
   // Whop hosted-checkout configuration created for this bettor. Payments made
   // through it are how the server verifies the purchase after the redirect.
   whopCheckoutConfigId: text("whop_checkout_config_id"),
+  // The crew whose leaderboard/head-to-head/recap this user is currently
+  // viewing. Plain integer (no FK) to avoid a circular schema import; the
+  // crews routes validate membership before writing it, and readers fall back
+  // to the user's first membership when it's null or stale.
+  activeCrewId: integer("active_crew_id"),
   // Demo crew member: fictional data shown on the public demo board only.
   // Every real-user query is scoped to isDemo=false and every demo query to
   // isDemo=true, so the two worlds never mix.

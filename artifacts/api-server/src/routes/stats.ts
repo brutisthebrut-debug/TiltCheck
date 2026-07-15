@@ -19,7 +19,7 @@ import { assembleRecapFacts, generateRecapNarrative, NARRATIVE_MODEL } from "../
 import { logger } from "../lib/logger";
 import { requireProfile } from "../middlewares/auth";
 import { requirePro } from "../middlewares/billing";
-import { userScopeCondition, userInScope } from "../lib/scope";
+import { userScopeCondition, userInScope, userInSocialScope, getSocialUsers } from "../lib/scope";
 import { isDemoRequest } from "../middlewares/demo";
 
 const router: IRouter = Router();
@@ -755,7 +755,9 @@ router.get("/stats/recap", requireProfile, async (req, res): Promise<void> => {
     return;
   }
   const userId = query.data.userId ?? req.currentUser!.id;
-  if (query.data.userId != null && !(await userInScope(req, query.data.userId))) {
+  // Crew-aware: a recap for someone outside your active crew is a privacy
+  // leak, not a feature — same 404 as a nonexistent user.
+  if (query.data.userId != null && !(await userInSocialScope(req, query.data.userId))) {
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -775,13 +777,15 @@ router.get("/stats/recap", requireProfile, async (req, res): Promise<void> => {
     }
   }
 
-  // Crew highlights only ever cover the request's world: the demo recap talks
-  // about the demo crew, real recaps never mention demo bettors.
-  const [users, allBets, allParlays] = await Promise.all([
-    db.select({ id: usersTable.id, displayName: usersTable.displayName }).from(usersTable).where(userScopeCondition(req)),
+  // Crew highlights only ever cover the viewer's active crew: the demo recap
+  // talks about the demo crew, real recaps never mention demo bettors or
+  // members of other crews.
+  const [crewUsers, allBets, allParlays] = await Promise.all([
+    getSocialUsers(req),
     db.select().from(betsTable),
     db.select().from(parlaysTable),
   ]);
+  const users = crewUsers.map((u) => ({ id: u.id, displayName: u.displayName }));
   const scopedIds = new Set(users.map((u) => u.id));
   const bets = allBets.filter((b) => scopedIds.has(b.userId));
   const parlays = allParlays.filter((p) => scopedIds.has(p.userId));
@@ -801,7 +805,10 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
     return;
   }
   const userId = query.data.userId ?? req.currentUser!.id;
-  if (query.data.userId != null && !(await userInScope(req, query.data.userId))) {
+  // Crew-aware: the narrative endpoint hands back a bettor's private tape —
+  // only their own crewmates (or themselves) may pull it. World-level checks
+  // aren't enough now that crews partition the real world.
+  if (query.data.userId != null && !(await userInSocialScope(req, query.data.userId))) {
     res.status(404).json({ error: "User not found" });
     return;
   }
@@ -842,11 +849,12 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
     return;
   }
 
-  const [users, allBets, allParlays] = await Promise.all([
-    db.select({ id: usersTable.id, displayName: usersTable.displayName }).from(usersTable).where(userScopeCondition(req)),
+  const [crewUsersForNarrative, allBets, allParlays] = await Promise.all([
+    getSocialUsers(req),
     db.select().from(betsTable).where(eq(betsTable.userId, userId)),
     db.select().from(parlaysTable).where(eq(parlaysTable.userId, userId)),
   ]);
+  const users = crewUsersForNarrative.map((u) => ({ id: u.id, displayName: u.displayName }));
   const recap = computeWeeklyRecap({ users, bets: allBets, parlays: allParlays, userId, weekStart });
 
   // Quiet week or nothing graded yet (e.g. a bettor's first week with only

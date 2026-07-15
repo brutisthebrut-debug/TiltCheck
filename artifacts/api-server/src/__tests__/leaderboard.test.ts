@@ -34,7 +34,7 @@ vi.mock("@clerk/express", () => ({
 }));
 
 import app from "../app";
-import { db, pool, usersTable, betsTable, parlaysTable } from "@workspace/db";
+import { db, pool, usersTable, betsTable, parlaysTable, crewsTable, crewMembersTable } from "@workspace/db";
 
 const createdUserIds: number[] = [];
 let counter = 0;
@@ -55,6 +55,23 @@ async function createUser(displayName: string) {
   createdUserIds.push(row.id);
   currentClerkUserId = clerkUserId;
   return row;
+}
+
+// The board is crew-scoped now: multi-user assertions need the users to
+// share a crew. The crew cascades away when its owner (a test user) is deleted.
+async function putInOneCrew(userIds: number[]) {
+  const [crew] = await db
+    .insert(crewsTable)
+    .values({
+      name: `LB Test Crew ${Date.now()}_${counter++}`,
+      ownerId: userIds[0],
+      inviteCode: `LBT${Date.now().toString(36).toUpperCase()}${counter}`.slice(0, 16),
+    })
+    .returning();
+  await db.insert(crewMembersTable).values(
+    userIds.map((userId, i) => ({ crewId: crew.id, userId, role: i === 0 ? "owner" : "member" })),
+  );
+  return crew;
 }
 
 afterAll(async () => {
@@ -113,6 +130,7 @@ describe("GET /workspace/leaderboard", () => {
     const winner = await createUser("Winner");
     const loser = await createUser("Loser");
     const idle = await createUser("Idle");
+    await putInOneCrew([winner.id, loser.id, idle.id]);
 
     await db.insert(betsTable).values([
       // winner: +150 profit settled, plus one pending that must not count

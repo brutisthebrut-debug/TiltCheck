@@ -4,6 +4,7 @@ import { Route, Switch, Link } from 'wouter';
 import { setUrlRewrite } from '@workspace/api-client-react';
 import { setOddsFormatServerSync } from '@/hooks/use-odds-format';
 import { setBillingServerSync } from '@/hooks/use-pro';
+import { setCrewActionsEnabled } from '@/hooks/use-crews';
 import { Layout } from '@/components/Layout';
 import { UserProvider } from '@/contexts/UserContext';
 import { toast } from '@/hooks/use-toast';
@@ -42,6 +43,8 @@ export default function DemoApp() {
     // The demo world is always Pro (the pitch shows the full product) and the
     // read-only demo API has no billing routes to ask.
     setBillingServerSync(false);
+    // The demo crew is sealed: visitors can see it but never create/join/switch.
+    setCrewActionsEnabled(false);
     return new QueryClient({
       mutationCache: new MutationCache({
         onError: (_error, _variables, _context, mutation) => {
@@ -62,10 +65,12 @@ export default function DemoApp() {
     setUrlRewrite(demoRewrite);
     setOddsFormatServerSync(false);
     setBillingServerSync(false);
+    setCrewActionsEnabled(false);
     return () => {
       setUrlRewrite(null);
       setOddsFormatServerSync(true);
       setBillingServerSync(true);
+      setCrewActionsEnabled(true);
     };
   }, []);
 

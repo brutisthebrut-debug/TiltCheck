@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureDemoSeeded } from "./lib/demo-seed";
+import { ensureCrewsBootstrapped } from "./lib/crews";
 
 const rawPort = process.env["PORT"];
 
@@ -34,5 +35,13 @@ app.listen(port, (err) => {
     })
     .catch((err) => {
       logger.error({ err }, "Demo board seeding failed");
+    })
+    // Crews bootstrap runs after demo seeding so a fresh demo world gets its
+    // sealed crew in the same boot. Idempotent: migrates a pre-crews real
+    // world into its first crew exactly once, then short-circuits forever.
+    .finally(() => {
+      ensureCrewsBootstrapped().catch((err) => {
+        logger.error({ err }, "Crews bootstrap failed");
+      });
     });
 });
