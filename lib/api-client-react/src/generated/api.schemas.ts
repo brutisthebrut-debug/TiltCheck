@@ -876,6 +876,19 @@ export interface RecapLeak {
   count: number;
 }
 
+/**
+ * AI-narrated review of a bettor's week, cached per user per week
+ */
+export interface RecapNarrative {
+  /** Monday of the reviewed week (YYYY-MM-DD, UTC) */
+  weekStart: string;
+  /**
+     * The written review, or null when the week had no activity or generation is unavailable
+     * @nullable
+     */
+  narrative: string | null;
+}
+
 export type WeeklyRecapPersonal = {
   userId: number;
   /** Plays logged during the week */
@@ -1079,6 +1092,18 @@ userId?: number | null;
 };
 
 export type GetWeeklyRecapParams = {
+/**
+ * @nullable
+ */
+userId?: number | null;
+/**
+ * Any date inside the desired week (YYYY-MM-DD)
+ * @nullable
+ */
+weekStart?: string | null;
+};
+
+export type GetRecapNarrativeParams = {
 /**
  * @nullable
  */

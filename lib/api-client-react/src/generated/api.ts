@@ -32,6 +32,7 @@ import type {
   ConfidenceBucket,
   GetBankrollParams,
   GetConfidenceAnalysisParams,
+  GetRecapNarrativeParams,
   GetRecentActivityParams,
   GetStatsBySportParams,
   GetStatsInsightsParams,
@@ -54,6 +55,7 @@ import type {
   ParlayLegUpdate,
   ParlaySettlement,
   ParlayUpdate,
+  RecapNarrative,
   SportStats,
   StatsSummary,
   StreaksSummary,
@@ -2705,6 +2707,91 @@ export function useGetWeeklyRecap<TData = Awaited<ReturnType<typeof getWeeklyRec
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetWeeklyRecapQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRecapNarrativeUrl = (params?: GetRecapNarrativeParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stats/recap/narrative?${stringifiedParams}` : `/api/stats/recap/narrative`
+}
+
+/**
+ * Returns a short written review of the bettor's week in EdgeBoard's voice, generated from the same computed recap facts the recap page shows (never from raw bets) and cached per user per week. When the week had no activity or generation is unavailable, `narrative` is null — the recap page simply omits the section.
+ * @summary AI-narrated review of a bettor's week
+ */
+export const getRecapNarrative = async (params?: GetRecapNarrativeParams, options?: RequestInit): Promise<RecapNarrative> => {
+
+  return customFetch<RecapNarrative>(getGetRecapNarrativeUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecapNarrativeQueryKey = (params?: GetRecapNarrativeParams,) => {
+    return [
+    `/api/stats/recap/narrative`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetRecapNarrativeQueryOptions = <TData = Awaited<ReturnType<typeof getRecapNarrative>>, TError = ErrorType<void>>(params?: GetRecapNarrativeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecapNarrative>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecapNarrativeQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecapNarrative>>> = ({ signal }) => getRecapNarrative(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecapNarrative>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecapNarrativeQueryResult = NonNullable<Awaited<ReturnType<typeof getRecapNarrative>>>
+export type GetRecapNarrativeQueryError = ErrorType<void>
+
+
+/**
+ * @summary AI-narrated review of a bettor's week
+ */
+
+export function useGetRecapNarrative<TData = Awaited<ReturnType<typeof getRecapNarrative>>, TError = ErrorType<void>>(
+ params?: GetRecapNarrativeParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecapNarrative>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecapNarrativeQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

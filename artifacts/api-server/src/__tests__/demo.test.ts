@@ -28,6 +28,13 @@ vi.mock("@clerk/express", () => ({
   },
 }));
 
+// The AI provider must never be hit from tests — any accidental narrative
+// generation here would be a real paid call.
+const demoGenerateMock = vi.fn();
+vi.mock("@workspace/integrations-openai-ai-server", () => ({
+  openai: { chat: { completions: { create: (...args: unknown[]) => demoGenerateMock(...args) } } },
+}));
+
 import app from "../app";
 import { db, pool, usersTable, betsTable } from "@workspace/db";
 
@@ -106,6 +113,13 @@ describe("demo board — public reads", () => {
 
     const stats = await request(app).get("/api/demo/stats/summary");
     expect(stats.status).toBe(200);
+
+    // Narrative spend guard: old demo weeks never trigger a fresh generation —
+    // anonymous visitors can't fan out paid calls across the seeded history.
+    const oldNarrative = await request(app).get("/api/demo/stats/recap/narrative?weekStart=2026-05-04");
+    expect(oldNarrative.status).toBe(200);
+    expect(oldNarrative.body.narrative).toBeNull();
+    expect(demoGenerateMock).not.toHaveBeenCalled();
 
     const bets = await request(app).get("/api/demo/bets");
     expect(bets.status).toBe(200);

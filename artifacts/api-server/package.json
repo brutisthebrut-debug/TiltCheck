@@ -17,6 +17,7 @@
     "@workspace/db": "workspace:*",
     "@workspace/odds": "workspace:*",
     "@workspace/weeks": "workspace:*",
+    "@workspace/integrations-openai-ai-server": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",

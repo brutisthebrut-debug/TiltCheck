@@ -814,6 +814,37 @@ paths:
         "400":
           description: Week not finished yet or invalid date
 
+  /stats/recap/narrative:
+    get:
+      operationId: getRecapNarrative
+      tags: [stats]
+      summary: AI-narrated review of a bettor's week
+      description: >
+        Returns a short written review of the bettor's week in EdgeBoard's
+        voice, generated from the same computed recap facts the recap page
+        shows (never from raw bets) and cached per user per week. When the
+        week had no activity or generation is unavailable, `narrative` is
+        null — the recap page simply omits the section.
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: weekStart
+          in: query
+          description: Any date inside the desired week (YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Narrative review (or null when unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecapNarrative"
+        "400":
+          description: Week not finished yet or invalid date
+
   /stats/streaks:
     get:
       operationId: getStreaks
@@ -1895,6 +1926,20 @@ components:
           type: integer
           description: Number of losing plays behind it
       required: [kind, label, amount, count]
+
+    RecapNarrative:
+      type: object
+      description: AI-narrated review of a bettor's week, cached per user per week
+      properties:
+        weekStart:
+          type: string
+          description: Monday of the reviewed week (YYYY-MM-DD, UTC)
+        narrative:
+          type: ["string", "null"]
+          description: >-
+            The written review, or null when the week had no activity or
+            generation is unavailable
+      required: [weekStart, narrative]
 
     WeeklyRecap:
       type: object

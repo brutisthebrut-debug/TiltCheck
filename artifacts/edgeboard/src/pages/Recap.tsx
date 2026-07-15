@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useUser } from "@/contexts/UserContext"
-import { useGetWeeklyRecap, getGetWeeklyRecapQueryKey, useMarkRecapSeen, getGetCurrentUserQueryKey } from "@workspace/api-client-react"
+import { useGetWeeklyRecap, getGetWeeklyRecapQueryKey, useGetRecapNarrative, getGetRecapNarrativeQueryKey, useMarkRecapSeen, getGetCurrentUserQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatOdds } from "@/lib/format"
-import { ChevronLeft, ChevronRight, Trophy, Skull, Droplets, Users, Sparkles, Crown, Rocket, CloudRain, WifiOff, RotateCw } from "lucide-react"
+import { ChevronLeft, ChevronRight, Trophy, Skull, Droplets, Users, Sparkles, Crown, Rocket, CloudRain, WifiOff, RotateCw, Clapperboard } from "lucide-react"
 import { addDays, latestRecapWeekStart, isRecapUnseen } from "@/lib/recapTeaser"
 
 const MISS_REASON_PHRASES: Record<string, string> = {
@@ -49,6 +49,21 @@ export default function Recap() {
   const { data: recap, isLoading, isError, refetch, isRefetching } = useGetWeeklyRecap(
     { userId: activeUser?.id, weekStart },
     { query: { enabled: !!activeUser?.id, queryKey: getGetWeeklyRecapQueryKey({ userId: activeUser?.id, weekStart }) } }
+  )
+
+  // The narrated tape review — generated once per week server-side, then
+  // cached. Purely additive: while loading or unavailable, the recap reads
+  // exactly like it did before this section existed.
+  const { data: tape, isLoading: tapeLoading } = useGetRecapNarrative(
+    { userId: activeUser?.id, weekStart },
+    {
+      query: {
+        enabled: !!activeUser?.id,
+        queryKey: getGetRecapNarrativeQueryKey({ userId: activeUser?.id, weekStart }),
+        staleTime: Infinity,
+        retry: false,
+      },
+    }
   )
 
   if (!activeUser) return null
@@ -151,6 +166,38 @@ export default function Recap() {
               <p className="text-sm text-muted-foreground">{recordLine}</p>
             </CardContent>
           </Card>
+
+          {/* The tape — AI-narrated decision review */}
+          {tapeLoading && !tape ? (
+            <Card className="border-primary/20" data-testid="card-recap-tape-loading">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Clapperboard className="h-4 w-4 text-primary" />
+                  <CardDescription className="uppercase tracking-wider text-[11px]">The tape</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="h-3 rounded bg-muted/60 animate-pulse" />
+                <div className="h-3 rounded bg-muted/60 animate-pulse w-11/12" />
+                <div className="h-3 rounded bg-muted/60 animate-pulse w-4/5" />
+              </CardContent>
+            </Card>
+          ) : tape?.narrative ? (
+            <Card className="border-primary/20 bg-primary/5 animate-in fade-in-50 duration-500" data-testid="card-recap-tape">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Clapperboard className="h-4 w-4 text-primary" />
+                  <CardDescription className="uppercase tracking-wider text-[11px]">The tape</CardDescription>
+                </div>
+                <CardTitle className="text-base">Your week, reviewed.</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tape.narrative.split(/\n{2,}|\n/).filter((s) => s.trim().length > 0).map((para, i) => (
+                  <p key={i} className="text-sm leading-relaxed text-foreground/90">{para}</p>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Best win */}
           {p!.bestWin && (

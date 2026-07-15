@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
-import { db, betsTable, parlaysTable, usersTable, transactionsTable } from "@workspace/db";
+import { db, betsTable, parlaysTable, usersTable, transactionsTable, recapNarrativesTable } from "@workspace/db";
 import {
   GetStatsSummaryQueryParams,
   GetStatsBySportQueryParams,
@@ -8,12 +8,16 @@ import {
   GetConfidenceAnalysisQueryParams,
   GetStatsInsightsQueryParams,
   GetWeeklyRecapQueryParams,
+  GetRecapNarrativeQueryParams,
 } from "@workspace/api-zod";
 import { isValidAmericanOdds } from "../lib/odds";
 import { isRealCalendarDate } from "../lib/dates";
 import { computeWeeklyRecap, mondayOf, lastCompletedWeekStart, dayOf } from "../lib/recap";
+import { assembleRecapFacts, generateRecapNarrative, NARRATIVE_MODEL } from "../lib/narrative";
+import { logger } from "../lib/logger";
 import { requireProfile } from "../middlewares/auth";
 import { userScopeCondition, userInScope } from "../lib/scope";
+import { isDemoRequest } from "../middlewares/demo";
 
 const router: IRouter = Router();
 
@@ -451,5 +455,122 @@ router.get("/stats/recap", requireProfile, async (req, res): Promise<void> => {
 
   res.json(computeWeeklyRecap({ users, bets, parlays, userId, weekStart }));
 });
+
+// GET /stats/recap/narrative — AI-narrated review of one bettor-week.
+// Generated once per user per week from the SAME computed facts the recap
+// shows (never raw rows), stored, and served from the cache ever after.
+// Any generation failure degrades to { narrative: null } — the recap page
+// works exactly as before, the section just doesn't appear.
+router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<void> => {
+  const query = GetRecapNarrativeQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: query.error.message });
+    return;
+  }
+  const userId = query.data.userId ?? req.currentUser!.id;
+  if (query.data.userId != null && !(await userInScope(req, query.data.userId))) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const today = dayOf(new Date());
+  const latest = lastCompletedWeekStart(today);
+  let weekStart = latest;
+  if (query.data.weekStart != null) {
+    if (!isRealCalendarDate(query.data.weekStart)) {
+      res.status(400).json({ error: "weekStart must be a valid calendar date in YYYY-MM-DD format" });
+      return;
+    }
+    weekStart = mondayOf(query.data.weekStart);
+    if (weekStart > latest) {
+      res.status(400).json({ error: "That week isn't finished yet — recaps cover completed weeks only" });
+      return;
+    }
+  }
+
+  // Cache hit: one generation per user per week, ever.
+  const [cached] = await db
+    .select()
+    .from(recapNarrativesTable)
+    .where(and(eq(recapNarrativesTable.userId, userId), eq(recapNarrativesTable.weekStart, weekStart)))
+    .limit(1);
+  if (cached) {
+    res.json({ weekStart, narrative: cached.narrative });
+    return;
+  }
+
+  const [user] = await db
+    .select({ id: usersTable.id, displayName: usersTable.displayName })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const [users, allBets, allParlays] = await Promise.all([
+    db.select({ id: usersTable.id, displayName: usersTable.displayName }).from(usersTable).where(userScopeCondition(req)),
+    db.select().from(betsTable).where(eq(betsTable.userId, userId)),
+    db.select().from(parlaysTable).where(eq(parlaysTable.userId, userId)),
+  ]);
+  const recap = computeWeeklyRecap({ users, bets: allBets, parlays: allParlays, userId, weekStart });
+
+  // Quiet week — nothing to review, nothing to generate.
+  if (recap.personal.loggedCount === 0 && recap.personal.settledCount === 0) {
+    res.json({ weekStart, narrative: null });
+    return;
+  }
+
+  // Spend guard for the public demo board: anonymous visitors only trigger
+  // fresh generation for the latest completed week (one per demo bettor per
+  // week); older demo weeks serve the cache or nothing.
+  if (isDemoRequest(req) && weekStart !== latest) {
+    res.json({ weekStart, narrative: null });
+    return;
+  }
+
+  try {
+    // Singleflight: concurrent first views of the same bettor-week share one
+    // in-flight generation instead of each paying for their own.
+    const flightKey = `${userId}:${weekStart}`;
+    let flight = narrativeFlights.get(flightKey);
+    if (!flight) {
+      flight = (async () => {
+        const facts = assembleRecapFacts({
+          displayName: user.displayName,
+          recap,
+          myBets: allBets,
+          myParlays: allParlays,
+        });
+        const narrative = await generateRecapNarrative(facts);
+        // The unique index makes sure only one row lands even across processes.
+        await db
+          .insert(recapNarrativesTable)
+          .values({ userId, weekStart, narrative, model: NARRATIVE_MODEL })
+          .onConflictDoNothing();
+        return narrative;
+      })();
+      narrativeFlights.set(flightKey, flight);
+      // Swallow the side-channel rejection: every caller awaits `flight`
+      // itself, this chain only exists to clear the slot.
+      void flight.catch(() => {}).finally(() => narrativeFlights.delete(flightKey));
+    }
+    const narrative = await flight;
+
+    const [stored] = await db
+      .select()
+      .from(recapNarrativesTable)
+      .where(and(eq(recapNarrativesTable.userId, userId), eq(recapNarrativesTable.weekStart, weekStart)))
+      .limit(1);
+    res.json({ weekStart, narrative: stored?.narrative ?? narrative });
+  } catch (err) {
+    logger.warn({ err, userId, weekStart }, "Recap narrative generation unavailable");
+    res.json({ weekStart, narrative: null });
+  }
+});
+
+// In-flight narrative generations, keyed `${userId}:${weekStart}`.
+const narrativeFlights = new Map<string, Promise<string>>();
 
 export default router;

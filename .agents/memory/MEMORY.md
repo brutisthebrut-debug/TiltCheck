@@ -3,4 +3,5 @@
 - [OpenAPI spec file integrity](openapi-spec-file-integrity.md) — openapi.yaml can gain a duplicated tail during parallel task edits; check for duplicate schema keys before codegen.
 - [Stale TS project references](stale-ts-project-references.md) — phantom "no exported member" errors for @workspace libs mean stale dist; run `tsc -b lib/api-zod lib/api-client-react` first.
 - [Beta gate & founder config](beta-gate-founder-config.md) — invite gate = invites table ∪ BETA_ALLOWED_EMAILS; FOUNDER_EMAIL must be set in prod or first sign-in grabs the founder seat.
+- [AI narrative generation](ai-narrative-generation.md) — lazy-import the AI client (import-time env throw kills boot); cache + singleflight + demo bounding for GET-triggered paid calls; mock provider in all test files.
 - [Demo board isolation](demo-board-isolation.md) — every real query must scope isDemo=false; tests wipe the dev DB but the server self-seeds the demo world at boot.

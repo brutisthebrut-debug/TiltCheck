@@ -35,7 +35,10 @@ export default function DemoApp() {
     setUrlRewrite(demoRewrite);
     return new QueryClient({
       mutationCache: new MutationCache({
-        onError: () => {
+        onError: (_error, _variables, _context, mutation) => {
+          // Background best-effort writes (like the recap "seen" marker) fire
+          // automatically — the visitor didn't do anything, so no scolding.
+          if (mutation.options.mutationKey?.[0] === 'markRecapSeen') return;
           toast({
             title: 'This board is a demo',
             description: 'The demo is read-only — get on the board to log your own plays.',

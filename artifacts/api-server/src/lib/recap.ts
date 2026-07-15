@@ -16,6 +16,7 @@ type PlayRow = {
   stake: string | number;
   actualPayout: string | number | null;
   missReason: string | null;
+  confidenceScore?: number | null;
   createdAt: Date;
   settledAt: Date | null;
 };

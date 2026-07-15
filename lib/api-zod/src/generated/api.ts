@@ -1125,6 +1125,21 @@ export const GetWeeklyRecapResponse = zod.object({
 
 
 /**
+ * Returns a short written review of the bettor's week in EdgeBoard's voice, generated from the same computed recap facts the recap page shows (never from raw bets) and cached per user per week. When the week had no activity or generation is unavailable, `narrative` is null — the recap page simply omits the section.
+ * @summary AI-narrated review of a bettor's week
+ */
+export const GetRecapNarrativeQueryParams = zod.object({
+  "userId": zod.coerce.number().nullish(),
+  "weekStart": zod.coerce.string().nullish().describe('Any date inside the desired week (YYYY-MM-DD)')
+})
+
+export const GetRecapNarrativeResponse = zod.object({
+  "weekStart": zod.string().describe('Monday of the reviewed week (YYYY-MM-DD, UTC)'),
+  "narrative": zod.string().nullable().describe('The written review, or null when the week had no activity or generation is unavailable')
+}).describe('AI-narrated review of a bettor\'s week, cached per user per week')
+
+
+/**
  * @summary Logging streak and settle streak for a bettor
  */
 export const GetStreaksQueryParams = zod.object({
