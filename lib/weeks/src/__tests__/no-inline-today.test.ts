@@ -91,13 +91,50 @@ const INLINE_TODAY_PATTERNS: ReadonlyArray<{ name: string; regex: RegExp }> = [
 // we pair up (a) variables assigned directly from `toISOString()`/`toJSON()`
 // (statement must END with the call — further chaining is already covered
 // by the one-liner patterns) with (b) a later date-shaped extraction applied
-// to that exact variable name in the same file. Same for
+// to that variable — or any variable reachable from it via plain
+// `const b = a;` alias assignments — in the same file. Same for
 // `JSON.stringify(...)` variables followed by the quote-shifted
 // `.slice(1, 11)` / `.substr(1, 10)`.
 const ISO_VAR_ASSIGNMENT =
   /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[^;\r\n]*?\bto(?:ISOString|JSON)\s*\(\s*\)\s*;?\s*$/gm;
 const STRINGIFY_VAR_ASSIGNMENT =
   /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*JSON\s*\.\s*stringify\s*\((?:[^()]|\([^()]*\))*\)\s*;?\s*$/gm;
+
+// Plain rename of one variable to another — `const raw = iso;` — with
+// nothing else on the right-hand side. Renaming the ISO variable before
+// slicing would otherwise smuggle the "today" string past the pairing
+// above, so we follow these alias edges (transitively) from each
+// ISO-producing variable before looking for the date-shaped extraction.
+const ALIAS_ASSIGNMENT = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([A-Za-z_$][\w$]*)\s*;?\s*$/gm;
+
+/**
+ * Returns `root` plus every variable reachable from it via plain
+ * `const b = a;` alias assignments in the same file (multi-hop chains
+ * included). Only bare identifier-to-identifier copies count — any
+ * expression on the right-hand side breaks the chain.
+ */
+function aliasesOf(content: string, root: string): string[] {
+  const edges = new Map<string, string[]>();
+  for (const match of content.matchAll(ALIAS_ASSIGNMENT)) {
+    const [, target, source] = match;
+    if (target === source) continue;
+    const targets = edges.get(source) ?? [];
+    targets.push(target);
+    edges.set(source, targets);
+  }
+  const seen = new Set<string>([root]);
+  const queue = [root];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const next of edges.get(current) ?? []) {
+      if (!seen.has(next)) {
+        seen.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  return [...seen];
+}
 
 function isoSliceOf(name: string): RegExp {
   // NAME.slice(0, 10) / .substring(0, 10) / .substr(0, 10) / .split("T")[0]
@@ -127,14 +164,22 @@ function findTwoStepToday(content: string): string[] {
   const findings: string[] = [];
   for (const match of content.matchAll(ISO_VAR_ASSIGNMENT)) {
     const name = match[1];
-    if (isoSliceOf(name).test(content)) {
-      findings.push(`two-step toISOString()/toJSON() then \`${name}.slice(0, 10)\`-style extraction`);
+    for (const alias of aliasesOf(content, name)) {
+      if (isoSliceOf(alias).test(content)) {
+        const via = alias === name ? `\`${name}\`` : `\`${name}\` (via alias \`${alias}\`)`;
+        findings.push(`two-step toISOString()/toJSON() then ${via} .slice(0, 10)-style extraction`);
+        break;
+      }
     }
   }
   for (const match of content.matchAll(STRINGIFY_VAR_ASSIGNMENT)) {
     const name = match[1];
-    if (stringifySliceOf(name).test(content)) {
-      findings.push(`two-step JSON.stringify(...) then \`${name}.slice(1, 11)\`-style extraction`);
+    for (const alias of aliasesOf(content, name)) {
+      if (stringifySliceOf(alias).test(content)) {
+        const via = alias === name ? `\`${name}\`` : `\`${name}\` (via alias \`${alias}\`)`;
+        findings.push(`two-step JSON.stringify(...) then ${via} .slice(1, 11)-style extraction`);
+        break;
+      }
     }
   }
   return findings;
@@ -301,6 +346,19 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
     'const wrapped = JSON.stringify(new Date());\nconst today = wrapped.slice(1, 11);',
     'const wrapped = JSON.stringify(now);\nconst today = wrapped.substring(1, 11);',
     'const wrapped = JSON.stringify(new Date());\nconst today = wrapped.substr(1, 10);',
+    // Renaming the intermediate variable before slicing — a plain alias
+    // chain must not launder the ISO string past the detector:
+    'const iso = new Date().toISOString();\nconst raw = iso;\nconst today = raw.slice(0, 10);',
+    'const iso = new Date().toISOString();\nconst raw = iso\nconst today = raw.substring(0, 10);',
+    // Multi-hop alias chain:
+    'const iso = new Date().toISOString();\nconst a = iso;\nconst b = a;\nconst today = b.split("T")[0];',
+    // Alias declared textually before the ISO assignment (hoisted helper):
+    'function day() { return copy.slice(0, 10); }\nconst iso = new Date().toISOString();\nconst copy = iso;',
+    // let/var aliases count too:
+    'let stamp = new Date().toJSON();\nvar renamed = stamp;\nconst day = renamed.substr(0, 10);',
+    // Aliased JSON.stringify result with the quote-shifted offsets:
+    'const wrapped = JSON.stringify(new Date());\nconst copy = wrapped;\nconst today = copy.slice(1, 11);',
+    'const wrapped = JSON.stringify(now);\nconst a = wrapped;\nconst b = a;\nconst today = b.substr(1, 10);',
   ];
 
   const twoStepShouldNotMatch: string[] = [
@@ -321,6 +379,18 @@ describe("no inline 'today' date math outside @workspace/weeks", () => {
     "const header = req.headers.x;\nconst parts = header.split('T')[0];",
     // Assignment keeps chaining past the call (one-liner patterns own this):
     'const today = new Date().toISOString().slice(0, 10);\nconst other = today.trim();',
+    // Unrelated variable aliased and sliced — never held an ISO timestamp:
+    'const header = req.headers.etag;\nconst raw = header;\nconst prefix = raw.slice(0, 10);',
+    // ISO variable aliased but the alias is never date-sliced:
+    'const iso = new Date().toISOString();\nconst raw = iso;\nreturn res.json({ createdAt: raw });',
+    // Alias of the ISO variable sliced with non-date-shaped offsets:
+    'const iso = new Date().toISOString();\nconst raw = iso;\nconst hour = raw.slice(11, 13);',
+    // Alias chain rooted at a different variable than the ISO one:
+    'const iso = new Date().toISOString();\nconst other = header;\nconst prefix = other.slice(0, 10);',
+    // Right-hand side is an expression, not a bare rename — chain broken:
+    'const iso = new Date().toISOString();\nconst raw = iso.trim();\nconst prefix = raw.slice(0, 4);',
+    // Aliased stringified non-date trimmed of quotes, not a date slice:
+    'const inner = JSON.stringify(key);\nconst copy = inner;\nconst body = copy.slice(1, -1);',
   ];
 
   it.each(twoStepShouldMatch)("two-step detector catches: %s", (snippet) => {
