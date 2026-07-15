@@ -13,7 +13,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, ClipboardList, AlertTriangle } from "lucide-react"
+import { Plus, ClipboardList, AlertTriangle, X } from "lucide-react"
 import { ListFilterBar } from "@/components/ListFilterBar"
 import { PlayListCard, PlayListCardSkeleton } from "@/components/PlayListCard"
 import { ExportCsvButton } from "@/components/ExportCsvButton"
@@ -21,6 +21,20 @@ import { useUrlFilters, hasActiveFilters } from "@/hooks/use-url-filters"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 
 const PAGE_SIZE = 25
+
+const DAY_NAMES: Record<string, string> = {
+  mon: "Mondays", tue: "Tuesdays", wed: "Wednesdays", thu: "Thursdays",
+  fri: "Fridays", sat: "Saturdays", sun: "Sundays",
+}
+
+const intOrUndef = (s: string) => {
+  const n = parseInt(s, 10)
+  return Number.isFinite(n) ? n : undefined
+}
+const numOrUndef = (s: string) => {
+  const n = parseFloat(s)
+  return Number.isFinite(n) ? n : undefined
+}
 
 export default function Bets() {
   const { activeUser } = useUser()
@@ -36,7 +50,42 @@ export default function Bets() {
     ...(filters.q ? { q: filters.q } : {}),
     ...(filters.from ? { dateFrom: filters.from } : {}),
     ...(filters.to ? { dateTo: filters.to } : {}),
+    ...(intOrUndef(filters.oddsMin) !== undefined ? { oddsMin: intOrUndef(filters.oddsMin) } : {}),
+    ...(intOrUndef(filters.oddsMax) !== undefined ? { oddsMax: intOrUndef(filters.oddsMax) } : {}),
+    ...(filters.day && DAY_NAMES[filters.day] ? { day: filters.day as ListBetsParams["day"] } : {}),
+    ...(numOrUndef(filters.stakeMin) !== undefined ? { stakeMin: numOrUndef(filters.stakeMin) } : {}),
+    ...(numOrUndef(filters.stakeMax) !== undefined ? { stakeMax: numOrUndef(filters.stakeMax) } : {}),
   }), [filters, activeUser])
+
+  // Chips for the Edge Finder drill-down filters — they arrive via deep
+  // links, so they need a visible, removable representation here.
+  const drillChips: { key: string; label: string; remove: () => void }[] = []
+  const oddsMinN = intOrUndef(filters.oddsMin)
+  const oddsMaxN = intOrUndef(filters.oddsMax)
+  if (oddsMinN !== undefined || oddsMaxN !== undefined) {
+    const fmt = (n: number) => formatOdds(n)
+    const label =
+      oddsMinN !== undefined && oddsMaxN !== undefined
+        ? `Odds ${fmt(oddsMinN)} to ${fmt(oddsMaxN)}`
+        : oddsMinN !== undefined
+          ? `Odds ${fmt(oddsMinN)} and longer`
+          : `Odds ${fmt(oddsMaxN!)} and heavier`
+    drillChips.push({ key: "odds", label, remove: () => update({ oddsMin: "", oddsMax: "" }) })
+  }
+  if (filters.day && DAY_NAMES[filters.day]) {
+    drillChips.push({ key: "day", label: DAY_NAMES[filters.day], remove: () => update({ day: null }) })
+  }
+  const stakeMinN = numOrUndef(filters.stakeMin)
+  const stakeMaxN = numOrUndef(filters.stakeMax)
+  if (stakeMinN !== undefined || stakeMaxN !== undefined) {
+    const label =
+      stakeMinN !== undefined && stakeMaxN !== undefined
+        ? `Stake ${formatCurrency(stakeMinN)}–${formatCurrency(stakeMaxN)}`
+        : stakeMinN !== undefined
+          ? `Stake ${formatCurrency(stakeMinN)}+`
+          : `Stake up to ${formatCurrency(stakeMaxN!)}`
+    drillChips.push({ key: "stake", label, remove: () => update({ stakeMin: "", stakeMax: "" }) })
+  }
 
   const {
     data,
@@ -84,6 +133,23 @@ export default function Bets() {
         mineLabel="My Bets"
         searchPlaceholder="Search event or pick…"
       />
+
+      {drillChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" data-testid="row-drilldown-filters">
+          {drillChips.map((chip) => (
+            <button
+              key={chip.key}
+              onClick={chip.remove}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-primary/10 text-primary border-primary/40 hover:border-primary transition-colors"
+              data-testid={`chip-drilldown-${chip.key}`}
+              title="Remove this filter"
+            >
+              {chip.label}
+              <X className="h-3 w-3" />
+            </button>
+          ))}
+        </div>
+      )}
 
       {isError ? (
         <QueryErrorCard

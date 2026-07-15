@@ -157,6 +157,63 @@ describe("GET /api/bets filtering", () => {
     expect(res.body[0].pick).toContain("100%");
   });
 
+  it("filters by odds range, day of week, and stake range (Edge Finder drill-downs)", async () => {
+    const user = await createUser();
+    await db.insert(betsTable).values([
+      // 2026-06-14 is a Sunday, 2026-06-15 a Monday
+      makeBet(user.id, { event: "Heavy fav", odds: -250, stake: "40", gameDate: "2026-06-14" }),
+      makeBet(user.id, { event: "Plain fav", odds: -120, stake: "100", gameDate: "2026-06-15" }),
+      makeBet(user.id, { event: "Dog", odds: 150, stake: "100", gameDate: "2026-06-15" }),
+      makeBet(user.id, { event: "Long shot", odds: 275, stake: "220", gameDate: "2026-06-16" }),
+    ]);
+
+    // odds band: -199..-100 (plain favorites)
+    let res = await request(app)
+      .get("/api/bets")
+      .query({ userId: user.id, oddsMin: -199, oddsMax: -100 });
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].event).toBe("Plain fav");
+
+    // open-ended: all favorites (odds <= -100)
+    res = await request(app).get("/api/bets").query({ userId: user.id, oddsMax: -100 });
+    expect(res.body.map((b: { event: string }) => b.event).sort()).toEqual(["Heavy fav", "Plain fav"]);
+
+    // open-ended: long shots (odds >= 200)
+    res = await request(app).get("/api/bets").query({ userId: user.id, oddsMin: 200 });
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].event).toBe("Long shot");
+
+    // day of week (UTC weekday of gameDate)
+    res = await request(app).get("/api/bets").query({ userId: user.id, day: "mon" });
+    expect(res.body).toHaveLength(2);
+    expect(res.body.every((b: { gameDate: string }) => b.gameDate === "2026-06-15")).toBe(true);
+    res = await request(app).get("/api/bets").query({ userId: user.id, day: "sun" });
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].event).toBe("Heavy fav");
+
+    // stake range, inclusive bounds
+    res = await request(app).get("/api/bets").query({ userId: user.id, stakeMin: 100, stakeMax: 100 });
+    expect(res.body).toHaveLength(2);
+    res = await request(app).get("/api/bets").query({ userId: user.id, stakeMax: 99.99 });
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].event).toBe("Heavy fav");
+    res = await request(app).get("/api/bets").query({ userId: user.id, stakeMin: 100.01 });
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].event).toBe("Long shot");
+
+    // combined: odds band AND day
+    res = await request(app)
+      .get("/api/bets")
+      .query({ userId: user.id, oddsMin: 100, oddsMax: 199, day: "mon" });
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].event).toBe("Dog");
+
+    // invalid day rejected by the generated params schema
+    res = await request(app).get("/api/bets").query({ userId: user.id, day: "funday" });
+    expect(res.status).toBe(400);
+  });
+
   it("pages with limit/offset in a stable order", async () => {
     const user = await createUser();
     await db.insert(betsTable).values(

@@ -294,6 +294,39 @@ export default function EdgeFinder() {
     )
   }
 
+  // Deep links into the bets list. Every lane href mirrors the exact
+  // boundaries the server uses to build the lane, so the drill-down shows
+  // the same bets the number was computed from (modulo pending/void bets,
+  // which the list includes but lanes don't).
+  const sportSuffix = sport != null ? `&sport=${encodeURIComponent(sport)}` : ""
+
+  // Inclusive stake bounds equivalent to the server's strict comparisons,
+  // given stakes are stored with cent precision.
+  const cents = (x: number) => Math.round(x * 100)
+  const nearlyInt = (x: number) => Math.abs(x * 100 - cents(x)) < 1e-6
+  const ltBound = (x: number) => (nearlyInt(x) ? cents(x) - 1 : Math.floor(x * 100)) / 100 // stake < x
+  const gtBound = (x: number) => (nearlyInt(x) ? cents(x) + 1 : Math.ceil(x * 100)) / 100 // stake > x
+  const geBound = (x: number) => Math.ceil(x * 100 - 1e-6) / 100 // stake >= x
+  const leBound = (x: number) => Math.floor(x * 100 + 1e-6) / 100 // stake <= x
+
+  const ODDS_BAND_HREFS: Record<string, string> = {
+    heavy_fav: "oddsMax=-200",
+    fav: "oddsMin=-199&oddsMax=-100",
+    dog: "oddsMin=100&oddsMax=199",
+    long_shot: "oddsMin=200",
+  }
+  const avg = data.avgStake
+  const stakeBandHref =
+    avg != null && avg > 0
+      ? (k: string) => {
+          const range =
+            k === "light" ? `stakeMax=${ltBound(avg * 0.75)}`
+            : k === "heavy" ? `stakeMin=${gtBound(avg * 1.5)}`
+            : `stakeMin=${geBound(avg * 0.75)}&stakeMax=${leBound(avg * 1.5)}`
+          return `/bets?mine=1&${range}${sportSuffix}`
+        }
+      : undefined
+
   const dimensions: Dimension[] = [
     {
       id: "sport",
@@ -311,6 +344,7 @@ export default function EdgeFinder() {
       lanes: data.favDog,
       label: (k) => FAV_DOG_LABELS[k] ?? k,
       heroLabel: (k) => FAV_DOG_LABELS[k] ?? k,
+      href: (k) => `/bets?mine=1&${k === "favorite" ? "oddsMax=-100" : "oddsMin=100"}${sportSuffix}`,
     },
     {
       id: "odds-band",
@@ -319,6 +353,7 @@ export default function EdgeFinder() {
       lanes: data.oddsBand,
       label: (k) => ODDS_BAND_LABELS[k] ?? k,
       heroLabel: (k) => ODDS_BAND_SHORT[k] ?? k,
+      href: (k) => `/bets?mine=1&${ODDS_BAND_HREFS[k] ?? ""}${sportSuffix}`,
     },
     {
       id: "day-of-week",
@@ -327,6 +362,7 @@ export default function EdgeFinder() {
       lanes: data.dayOfWeek,
       label: (k) => DAY_LABELS[k] ?? k,
       heroLabel: (k) => DAY_LABELS[k] ?? k,
+      href: (k) => `/bets?mine=1&day=${k}${sportSuffix}`,
     },
     {
       id: "stake-band",
@@ -337,6 +373,7 @@ export default function EdgeFinder() {
       lanes: data.stakeBand,
       label: (k) => STAKE_LABELS[k] ?? k,
       heroLabel: (k) => STAKE_LABELS[k]?.toLowerCase() ?? k,
+      href: stakeBandHref,
     },
   ]
 

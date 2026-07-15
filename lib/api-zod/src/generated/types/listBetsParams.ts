@@ -5,6 +5,7 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListBetsDay } from './listBetsDay';
 import type { ListBetsStatus } from './listBetsStatus';
 
 export type ListBetsParams = {
@@ -39,6 +40,31 @@ dateFrom?: string | null;
  * @nullable
  */
 dateTo?: string | null;
+/**
+ * Lowest American odds to include (inclusive, e.g. -150)
+ * @nullable
+ */
+oddsMin?: number | null;
+/**
+ * Highest American odds to include (inclusive, e.g. 200)
+ * @nullable
+ */
+oddsMax?: number | null;
+/**
+ * Day of week the game was played (UTC, from gameDate)
+ * @nullable
+ */
+day?: ListBetsDay;
+/**
+ * Lowest stake to include (inclusive)
+ * @nullable
+ */
+stakeMin?: number | null;
+/**
+ * Highest stake to include (inclusive)
+ * @nullable
+ */
+stakeMax?: number | null;
 limit?: number;
 offset?: number;
 };

@@ -543,6 +543,32 @@ paths:
           description: Latest game date (inclusive, YYYY-MM-DD)
           schema:
             type: ["string", "null"]
+        - name: oddsMin
+          in: query
+          description: Lowest American odds to include (inclusive, e.g. -150)
+          schema:
+            type: ["integer", "null"]
+        - name: oddsMax
+          in: query
+          description: Highest American odds to include (inclusive, e.g. 200)
+          schema:
+            type: ["integer", "null"]
+        - name: day
+          in: query
+          description: Day of week the game was played (UTC, from gameDate)
+          schema:
+            type: ["string", "null"]
+            enum: [mon, tue, wed, thu, fri, sat, sun, null]
+        - name: stakeMin
+          in: query
+          description: Lowest stake to include (inclusive)
+          schema:
+            type: ["number", "null"]
+        - name: stakeMax
+          in: query
+          description: Highest stake to include (inclusive)
+          schema:
+            type: ["number", "null"]
         - name: limit
           in: query
           schema:

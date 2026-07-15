@@ -62,7 +62,7 @@ router.get("/bets", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
-  const { userId, status, sport, sportsbook, q, dateFrom, dateTo, limit, offset } = query.data;
+  const { userId, status, sport, sportsbook, q, dateFrom, dateTo, oddsMin, oddsMax, day, stakeMin, stakeMax, limit, offset } = query.data;
 
   // World scoping: the join to users is inner + scoped, so demo sessions only
   // ever see demo bets and real sessions never see demo bets — even when an
@@ -78,6 +78,16 @@ router.get("/bets", async (req, res): Promise<void> => {
   }
   if (dateFrom != null) conditions.push(gte(betsTable.gameDate, dateFrom));
   if (dateTo != null) conditions.push(lte(betsTable.gameDate, dateTo));
+  if (oddsMin != null) conditions.push(gte(betsTable.odds, oddsMin));
+  if (oddsMax != null) conditions.push(lte(betsTable.odds, oddsMax));
+  if (day != null) {
+    // Same convention as Edge Finder's day lanes: the UTC weekday of the
+    // game date (postgres DOW: 0 = Sunday … 6 = Saturday).
+    const dow = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(day);
+    conditions.push(sql`extract(dow from ${betsTable.gameDate}) = ${dow}`);
+  }
+  if (stakeMin != null) conditions.push(gte(betsTable.stake, String(stakeMin)));
+  if (stakeMax != null) conditions.push(lte(betsTable.stake, String(stakeMax)));
 
   const rows = await db
     .select({ bet: betsTable, user: usersTable })

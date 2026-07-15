@@ -1414,6 +1414,31 @@ dateFrom?: string | null;
  * @nullable
  */
 dateTo?: string | null;
+/**
+ * Lowest American odds to include (inclusive, e.g. -150)
+ * @nullable
+ */
+oddsMin?: number | null;
+/**
+ * Highest American odds to include (inclusive, e.g. 200)
+ * @nullable
+ */
+oddsMax?: number | null;
+/**
+ * Day of week the game was played (UTC, from gameDate)
+ * @nullable
+ */
+day?: ListBetsDay;
+/**
+ * Lowest stake to include (inclusive)
+ * @nullable
+ */
+stakeMin?: number | null;
+/**
+ * Highest stake to include (inclusive)
+ * @nullable
+ */
+stakeMax?: number | null;
 limit?: number;
 offset?: number;
 };
@@ -1427,6 +1452,19 @@ export const ListBetsStatus = {
   lost: 'lost',
   push: 'push',
   void: 'void',
+} as const;
+
+export type ListBetsDay = typeof ListBetsDay[keyof typeof ListBetsDay] | null;
+
+
+export const ListBetsDay = {
+  mon: 'mon',
+  tue: 'tue',
+  wed: 'wed',
+  thu: 'thu',
+  fri: 'fri',
+  sat: 'sat',
+  sun: 'sun',
 } as const;
 
 export type ListParlaysParams = {

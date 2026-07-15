@@ -80,6 +80,7 @@ export * from './lessonItemResult';
 export * from './lessonItemType';
 export * from './lessonsResponse';
 export * from './lessonsSummary';
+export * from './listBetsDay';
 export * from './listBetsParams';
 export * from './listBetsStatus';
 export * from './listParlaysParams';

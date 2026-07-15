@@ -372,6 +372,11 @@ export const ListBetsQueryParams = zod.object({
   "q": zod.coerce.string().nullish().describe('Case-insensitive text search over event and pick'),
   "dateFrom": zod.coerce.string().nullish().describe('Earliest game date (inclusive, YYYY-MM-DD)'),
   "dateTo": zod.coerce.string().nullish().describe('Latest game date (inclusive, YYYY-MM-DD)'),
+  "oddsMin": zod.coerce.number().nullish().describe('Lowest American odds to include (inclusive, e.g. -150)'),
+  "oddsMax": zod.coerce.number().nullish().describe('Highest American odds to include (inclusive, e.g. 200)'),
+  "day": zod.union([zod.literal('mon'),zod.literal('tue'),zod.literal('wed'),zod.literal('thu'),zod.literal('fri'),zod.literal('sat'),zod.literal('sun'),zod.literal(null)]).nullish().describe('Day of week the game was played (UTC, from gameDate)'),
+  "stakeMin": zod.coerce.number().nullish().describe('Lowest stake to include (inclusive)'),
+  "stakeMax": zod.coerce.number().nullish().describe('Highest stake to include (inclusive)'),
   "limit": zod.coerce.number().default(listBetsQueryLimitDefault),
   "offset": zod.coerce.number().default(listBetsQueryOffsetDefault)
 })
