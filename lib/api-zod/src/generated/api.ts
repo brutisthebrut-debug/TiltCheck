@@ -1569,7 +1569,8 @@ export const GetWeeklyRecapResponse = zod.object({
   "userName": zod.string(),
   "title": zod.string(),
   "odds": zod.number().describe('American odds of the play'),
-  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)'),
+  "reasoningQuality": zod.union([zod.literal('sound'),zod.literal('flawed'),zod.literal(null)]).nullish().describe('The bettor\'s own post-mortem grade of the reasoning behind this play, when they recorded one')
 }).describe('One notable play inside the recap week'),zod.null()]),
   "worstBeat": zod.union([zod.object({
   "type": zod.enum(['bet', 'parlay']),
@@ -1578,7 +1579,8 @@ export const GetWeeklyRecapResponse = zod.object({
   "userName": zod.string(),
   "title": zod.string(),
   "odds": zod.number().describe('American odds of the play'),
-  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)'),
+  "reasoningQuality": zod.union([zod.literal('sound'),zod.literal('flawed'),zod.literal(null)]).nullish().describe('The bettor\'s own post-mortem grade of the reasoning behind this play, when they recorded one')
 }).describe('One notable play inside the recap week'),zod.null()]),
   "leak": zod.union([zod.object({
   "kind": zod.enum(['sport', 'miss_reason', 'parlays']),
@@ -1602,7 +1604,8 @@ export const GetWeeklyRecapResponse = zod.object({
   "userName": zod.string(),
   "title": zod.string(),
   "odds": zod.number().describe('American odds of the play'),
-  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)'),
+  "reasoningQuality": zod.union([zod.literal('sound'),zod.literal('flawed'),zod.literal(null)]).nullish().describe('The bettor\'s own post-mortem grade of the reasoning behind this play, when they recorded one')
 }).describe('One notable play inside the recap week'),zod.null()]),
   "worstBeat": zod.union([zod.object({
   "type": zod.enum(['bet', 'parlay']),
@@ -1611,7 +1614,8 @@ export const GetWeeklyRecapResponse = zod.object({
   "userName": zod.string(),
   "title": zod.string(),
   "odds": zod.number().describe('American odds of the play'),
-  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)')
+  "amount": zod.number().describe('Net result in dollars (positive win, negative loss)'),
+  "reasoningQuality": zod.union([zod.literal('sound'),zod.literal('flawed'),zod.literal(null)]).nullish().describe('The bettor\'s own post-mortem grade of the reasoning behind this play, when they recorded one')
 }).describe('One notable play inside the recap week'),zod.null()])
 }).describe('Group highlights across every member\'s settled plays in the week')
 }).describe('One week\'s story — personal facts plus crew highlights')

@@ -17,7 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw } from "lucide-react"
+import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw, Lightbulb } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import type { LegResult } from "@workspace/api-client-react"
@@ -386,8 +386,7 @@ export default function ParlayDetail() {
             </CardContent>
           </Card>
           
-          {(parlay.rationale || parlay.promoNote || isSettled) && (
-            <Card className="bg-card">
+          <Card className="bg-card">
               <CardContent className="p-6 space-y-6">
                 {parlay.promoNote && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground px-3 py-2 rounded bg-muted/30 border border-dashed border-muted-foreground/20">
@@ -396,17 +395,24 @@ export default function ParlayDetail() {
                   </div>
                 )}
 
-                {parlay.rationale && (
-                  <div className="space-y-2">
-                    <div className="text-sm font-semibold flex items-center gap-2">
-                      Pre-game Rationale
-                      {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50" />}
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-4 rounded-md border">
+                {/* The why — always shown, first-class. An honest empty state
+                    beats quietly hiding that no reasoning was recorded. */}
+                <div className="space-y-2" data-testid="section-rationale">
+                  <div className="text-sm font-semibold flex items-center gap-2">
+                    <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                    The Why
+                    {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50" />}
+                  </div>
+                  {parlay.rationale ? (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap bg-primary/5 border-primary/20 p-4 rounded-md border">
                       {parlay.rationale}
                     </p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic bg-background p-4 rounded-md border border-dashed" data-testid="text-no-rationale">
+                      No rationale was written for this ticket. The record remembers that too.
+                    </p>
+                  )}
+                </div>
                 
                 {isSettled && (parlay.reasoningQuality || parlay.whatHappened || parlay.missReason) && (
                   <div className="space-y-3 pt-2 border-t">
@@ -440,7 +446,6 @@ export default function ParlayDetail() {
                 )}
               </CardContent>
             </Card>
-          )}
         </div>
 
         <div className="space-y-6">
@@ -625,6 +630,23 @@ export default function ParlayDetail() {
           </DialogHeader>
 
           <div className="space-y-5 py-2">
+            {/* Replay the pre-game reasoning so the grade is about the call
+                actually made, not the call remembered. */}
+            <div className="space-y-1.5 rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5" data-testid="replay-rationale">
+              <div className="text-xs font-semibold flex items-center gap-1.5 text-primary">
+                <Lightbulb className="h-3.5 w-3.5" />
+                What you said going in
+                <span className="ml-auto font-mono text-muted-foreground font-normal">Confidence {parlay.confidenceScore}/10</span>
+              </div>
+              {parlay.rationale ? (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{parlay.rationale}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Nothing. No rationale was written — grade the decision as honestly as you can remember it.
+                </p>
+              )}
+            </div>
+
             {pendingStatus === 'won' && (
               <div className="space-y-2">
                 <Label>

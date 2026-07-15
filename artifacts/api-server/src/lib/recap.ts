@@ -16,6 +16,7 @@ type PlayRow = {
   stake: string | number;
   actualPayout: string | number | null;
   missReason: string | null;
+  reasoningQuality?: string | null;
   confidenceScore?: number | null;
   createdAt: Date;
   settledAt: Date | null;
@@ -34,6 +35,7 @@ export type RecapPlay = {
   title: string;
   odds: number;
   amount: number;
+  reasoningQuality: "sound" | "flawed" | null;
 };
 
 export type RecapLeak = {
@@ -93,6 +95,11 @@ export function computeWeeklyRecap(input: {
     title: type === "bet" ? `${(p as RecapBet).pick} (${(p as RecapBet).event})` : `Parlay: ${(p as RecapParlay).name}`,
     odds: p.odds,
     amount: round2(net(p)),
+    // The bettor's own grade of their reasoning — lets the recap call a
+    // flawed-reasoning win what it is (luck) and a sound-reasoning loss a
+    // bad beat, in their own words.
+    reasoningQuality:
+      p.reasoningQuality === "sound" || p.reasoningQuality === "flawed" ? p.reasoningQuality : null,
   });
 
   // Dead-zone odds rows carry nonsense payouts — recap math skips them, same

@@ -275,7 +275,11 @@ export default function Recap() {
               </CardHeader>
               <CardContent>
                 <p className="font-mono text-2xl font-bold text-chart-1 text-glow-success">+{formatCurrency(p!.bestWin.amount)}</p>
-                <p className="text-xs text-foreground/80 mt-2">At {formatOdds(p!.bestWin.odds)}. This is the one you'll bring up all month.</p>
+                <p className="text-xs text-foreground/80 mt-2">
+                  {p!.bestWin.reasoningQuality === 'flawed'
+                    ? <>At {formatOdds(p!.bestWin.odds)}. You graded your own reasoning flawed on this one — that's called luck, and luck doesn't do encores.</>
+                    : <>At {formatOdds(p!.bestWin.odds)}. This is the one you'll bring up all month.</>}
+                </p>
               </CardContent>
             </Card>
           )}
@@ -292,7 +296,11 @@ export default function Recap() {
               </CardHeader>
               <CardContent>
                 <p className="font-mono text-2xl font-bold text-chart-2 text-glow-destructive">{formatCurrency(p!.worstBeat.amount)}</p>
-                <p className="text-xs text-foreground/80 mt-2">At {formatOdds(p!.worstBeat.odds)}. We don't have to talk about it. But it's staying in the record.</p>
+                <p className="text-xs text-foreground/80 mt-2">
+                  {p!.worstBeat.reasoningQuality === 'sound'
+                    ? <>At {formatOdds(p!.worstBeat.odds)}. You called your reasoning sound, and it was. Bad beat, not a bad call — keep making this bet.</>
+                    : <>At {formatOdds(p!.worstBeat.odds)}. We don't have to talk about it. But it's staying in the record.</>}
+                </p>
               </CardContent>
             </Card>
           )}

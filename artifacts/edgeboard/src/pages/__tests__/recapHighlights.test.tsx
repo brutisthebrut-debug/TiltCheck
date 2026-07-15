@@ -158,6 +158,44 @@ describe("Recap personal highlight cards", () => {
   })
 })
 
+// ── Reasoning-quality flavored copy ──────────────────────────────────────────
+
+describe("Recap highlight copy reflects the bettor's own reasoning grade", () => {
+  it("calls a flawed-reasoning best win luck", () => {
+    setRecap(makeRecap({ bestWin: { ...bestWin, reasoningQuality: "flawed" } }))
+    renderRecap()
+
+    const card = screen.getByTestId("card-recap-best-win")
+    expect(card.textContent).toContain("that's called luck")
+  })
+
+  it("keeps the default best-win line when reasoning was not graded flawed", () => {
+    setRecap(makeRecap({ bestWin: { ...bestWin, reasoningQuality: null } }))
+    renderRecap()
+
+    const card = screen.getByTestId("card-recap-best-win")
+    expect(card.textContent).toContain("bring up all month")
+    expect(card.textContent).not.toContain("that's called luck")
+  })
+
+  it("calls a sound-reasoning worst beat a bad beat, not a bad call", () => {
+    setRecap(makeRecap({ worstBeat: { ...worstBeat, reasoningQuality: "sound" } }))
+    renderRecap()
+
+    const card = screen.getByTestId("card-recap-worst-beat")
+    expect(card.textContent).toContain("Bad beat, not a bad call")
+  })
+
+  it("keeps the default worst-beat line when reasoning was not graded sound", () => {
+    setRecap(makeRecap({ worstBeat }))
+    renderRecap()
+
+    const card = screen.getByTestId("card-recap-worst-beat")
+    expect(card.textContent).toContain("staying in the record")
+    expect(card.textContent).not.toContain("not a bad call")
+  })
+})
+
 // ── Leak card headline per kind ──────────────────────────────────────────────
 
 describe("Recap leak card headlines", () => {

@@ -2849,6 +2849,10 @@ components:
         amount:
           type: number
           description: Net result in dollars (positive win, negative loss)
+        reasoningQuality:
+          type: ["string", "null"]
+          enum: [sound, flawed, null]
+          description: The bettor's own post-mortem grade of the reasoning behind this play, when they recorded one
       required: [type, id, userId, userName, title, odds, amount]
 
     RecapLeak:

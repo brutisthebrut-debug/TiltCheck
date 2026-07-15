@@ -1216,6 +1216,18 @@ export const RecapPlayType = {
 } as const;
 
 /**
+ * The bettor's own post-mortem grade of the reasoning behind this play, when they recorded one
+ * @nullable
+ */
+export type RecapPlayReasoningQuality = typeof RecapPlayReasoningQuality[keyof typeof RecapPlayReasoningQuality] | null;
+
+
+export const RecapPlayReasoningQuality = {
+  sound: 'sound',
+  flawed: 'flawed',
+} as const;
+
+/**
  * One notable play inside the recap week
  */
 export interface RecapPlay {
@@ -1228,6 +1240,11 @@ export interface RecapPlay {
   odds: number;
   /** Net result in dollars (positive win, negative loss) */
   amount: number;
+  /**
+     * The bettor's own post-mortem grade of the reasoning behind this play, when they recorded one
+     * @nullable
+     */
+  reasoningQuality?: RecapPlayReasoningQuality;
 }
 
 export type RecapLeakKind = typeof RecapLeakKind[keyof typeof RecapLeakKind];

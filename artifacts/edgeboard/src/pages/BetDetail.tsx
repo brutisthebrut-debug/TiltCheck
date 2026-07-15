@@ -17,7 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw } from "lucide-react"
+import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw, Lightbulb } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 
@@ -293,17 +293,24 @@ export default function BetDetail() {
               </div>
             )}
 
-            {bet.rationale && (
-              <div className="space-y-2 pt-2 border-t">
-                <div className="text-sm font-semibold flex items-center gap-2">
-                  Pre-game Rationale
-                  {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50" />}
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap bg-background p-3 rounded border">
+            {/* The why — always shown, first-class. An honest empty state beats
+                quietly hiding the fact that no reasoning was recorded. */}
+            <div className="space-y-2 pt-2 border-t" data-testid="section-rationale">
+              <div className="text-sm font-semibold flex items-center gap-2">
+                <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                The Why
+                {isSettled && <Lock className="h-3 w-3 text-muted-foreground/50" />}
+              </div>
+              {bet.rationale ? (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap bg-primary/5 border-primary/20 p-3 rounded border">
                   {bet.rationale}
                 </p>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground italic bg-background p-3 rounded border border-dashed" data-testid="text-no-rationale">
+                  No rationale was written for this one. The record remembers that too.
+                </p>
+              )}
+            </div>
             
             {/* Post-game review (settled) */}
             {isSettled && (bet.reasoningQuality || bet.whatHappened || bet.missReason) && (
@@ -460,6 +467,23 @@ export default function BetDetail() {
           </DialogHeader>
 
           <div className="space-y-5 py-2">
+            {/* Replay the pre-game reasoning so the grade is about the call
+                actually made, not the call remembered. */}
+            <div className="space-y-1.5 rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5" data-testid="replay-rationale">
+              <div className="text-xs font-semibold flex items-center gap-1.5 text-primary">
+                <Lightbulb className="h-3.5 w-3.5" />
+                What you said going in
+                <span className="ml-auto font-mono text-muted-foreground font-normal">Confidence {bet.confidenceScore}/10</span>
+              </div>
+              {bet.rationale ? (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{bet.rationale}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Nothing. No rationale was written — grade the decision as honestly as you can remember it.
+                </p>
+              )}
+            </div>
+
             {/* Actual payout override (won + any promo) */}
             {pendingStatus === 'won' && (
               <div className="space-y-2">

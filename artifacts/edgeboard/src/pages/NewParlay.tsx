@@ -29,7 +29,7 @@ import {
 import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
-import { ArrowLeft, Plus, Trash2, ChevronDown, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, ChevronDown, AlertTriangle, Lightbulb } from "lucide-react"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 import { dayOf } from "@workspace/weeks"
 
@@ -70,6 +70,9 @@ export default function NewParlay() {
   const [customSportsbook, setCustomSportsbook] = useState(lastBookIsCustom ? lastBook : "")
   const [showMore, setShowMore] = useState(false)
   const [stakePresets] = useState(() => getStakePresets())
+  // Soft nudge, never a block: the first submit without a rationale pauses to
+  // ask once; the next click logs the parlay regardless.
+  const [rationaleNudged, setRationaleNudged] = useState(false)
 
   const defaultLeg = {
     sport: getFavoriteSports()[0] ?? "NFL",
@@ -139,12 +142,19 @@ export default function NewParlay() {
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!activeUser) return
+    if (!values.rationale?.trim() && !rationaleNudged) {
+      setRationaleNudged(true)
+      return
+    }
     const sportsbook = values.sportsbook === "Other" ? (customSportsbook || "Other") : (values.sportsbook || undefined)
     createParlay.mutate({
       data: {
         userId: activeUser.id,
         ...values,
         sportsbook,
+        // Whitespace-only rationale is normalized away so the detail page's
+        // honest "no rationale" state stays honest.
+        rationale: values.rationale?.trim() || undefined,
         promoNote: values.promoNote || undefined,
       }
     }, {
@@ -226,6 +236,31 @@ export default function NewParlay() {
                   )}
                 />
               </div>
+
+              {/* The why — front and center, not buried in the extras. Optional,
+                  but skipping it earns a nudge at submit time. */}
+              <FormField
+                control={form.control}
+                name="rationale"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                      Why this parlay?
+                      <span className="text-muted-foreground font-normal">(the part future-you reads)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Why do these picks belong on one ticket? If it's 'the payout looked nice', write that down — it'll be educational later."
+                        className="h-20 resize-none"
+                        data-testid="input-rationale"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {/* Everything below has a sensible default — tucked away so the
                   fast path is just: name, stake, legs, log. */}
@@ -309,24 +344,6 @@ export default function NewParlay() {
                               value={[field.value]}
                               onValueChange={(vals) => field.onChange(vals[0])}
                               className="py-4"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="rationale"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Rationale (Pre-game Notes)</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Why are you grouping these picks?" 
-                              className="h-20 resize-none"
-                              {...field} 
                             />
                           </FormControl>
                           <FormMessage />
@@ -515,6 +532,18 @@ export default function NewParlay() {
                 </div>
               )}
               <CardContent className="p-4 space-y-2">
+                {rationaleNudged && !form.watch("rationale")?.trim() && (
+                  <div
+                    className="flex items-start gap-2.5 rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm"
+                    data-testid="nudge-rationale"
+                  >
+                    <Lightbulb className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                    <span>
+                      {fields.length} legs and no why? When this settles you'll be grading a ticket
+                      you can't explain. One sentence now — or log it anyway.
+                    </span>
+                  </div>
+                )}
                 {exceedsStorageBounds && (
                   <div
                     className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -549,8 +578,12 @@ export default function NewParlay() {
                       )}
                     </div>
                   </div>
-                  <Button type="submit" size="lg" disabled={createParlay.isPending || fields.length < 2 || exceedsStorageBounds}>
-                    {createParlay.isPending ? "Logging..." : "Log Parlay"}
+                  <Button type="submit" size="lg" disabled={createParlay.isPending || fields.length < 2 || exceedsStorageBounds} data-testid="button-submit-parlay">
+                    {createParlay.isPending
+                      ? "Logging..."
+                      : rationaleNudged && !form.watch("rationale")?.trim()
+                        ? "Log It Anyway"
+                        : "Log Parlay"}
                   </Button>
                 </div>
               </CardContent>

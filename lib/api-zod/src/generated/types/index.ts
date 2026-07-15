@@ -107,6 +107,7 @@ export * from './recapLeak';
 export * from './recapLeakKind';
 export * from './recapNarrative';
 export * from './recapPlay';
+export * from './recapPlayReasoningQuality';
 export * from './recapPlayType';
 export * from './record';
 export * from './reviewNote';

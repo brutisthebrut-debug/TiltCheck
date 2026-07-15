@@ -5,6 +5,7 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { RecapPlayReasoningQuality } from './recapPlayReasoningQuality';
 import type { RecapPlayType } from './recapPlayType';
 
 /**
@@ -20,4 +21,9 @@ export interface RecapPlay {
   odds: number;
   /** Net result in dollars (positive win, negative loss) */
   amount: number;
+  /**
+     * The bettor's own post-mortem grade of the reasoning behind this play, when they recorded one
+     * @nullable
+     */
+  reasoningQuality?: RecapPlayReasoningQuality;
 }
