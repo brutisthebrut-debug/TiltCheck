@@ -7,3 +7,4 @@
 - [Dark mode class placement](dark-mode-class-placement.md) — `dark` must be on `<html>`, not inner divs, or inherited body color resolves light-mode vars → invisible text.
 - [Demo board isolation](demo-board-isolation.md) — every real query must scope isDemo=false; tests wipe the dev DB but the server self-seeds the demo world at boot.
 - [Recharts time axis](recharts-time-axis.md) — numeric scale="time" XAxis needs an explicit ticks array or it draws a tick per point (overlap + dup-key errors).
+- [Frontend component tests](frontend-component-tests.md) — edgeboard vitest is node-env; tsx tests need the jsdom docblock and `esbuild.jsx: "automatic"`; mock generated hooks, keep a real QueryClientProvider.
