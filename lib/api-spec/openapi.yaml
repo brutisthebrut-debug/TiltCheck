@@ -344,6 +344,140 @@ paths:
         "404":
           description: Not a member of this crew
 
+  /crews/{id}:
+    delete:
+      operationId: deleteCrew
+      tags: [crews]
+      summary: Delete the crew
+      description: >
+        Owner only. Shuts the crew down for everyone — memberships cascade,
+        and former members fall back to another crew they belong to (or go
+        crewless).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Crew deleted
+        "403":
+          description: Only the crew owner can delete the crew (`error` is `owner_only`)
+        "404":
+          description: Not a member of this crew
+
+  /crews/{id}/members:
+    get:
+      operationId: listCrewMembers
+      tags: [crews]
+      summary: List the crew's members
+      description: >
+        The crew's roster, visible to any member. Powers the management view
+        (remove / transfer targets).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Crew members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CrewMember"
+        "404":
+          description: Not a member of this crew
+
+  /crews/{id}/leave:
+    post:
+      operationId: leaveCrew
+      tags: [crews]
+      summary: Leave the crew
+      description: >
+        Removes the signed-in member from the crew, freeing up their one free
+        membership slot. The owner can't leave — they must hand off ownership
+        first or delete the crew (409 `owner_cannot_leave`).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Left the crew
+        "404":
+          description: Not a member of this crew
+        "409":
+          description: The owner can't leave — transfer ownership or delete the crew (`error` is `owner_cannot_leave`)
+
+  /crews/{id}/members/{userId}:
+    delete:
+      operationId: removeCrewMember
+      tags: [crews]
+      summary: Remove a member from the crew
+      description: >
+        Owner only. Kicks the member off the board and frees up their
+        membership slot. The owner can't remove themselves — that's leave
+        (blocked) or delete (409 `cannot_remove_owner`).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Member removed
+        "403":
+          description: Only the crew owner can remove members (`error` is `owner_only`)
+        "404":
+          description: Not a member of this crew, or the target isn't a member
+        "409":
+          description: The owner can't remove themselves (`error` is `cannot_remove_owner`)
+
+  /crews/{id}/transfer:
+    post:
+      operationId: transferCrewOwnership
+      tags: [crews]
+      summary: Hand crew ownership to another member
+      description: >
+        Owner only. The target member becomes the owner; the previous owner
+        stays in the crew as a regular member.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferCrewOwnershipInput"
+      responses:
+        "200":
+          description: The crew, with the caller's role now `member`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Crew"
+        "403":
+          description: Only the crew owner can transfer ownership (`error` is `owner_only`)
+        "404":
+          description: Not a member of this crew, or the target isn't a member
+
   # ── Bets ──────────────────────────────────────────────────────────────────
   /bets:
     get:
@@ -1505,6 +1639,30 @@ components:
           maxLength: 16
           description: Invite code shared by a crew member (case-insensitive)
       required: [inviteCode]
+
+    CrewMember:
+      type: object
+      properties:
+        userId:
+          type: integer
+        displayName:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [owner, member]
+        joinedAt:
+          type: string
+      required: [userId, displayName, username, role, joinedAt]
+
+    TransferCrewOwnershipInput:
+      type: object
+      properties:
+        userId:
+          type: integer
+          description: The member who takes over as owner
+      required: [userId]
 
     Invite:
       type: object

@@ -37,6 +37,7 @@ import type {
   ConfidenceBucket,
   CreateCrewInput,
   Crew,
+  CrewMember,
   EdgeFinder,
   GetBankrollHistoryParams,
   GetBankrollParams,
@@ -74,6 +75,7 @@ import type {
   StreaksSummary,
   Transaction,
   TransactionInput,
+  TransferCrewOwnershipInput,
   UpdateUserInput,
   User,
   WeeklyRecap,
@@ -1144,6 +1146,375 @@ export const useRotateCrewInviteCode = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getRotateCrewInviteCodeMutationOptions(options));
+    }
+
+export const getDeleteCrewUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}`
+}
+
+/**
+ * Owner only. Shuts the crew down for everyone — memberships cascade, and former members fall back to another crew they belong to (or go crewless).
+ * @summary Delete the crew
+ */
+export const deleteCrew = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCrewUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteCrewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCrew>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCrew>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteCrew'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCrew>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCrew(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCrewMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCrew>>>
+
+    export type DeleteCrewMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete the crew
+ */
+export const useDeleteCrew = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCrew>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCrew>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteCrewMutationOptions(options));
+    }
+
+export const getListCrewMembersUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/members`
+}
+
+/**
+ * The crew's roster, visible to any member. Powers the management view (remove / transfer targets).
+ * @summary List the crew's members
+ */
+export const listCrewMembers = async (id: number, options?: RequestInit): Promise<CrewMember[]> => {
+
+  return customFetch<CrewMember[]>(getListCrewMembersUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCrewMembersQueryKey = (id: number,) => {
+    return [
+    `/api/crews/${id}/members`
+    ] as const;
+    }
+
+
+export const getListCrewMembersQueryOptions = <TData = Awaited<ReturnType<typeof listCrewMembers>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCrewMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCrewMembersQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCrewMembers>>> = ({ signal }) => listCrewMembers(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCrewMembers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCrewMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listCrewMembers>>>
+export type ListCrewMembersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the crew's members
+ */
+
+export function useListCrewMembers<TData = Awaited<ReturnType<typeof listCrewMembers>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCrewMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCrewMembersQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getLeaveCrewUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/leave`
+}
+
+/**
+ * Removes the signed-in member from the crew, freeing up their one free membership slot. The owner can't leave — they must hand off ownership first or delete the crew (409 `owner_cannot_leave`).
+ * @summary Leave the crew
+ */
+export const leaveCrew = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getLeaveCrewUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLeaveCrewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveCrew>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof leaveCrew>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['leaveCrew'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof leaveCrew>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  leaveCrew(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LeaveCrewMutationResult = NonNullable<Awaited<ReturnType<typeof leaveCrew>>>
+
+    export type LeaveCrewMutationError = ErrorType<void>
+
+    /**
+ * @summary Leave the crew
+ */
+export const useLeaveCrew = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveCrew>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof leaveCrew>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getLeaveCrewMutationOptions(options));
+    }
+
+export const getRemoveCrewMemberUrl = (id: number,
+    userId: number,) => {
+
+
+
+
+  return `/api/crews/${id}/members/${userId}`
+}
+
+/**
+ * Owner only. Kicks the member off the board and frees up their membership slot. The owner can't remove themselves — that's leave (blocked) or delete (409 `cannot_remove_owner`).
+ * @summary Remove a member from the crew
+ */
+export const removeCrewMember = async (id: number,
+    userId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRemoveCrewMemberUrl(id,userId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveCrewMemberMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeCrewMember>>, TError,{id: number;userId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeCrewMember>>, TError,{id: number;userId: number}, TContext> => {
+
+const mutationKey = ['removeCrewMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeCrewMember>>, {id: number;userId: number}> = (props) => {
+          const {id,userId} = props ?? {};
+
+          return  removeCrewMember(id,userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveCrewMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeCrewMember>>>
+
+    export type RemoveCrewMemberMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a member from the crew
+ */
+export const useRemoveCrewMember = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeCrewMember>>, TError,{id: number;userId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeCrewMember>>,
+        TError,
+        {id: number;userId: number},
+        TContext
+      > => {
+      return useMutation(getRemoveCrewMemberMutationOptions(options));
+    }
+
+export const getTransferCrewOwnershipUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/transfer`
+}
+
+/**
+ * Owner only. The target member becomes the owner; the previous owner stays in the crew as a regular member.
+ * @summary Hand crew ownership to another member
+ */
+export const transferCrewOwnership = async (id: number,
+    transferCrewOwnershipInput: TransferCrewOwnershipInput, options?: RequestInit): Promise<Crew> => {
+
+  return customFetch<Crew>(getTransferCrewOwnershipUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(transferCrewOwnershipInput)
+  }
+);}
+
+
+
+
+
+export const getTransferCrewOwnershipMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferCrewOwnership>>, TError,{id: number;data: BodyType<TransferCrewOwnershipInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transferCrewOwnership>>, TError,{id: number;data: BodyType<TransferCrewOwnershipInput>}, TContext> => {
+
+const mutationKey = ['transferCrewOwnership'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferCrewOwnership>>, {id: number;data: BodyType<TransferCrewOwnershipInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transferCrewOwnership(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransferCrewOwnershipMutationResult = NonNullable<Awaited<ReturnType<typeof transferCrewOwnership>>>
+    export type TransferCrewOwnershipMutationBody = BodyType<TransferCrewOwnershipInput>
+    export type TransferCrewOwnershipMutationError = ErrorType<void>
+
+    /**
+ * @summary Hand crew ownership to another member
+ */
+export const useTransferCrewOwnership = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferCrewOwnership>>, TError,{id: number;data: BodyType<TransferCrewOwnershipInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transferCrewOwnership>>,
+        TError,
+        {id: number;data: BodyType<TransferCrewOwnershipInput>},
+        TContext
+      > => {
+      return useMutation(getTransferCrewOwnershipMutationOptions(options));
     }
 
 export const getListBetsUrl = (params?: ListBetsParams,) => {

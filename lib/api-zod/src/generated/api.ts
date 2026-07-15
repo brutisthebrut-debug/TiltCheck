@@ -276,6 +276,81 @@ export const RotateCrewInviteCodeResponse = zod.object({
 
 
 /**
+ * Owner only. Shuts the crew down for everyone — memberships cascade, and former members fall back to another crew they belong to (or go crewless).
+ * @summary Delete the crew
+ */
+export const DeleteCrewParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteCrewResponse = zod.void()
+
+
+/**
+ * The crew's roster, visible to any member. Powers the management view (remove / transfer targets).
+ * @summary List the crew's members
+ */
+export const ListCrewMembersParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListCrewMembersResponseItem = zod.object({
+  "userId": zod.number(),
+  "displayName": zod.string(),
+  "username": zod.string(),
+  "role": zod.enum(['owner', 'member']),
+  "joinedAt": zod.string()
+})
+export const ListCrewMembersResponse = zod.array(ListCrewMembersResponseItem)
+
+
+/**
+ * Removes the signed-in member from the crew, freeing up their one free membership slot. The owner can't leave — they must hand off ownership first or delete the crew (409 `owner_cannot_leave`).
+ * @summary Leave the crew
+ */
+export const LeaveCrewParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const LeaveCrewResponse = zod.void()
+
+
+/**
+ * Owner only. Kicks the member off the board and frees up their membership slot. The owner can't remove themselves — that's leave (blocked) or delete (409 `cannot_remove_owner`).
+ * @summary Remove a member from the crew
+ */
+export const RemoveCrewMemberParams = zod.object({
+  "id": zod.coerce.number(),
+  "userId": zod.coerce.number()
+})
+
+export const RemoveCrewMemberResponse = zod.void()
+
+
+/**
+ * Owner only. The target member becomes the owner; the previous owner stays in the crew as a regular member.
+ * @summary Hand crew ownership to another member
+ */
+export const TransferCrewOwnershipParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const TransferCrewOwnershipBody = zod.object({
+  "userId": zod.number().describe('The member who takes over as owner')
+})
+
+export const TransferCrewOwnershipResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'member']).describe('The signed-in user\'s role in this crew'),
+  "inviteCode": zod.string().describe('Shareable join code — sharing it is free, joining may need Pro'),
+  "memberCount": zod.number(),
+  "isActive": zod.boolean().describe('Whether this is the crew the user\'s social views currently cover'),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary List straight bets
  */
 export const listBetsQueryLimitDefault = 50;

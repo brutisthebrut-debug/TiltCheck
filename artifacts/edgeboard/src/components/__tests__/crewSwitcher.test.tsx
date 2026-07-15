@@ -21,13 +21,25 @@ const crews = [
 let listCrewsResult: { data: unknown; isPending: boolean; isError: boolean; refetch: () => void }
 let createResult: Record<string, unknown>
 
+const idleMutation = () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null })
+
+let membersResult: { data: unknown; isPending: boolean }
+
 vi.mock("@workspace/api-client-react", () => ({
   useListCrews: () => listCrewsResult,
   getListCrewsQueryKey: () => ["/api/crews"],
   useCreateCrew: () => createResult,
-  useJoinCrew: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
-  useActivateCrew: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }),
+  useJoinCrew: () => idleMutation(),
+  useActivateCrew: () => idleMutation(),
   useCreateBillingCheckout: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useGetCurrentUser: () => ({ data: { id: 10 } }),
+  getGetCurrentUserQueryKey: () => ["/api/users/me"],
+  useListCrewMembers: () => membersResult,
+  getListCrewMembersQueryKey: (id: number) => [`/api/crews/${id}/members`],
+  useLeaveCrew: () => idleMutation(),
+  useRemoveCrewMember: () => idleMutation(),
+  useTransferCrewOwnership: () => idleMutation(),
+  useDeleteCrew: () => idleMutation(),
 }))
 
 import { CrewSwitcher } from "../CrewSwitcher"
@@ -43,6 +55,13 @@ beforeEach(() => {
   setCrewActionsEnabled(true)
   listCrewsResult = { data: crews, isPending: false, isError: false, refetch: vi.fn() }
   createResult = { mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false, error: null }
+  membersResult = {
+    data: [
+      { userId: 10, displayName: "Me", username: "me", role: "owner", joinedAt: "2026-01-01T00:00:00Z" },
+      { userId: 11, displayName: "Dana", username: "dana", role: "member", joinedAt: "2026-01-02T00:00:00Z" },
+    ],
+    isPending: false,
+  }
 })
 
 afterEach(() => {
@@ -78,6 +97,50 @@ describe("CrewSwitcher", () => {
     expect(screen.getByTestId("item-crew-1")).toBeTruthy()
     expect(screen.queryByTestId("item-create-crew")).toBeNull()
     expect(screen.queryByTestId("item-join-crew")).toBeNull()
+  })
+
+  it("manage dialog: the owner gets kick/transfer/delete, never a leave button", () => {
+    wrap(<CrewSwitcher />)
+    fireEvent.keyDown(screen.getByTestId("button-crew-switcher"), { key: "Enter" })
+    fireEvent.click(screen.getByTestId("item-manage-crew"))
+    expect(screen.getByTestId("row-member-11").textContent).toContain("Dana")
+    expect(screen.getByTestId("button-transfer-11")).toBeTruthy()
+    expect(screen.getByTestId("button-remove-11")).toBeTruthy()
+    expect(screen.queryByTestId("button-transfer-10")).toBeNull()
+    expect(screen.getByTestId("button-delete-crew")).toBeTruthy()
+    expect(screen.queryByTestId("button-leave-crew")).toBeNull()
+  })
+
+  it("manage dialog: a plain member only gets the door", () => {
+    listCrewsResult = {
+      data: [{ ...crews[0], role: "member" }],
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    }
+    wrap(<CrewSwitcher />)
+    fireEvent.keyDown(screen.getByTestId("button-crew-switcher"), { key: "Enter" })
+    fireEvent.click(screen.getByTestId("item-manage-crew"))
+    expect(screen.getByTestId("button-leave-crew")).toBeTruthy()
+    expect(screen.queryByTestId("button-delete-crew")).toBeNull()
+    expect(screen.queryByTestId("button-remove-11")).toBeNull()
+  })
+
+  it("destructive moves go through an inline confirm first", () => {
+    wrap(<CrewSwitcher />)
+    fireEvent.keyDown(screen.getByTestId("button-crew-switcher"), { key: "Enter" })
+    fireEvent.click(screen.getByTestId("item-manage-crew"))
+    fireEvent.click(screen.getByTestId("button-delete-crew"))
+    expect(screen.getByTestId("text-confirm-action").textContent).toContain("Shut down")
+    fireEvent.click(screen.getByTestId("button-cancel-action"))
+    expect(screen.queryByTestId("text-confirm-action")).toBeNull()
+  })
+
+  it("demo mode hides the manage entry too", () => {
+    setCrewActionsEnabled(false)
+    wrap(<CrewSwitcher />)
+    fireEvent.keyDown(screen.getByTestId("button-crew-switcher"), { key: "Enter" })
+    expect(screen.queryByTestId("item-manage-crew")).toBeNull()
   })
 
   it("a 402 from create swaps the dialog to the Pro pitch", () => {

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, asc, eq, count, sql, inArray } from "drizzle-orm";
 import { db, usersTable, crewsTable, crewMembersTable } from "@workspace/db";
-import { CreateCrewBody, JoinCrewBody } from "@workspace/api-zod";
+import { CreateCrewBody, JoinCrewBody, TransferCrewOwnershipBody } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { generateInviteCode, resolveActiveCrewId } from "../lib/crews";
 import { logger } from "../lib/logger";
@@ -12,6 +12,17 @@ const router: IRouter = Router();
 // the user id), so a double-click can't slip two memberships past the free
 // cap. Distinct from the checkout (429_001) and claim lock keys.
 const CREW_LOCK_NS = 429_002;
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// Serialize all owner-gated management (and the role checks they depend on)
+// per crew: lock the crew row, THEN read roles. A racing transfer holds this
+// lock until commit, so a stale ex-owner can never pass the owner check and
+// still fire a privileged mutation. Returns null when the crew is gone.
+async function lockCrew(tx: Tx, crewId: number): Promise<CrewRow | null> {
+  const [crew] = await tx.select().from(crewsTable).where(eq(crewsTable.id, crewId)).for("update");
+  return crew ?? null;
+}
 
 // The Pro lever: free accounts hold exactly one crew membership. Founders and
 // the demo world ride free; a live server-verified subscription unlocks more.
@@ -252,6 +263,270 @@ router.post("/crews/:id/invite-code", requireProfile, async (req, res): Promise<
     .where(eq(crewMembersTable.crewId, crewId));
   const activeId = await resolveActiveCrewId(me);
   res.json(formatCrew(updated, "owner", members, activeId === crewId));
+});
+
+// GET /crews/:id/members — the roster, visible to any member. Powers the
+// management view (remove / transfer targets).
+router.get("/crews/:id/members", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  if (isNaN(crewId)) {
+    res.status(400).json({ error: "Invalid crew id" });
+    return;
+  }
+  const me = req.currentUser!;
+  const [membership] = await db
+    .select({ id: crewMembersTable.id })
+    .from(crewMembersTable)
+    .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)))
+    .limit(1);
+  if (!membership) {
+    res.status(404).json({ error: "You're not in this crew" });
+    return;
+  }
+  const rows = await db
+    .select({
+      userId: crewMembersTable.userId,
+      role: crewMembersTable.role,
+      joinedAt: crewMembersTable.joinedAt,
+      displayName: usersTable.displayName,
+      username: usersTable.username,
+    })
+    .from(crewMembersTable)
+    .innerJoin(usersTable, eq(crewMembersTable.userId, usersTable.id))
+    .where(eq(crewMembersTable.crewId, crewId))
+    .orderBy(asc(crewMembersTable.id));
+  res.json(
+    rows.map((r) => ({
+      userId: r.userId,
+      displayName: r.displayName,
+      username: r.username,
+      role: r.role === "owner" ? "owner" : "member",
+      joinedAt: r.joinedAt.toISOString(),
+    })),
+  );
+});
+
+// POST /crews/:id/leave — a member walks; their free slot opens back up. The
+// owner can't leave — the crew needs an owner, so it's transfer or delete.
+router.post("/crews/:id/leave", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  if (isNaN(crewId)) {
+    res.status(400).json({ error: "Invalid crew id" });
+    return;
+  }
+  const me = req.currentUser!;
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      // Per-user lock guards the free-slot accounting; the crew row lock makes
+      // the role check atomic against a concurrent ownership transfer (a
+      // member who just became owner mid-leave must not slip out ownerless).
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${CREW_LOCK_NS}, ${me.id})`);
+      const crew = await lockCrew(tx, crewId);
+      if (!crew) return { kind: "not_member" as const };
+      const [membership] = await tx
+        .select({ role: crewMembersTable.role })
+        .from(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)))
+        .limit(1);
+      if (!membership) return { kind: "not_member" as const };
+      if (membership.role === "owner") return { kind: "owner" as const };
+      await tx
+        .delete(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)));
+      // Point the active crew away from the one just left; the resolver would
+      // fall back anyway, but a stale pointer is a stale pointer.
+      await tx
+        .update(usersTable)
+        .set({ activeCrewId: null })
+        .where(and(eq(usersTable.id, me.id), eq(usersTable.activeCrewId, crewId)));
+      return { kind: "left" as const };
+    });
+    if (outcome.kind === "not_member") {
+      res.status(404).json({ error: "You're not in this crew" });
+      return;
+    }
+    if (outcome.kind === "owner") {
+      res.status(409).json({
+        error: "owner_cannot_leave",
+        message: "The owner can't just walk. Hand off ownership first, or shut the crew down.",
+      });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    logger.error({ err, userId: me.id, crewId }, "crews: leave failed");
+    res.status(500).json({ error: "Could not leave the crew — try again" });
+  }
+});
+
+// DELETE /crews/:id/members/:userId — owner-only kick. Frees the target's slot.
+router.delete("/crews/:id/members/:userId", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  const targetId = parseInt(String(req.params.userId), 10);
+  if (isNaN(crewId) || isNaN(targetId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const me = req.currentUser!;
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const crew = await lockCrew(tx, crewId);
+      if (!crew) return { kind: "not_member" as const };
+      const [mine] = await tx
+        .select({ role: crewMembersTable.role })
+        .from(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)))
+        .limit(1);
+      if (!mine) return { kind: "not_member" as const };
+      if (mine.role !== "owner") return { kind: "not_owner" as const };
+      if (targetId === me.id) return { kind: "self" as const };
+      const removed = await tx
+        .delete(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, targetId)))
+        .returning({ id: crewMembersTable.id });
+      if (removed.length === 0) return { kind: "target_missing" as const };
+      await tx
+        .update(usersTable)
+        .set({ activeCrewId: null })
+        .where(and(eq(usersTable.id, targetId), eq(usersTable.activeCrewId, crewId)));
+      return { kind: "removed" as const };
+    });
+    if (outcome.kind === "not_member") {
+      res.status(404).json({ error: "You're not in this crew" });
+      return;
+    }
+    if (outcome.kind === "not_owner") {
+      res.status(403).json({ error: "owner_only", message: "Only the crew owner can remove members." });
+      return;
+    }
+    if (outcome.kind === "self") {
+      res.status(409).json({
+        error: "cannot_remove_owner",
+        message: "You can't kick yourself. Hand off ownership or shut the crew down.",
+      });
+      return;
+    }
+    if (outcome.kind === "target_missing") {
+      res.status(404).json({ error: "That bettor isn't in this crew" });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    logger.error({ err, userId: me.id, crewId, targetId }, "crews: remove member failed");
+    res.status(500).json({ error: "Could not remove the member — try again" });
+  }
+});
+
+// POST /crews/:id/transfer — hand the keys to another member; the previous
+// owner stays on the board as a regular member.
+router.post("/crews/:id/transfer", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  if (isNaN(crewId)) {
+    res.status(400).json({ error: "Invalid crew id" });
+    return;
+  }
+  const parsed = TransferCrewOwnershipBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const targetId = parsed.data.userId;
+  const me = req.currentUser!;
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const crew0 = await lockCrew(tx, crewId);
+      if (!crew0) return { kind: "not_member" as const };
+      const [mine] = await tx
+        .select({ role: crewMembersTable.role })
+        .from(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)))
+        .limit(1);
+      if (!mine) return { kind: "not_member" as const };
+      if (mine.role !== "owner") return { kind: "not_owner" as const };
+      if (targetId === me.id) return { kind: "target_missing" as const };
+      const [target] = await tx
+        .select({ id: crewMembersTable.id })
+        .from(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, targetId)))
+        .limit(1);
+      if (!target) return { kind: "target_missing" as const };
+      const [crew] = await tx
+        .update(crewsTable)
+        .set({ ownerId: targetId })
+        .where(eq(crewsTable.id, crewId))
+        .returning();
+      await tx
+        .update(crewMembersTable)
+        .set({ role: "owner" })
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, targetId)));
+      await tx
+        .update(crewMembersTable)
+        .set({ role: "member" })
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)));
+      const [{ members }] = await tx
+        .select({ members: count() })
+        .from(crewMembersTable)
+        .where(eq(crewMembersTable.crewId, crewId));
+      return { kind: "transferred" as const, crew, members };
+    });
+    if (outcome.kind === "not_member") {
+      res.status(404).json({ error: "You're not in this crew" });
+      return;
+    }
+    if (outcome.kind === "not_owner") {
+      res.status(403).json({ error: "owner_only", message: "Only the crew owner can hand off ownership." });
+      return;
+    }
+    if (outcome.kind === "target_missing") {
+      res.status(404).json({ error: "That bettor isn't in this crew" });
+      return;
+    }
+    const activeId = await resolveActiveCrewId(me);
+    res.json(formatCrew(outcome.crew, "member", outcome.members, activeId === crewId));
+  } catch (err) {
+    logger.error({ err, userId: me.id, crewId }, "crews: transfer failed");
+    res.status(500).json({ error: "Could not transfer ownership — try again" });
+  }
+});
+
+// DELETE /crews/:id — owner-only shutdown. Memberships cascade with the crew
+// row; former members' active pointers are cleared so the resolver falls back
+// to whatever crew they still have (or crewless).
+router.delete("/crews/:id", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  if (isNaN(crewId)) {
+    res.status(400).json({ error: "Invalid crew id" });
+    return;
+  }
+  const me = req.currentUser!;
+  try {
+    const outcome = await db.transaction(async (tx) => {
+      const crew = await lockCrew(tx, crewId);
+      if (!crew) return { kind: "not_member" as const };
+      const [mine] = await tx
+        .select({ role: crewMembersTable.role })
+        .from(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)))
+        .limit(1);
+      if (!mine) return { kind: "not_member" as const };
+      if (mine.role !== "owner") return { kind: "not_owner" as const };
+      await tx.update(usersTable).set({ activeCrewId: null }).where(eq(usersTable.activeCrewId, crewId));
+      await tx.delete(crewsTable).where(eq(crewsTable.id, crewId));
+      return { kind: "deleted" as const };
+    });
+    if (outcome.kind === "not_member") {
+      res.status(404).json({ error: "You're not in this crew" });
+      return;
+    }
+    if (outcome.kind === "not_owner") {
+      res.status(403).json({ error: "owner_only", message: "Only the crew owner can shut it down." });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    logger.error({ err, userId: me.id, crewId }, "crews: delete failed");
+    res.status(500).json({ error: "Could not delete the crew — try again" });
+  }
 });
 
 export default router;

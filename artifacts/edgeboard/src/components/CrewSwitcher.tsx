@@ -20,7 +20,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { UpgradeCard } from "@/components/UpgradeCard"
-import { Shield, Check, ChevronsUpDown, Plus, KeyRound } from "lucide-react"
+import { CrewManageDialog } from "@/components/CrewManageDialog"
+import { Shield, Check, ChevronsUpDown, Plus, KeyRound, Settings2 } from "lucide-react"
 
 function errorStatus(error: unknown): number | null {
   const status = (error as { status?: unknown } | null)?.status
@@ -44,6 +45,7 @@ export function CrewSwitcher({ className = "" }: { className?: string }) {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
   const [name, setName] = useState("")
   const [code, setCode] = useState("")
 
@@ -135,6 +137,12 @@ export function CrewSwitcher({ className = "" }: { className?: string }) {
           {actionsEnabled && (
             <>
               <DropdownMenuSeparator />
+              {activeCrew && (
+                <DropdownMenuItem onSelect={() => setManageOpen(true)} data-testid="item-manage-crew">
+                  <Settings2 className="h-4 w-4" />
+                  Manage {activeCrew.name}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onSelect={() => setCreateOpen(true)} data-testid="item-create-crew">
                 <Plus className="h-4 w-4" />
                 Start a new crew
@@ -230,6 +238,11 @@ export function CrewSwitcher({ className = "" }: { className?: string }) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Manage the active crew: roster, leave, kick, transfer, delete */}
+      {activeCrew && (
+        <CrewManageDialog crew={activeCrew} open={manageOpen} onOpenChange={setManageOpen} />
+      )}
     </div>
   )
 }

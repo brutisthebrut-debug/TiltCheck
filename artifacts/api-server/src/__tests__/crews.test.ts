@@ -281,6 +281,275 @@ describe("crew scoping of social surfaces", () => {
   });
 });
 
+describe("crew management — leave, remove, transfer, delete", () => {
+  it("a member can leave: 204, drops off the list, and the freed slot lets them join again", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Revolving Door" });
+    trackCrew(created.body.id);
+
+    const member = await createLinkedUser();
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: created.body.inviteCode });
+
+    const left = await request(app).post(`/api/crews/${created.body.id}/leave`).set("x-test-clerk-id", member.clerkUserId);
+    expect(left.status).toBe(204);
+
+    const list = await request(app).get("/api/crews").set("x-test-clerk-id", member.clerkUserId);
+    expect(list.body).toHaveLength(0);
+
+    // The one free membership slot is open again — a fresh join is free, not 402.
+    const owner2 = await createLinkedUser();
+    const other = await request(app).post("/api/crews").set("x-test-clerk-id", owner2.clerkUserId).send({ name: "Fresh Board" });
+    trackCrew(other.body.id);
+    const rejoin = await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: other.body.inviteCode });
+    expect(rejoin.status).toBe(200);
+  });
+
+  it("the owner can't leave (409) and a non-member gets 404", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Stuck Captain" });
+    trackCrew(created.body.id);
+
+    const denied = await request(app).post(`/api/crews/${created.body.id}/leave`).set("x-test-clerk-id", owner.clerkUserId);
+    expect(denied.status).toBe(409);
+    expect(denied.body.error).toBe("owner_cannot_leave");
+
+    const stranger = await createLinkedUser();
+    const nope = await request(app).post(`/api/crews/${created.body.id}/leave`).set("x-test-clerk-id", stranger.clerkUserId);
+    expect(nope.status).toBe(404);
+  });
+
+  it("owner removes a member: 204; non-owner 403; self 409; non-member target 404", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Kick Test" });
+    trackCrew(created.body.id);
+
+    const member = await createLinkedUser();
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: created.body.inviteCode });
+
+    // Member kicking the owner: owner-only.
+    const notOwner = await request(app)
+      .delete(`/api/crews/${created.body.id}/members/${owner.user.id}`)
+      .set("x-test-clerk-id", member.clerkUserId);
+    expect(notOwner.status).toBe(403);
+    expect(notOwner.body.error).toBe("owner_only");
+
+    // Owner kicking themselves: nope, that's transfer-or-delete.
+    const self = await request(app)
+      .delete(`/api/crews/${created.body.id}/members/${owner.user.id}`)
+      .set("x-test-clerk-id", owner.clerkUserId);
+    expect(self.status).toBe(409);
+    expect(self.body.error).toBe("cannot_remove_owner");
+
+    // Target not in the crew: 404.
+    const stranger = await createLinkedUser();
+    const missing = await request(app)
+      .delete(`/api/crews/${created.body.id}/members/${stranger.user.id}`)
+      .set("x-test-clerk-id", owner.clerkUserId);
+    expect(missing.status).toBe(404);
+
+    // The real kick.
+    const kicked = await request(app)
+      .delete(`/api/crews/${created.body.id}/members/${member.user.id}`)
+      .set("x-test-clerk-id", owner.clerkUserId);
+    expect(kicked.status).toBe(204);
+
+    const list = await request(app).get("/api/crews").set("x-test-clerk-id", member.clerkUserId);
+    expect(list.body).toHaveLength(0);
+
+    // Kicked member's slot is free again.
+    const owner2 = await createLinkedUser();
+    const other = await request(app).post("/api/crews").set("x-test-clerk-id", owner2.clerkUserId).send({ name: "After Kick" });
+    trackCrew(other.body.id);
+    const rejoin = await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: other.body.inviteCode });
+    expect(rejoin.status).toBe(200);
+  });
+
+  it("ownership transfer flips the roles; old owner can now leave, new owner can rotate", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Handoff" });
+    trackCrew(created.body.id);
+
+    const member = await createLinkedUser();
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: created.body.inviteCode });
+
+    // Non-owner can't transfer; owner can't transfer to a non-member.
+    const notOwner = await request(app)
+      .post(`/api/crews/${created.body.id}/transfer`)
+      .set("x-test-clerk-id", member.clerkUserId)
+      .send({ userId: member.user.id });
+    expect(notOwner.status).toBe(403);
+    const stranger = await createLinkedUser();
+    const badTarget = await request(app)
+      .post(`/api/crews/${created.body.id}/transfer`)
+      .set("x-test-clerk-id", owner.clerkUserId)
+      .send({ userId: stranger.user.id });
+    expect(badTarget.status).toBe(404);
+
+    const handed = await request(app)
+      .post(`/api/crews/${created.body.id}/transfer`)
+      .set("x-test-clerk-id", owner.clerkUserId)
+      .send({ userId: member.user.id });
+    expect(handed.status).toBe(200);
+    expect(handed.body.role).toBe("member");
+
+    const newOwnerList = await request(app).get("/api/crews").set("x-test-clerk-id", member.clerkUserId);
+    expect(newOwnerList.body.find((c: { id: number }) => c.id === created.body.id).role).toBe("owner");
+
+    // Roles genuinely moved: old owner can walk now, new owner can rotate.
+    const rotate = await request(app).post(`/api/crews/${created.body.id}/invite-code`).set("x-test-clerk-id", member.clerkUserId);
+    expect(rotate.status).toBe(200);
+    const oldOwnerRotate = await request(app).post(`/api/crews/${created.body.id}/invite-code`).set("x-test-clerk-id", owner.clerkUserId);
+    expect(oldOwnerRotate.status).toBe(403);
+    const oldOwnerLeaves = await request(app).post(`/api/crews/${created.body.id}/leave`).set("x-test-clerk-id", owner.clerkUserId);
+    expect(oldOwnerLeaves.status).toBe(204);
+  });
+
+  it("delete is owner-only, cascades memberships, and members fall back to another crew", async () => {
+    const owner = await createLinkedUser();
+    const doomed = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Doomed" });
+    trackCrew(doomed.body.id);
+
+    // A Pro member who's also in a second crew — they should fall back to it.
+    const member = await createLinkedUser({ proUntil: FUTURE });
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: doomed.body.inviteCode });
+    const backup = await request(app).post("/api/crews").set("x-test-clerk-id", member.clerkUserId).send({ name: "Backup" });
+    trackCrew(backup.body.id);
+    // Make the doomed crew their active one so the fallback actually matters.
+    await request(app).post(`/api/crews/${doomed.body.id}/activate`).set("x-test-clerk-id", member.clerkUserId);
+
+    const notOwner = await request(app).delete(`/api/crews/${doomed.body.id}`).set("x-test-clerk-id", member.clerkUserId);
+    expect(notOwner.status).toBe(403);
+    expect(notOwner.body.error).toBe("owner_only");
+
+    const gone = await request(app).delete(`/api/crews/${doomed.body.id}`).set("x-test-clerk-id", owner.clerkUserId);
+    expect(gone.status).toBe(204);
+
+    // Owner is crewless now; the member fell back to their backup crew.
+    const ownerList = await request(app).get("/api/crews").set("x-test-clerk-id", owner.clerkUserId);
+    expect(ownerList.body).toHaveLength(0);
+    const memberList = await request(app).get("/api/crews").set("x-test-clerk-id", member.clerkUserId);
+    expect(memberList.body).toHaveLength(1);
+    expect(memberList.body[0]).toMatchObject({ id: backup.body.id, isActive: true });
+
+    // No orphaned membership rows survived the cascade.
+    const orphans = await db.select().from(crewMembersTable).where(eq(crewMembersTable.crewId, doomed.body.id));
+    expect(orphans).toHaveLength(0);
+
+    // Deleting again: the crew's gone, so it's a plain 404.
+    const again = await request(app).delete(`/api/crews/${doomed.body.id}`).set("x-test-clerk-id", owner.clerkUserId);
+    expect(again.status).toBe(404);
+  });
+
+  it("race-safe: a transfer racing a delete never lets a stale ex-owner nuke the crew", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Race Delete" });
+    trackCrew(created.body.id);
+    const member = await createLinkedUser();
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: created.body.inviteCode });
+
+    const [transferRes, deleteRes] = await Promise.all([
+      request(app).post(`/api/crews/${created.body.id}/transfer`).set("x-test-clerk-id", owner.clerkUserId).send({ userId: member.user.id }),
+      request(app).delete(`/api/crews/${created.body.id}`).set("x-test-clerk-id", owner.clerkUserId),
+    ]);
+
+    const [crewNow] = await db.select().from(crewsTable).where(eq(crewsTable.id, created.body.id));
+    if (transferRes.status === 200) {
+      // Transfer won the lock: the caller is a stale ex-owner by the time the
+      // delete's role check runs — it must be refused, and the crew survives.
+      expect(deleteRes.status).toBe(403);
+      expect(crewNow).toBeDefined();
+      expect(crewNow.ownerId).toBe(member.user.id);
+    } else {
+      // Delete won: the crew was gone before transfer's membership check.
+      expect(deleteRes.status).toBe(204);
+      expect(transferRes.status).toBe(404);
+      expect(crewNow).toBeUndefined();
+    }
+  });
+
+  it("race-safe: a transfer racing a kick never lets a stale ex-owner remove the new owner", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Race Kick" });
+    trackCrew(created.body.id);
+    const member = await createLinkedUser();
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: created.body.inviteCode });
+
+    const [transferRes, kickRes] = await Promise.all([
+      request(app).post(`/api/crews/${created.body.id}/transfer`).set("x-test-clerk-id", owner.clerkUserId).send({ userId: member.user.id }),
+      request(app).delete(`/api/crews/${created.body.id}/members/${member.user.id}`).set("x-test-clerk-id", owner.clerkUserId),
+    ]);
+
+    const memberships = await db
+      .select()
+      .from(crewMembersTable)
+      .where(eq(crewMembersTable.crewId, created.body.id));
+    const [crewNow] = await db.select().from(crewsTable).where(eq(crewsTable.id, created.body.id));
+    if (transferRes.status === 200) {
+      // Transfer won: the stale ex-owner's kick must bounce off the role check.
+      expect(kickRes.status).toBe(403);
+      expect(crewNow.ownerId).toBe(member.user.id);
+      expect(memberships.find((m) => m.userId === member.user.id)?.role).toBe("owner");
+    } else {
+      // Kick won: the target left before the transfer could crown them.
+      expect(kickRes.status).toBe(204);
+      expect(transferRes.status).toBe(404);
+      expect(crewNow.ownerId).toBe(owner.user.id);
+      expect(memberships.map((m) => m.userId)).toEqual([owner.user.id]);
+    }
+    // Either way the crew still has exactly one owner.
+    expect(memberships.filter((m) => m.role === "owner")).toHaveLength(crewNow ? 1 : 0);
+  });
+
+  it("race-safe: a member crowned mid-leave can't slip out and strand the crew ownerless", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Race Leave" });
+    trackCrew(created.body.id);
+    const member = await createLinkedUser();
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: created.body.inviteCode });
+
+    const [transferRes, leaveRes] = await Promise.all([
+      request(app).post(`/api/crews/${created.body.id}/transfer`).set("x-test-clerk-id", owner.clerkUserId).send({ userId: member.user.id }),
+      request(app).post(`/api/crews/${created.body.id}/leave`).set("x-test-clerk-id", member.clerkUserId),
+    ]);
+
+    const memberships = await db
+      .select()
+      .from(crewMembersTable)
+      .where(eq(crewMembersTable.crewId, created.body.id));
+    const [crewNow] = await db.select().from(crewsTable).where(eq(crewsTable.id, created.body.id));
+    if (leaveRes.status === 204) {
+      // Leave won: the transfer must have missed its target.
+      expect(transferRes.status).toBe(404);
+      expect(crewNow.ownerId).toBe(owner.user.id);
+    } else {
+      // Transfer won: the freshly crowned owner's leave must be refused.
+      expect(transferRes.status).toBe(200);
+      expect(leaveRes.status).toBe(409);
+      expect(crewNow.ownerId).toBe(member.user.id);
+    }
+    // Never ownerless.
+    expect(memberships.filter((m) => m.role === "owner")).toHaveLength(1);
+  });
+
+  it("the roster is member-visible, ordered, and hidden from outsiders", async () => {
+    const owner = await createLinkedUser();
+    const created = await request(app).post("/api/crews").set("x-test-clerk-id", owner.clerkUserId).send({ name: "Roster" });
+    trackCrew(created.body.id);
+    const member = await createLinkedUser();
+    await request(app).post("/api/crews/join").set("x-test-clerk-id", member.clerkUserId).send({ inviteCode: created.body.inviteCode });
+
+    const roster = await request(app).get(`/api/crews/${created.body.id}/members`).set("x-test-clerk-id", member.clerkUserId);
+    expect(roster.status).toBe(200);
+    expect(roster.body).toHaveLength(2);
+    expect(roster.body[0]).toMatchObject({ userId: owner.user.id, role: "owner" });
+    expect(roster.body[1]).toMatchObject({ userId: member.user.id, role: "member" });
+
+    const stranger = await createLinkedUser();
+    const denied = await request(app).get(`/api/crews/${created.body.id}/members`).set("x-test-clerk-id", stranger.clerkUserId);
+    expect(denied.status).toBe(404);
+  });
+});
+
 describe("boot bootstrap", () => {
   it("migrates a pre-crews real world into one default crew, once", async () => {
     // Simulate the pre-crews world: no real crews at all.

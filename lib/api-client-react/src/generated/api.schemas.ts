@@ -115,6 +115,27 @@ export interface JoinCrewInput {
   inviteCode: string;
 }
 
+export type CrewMemberRole = typeof CrewMemberRole[keyof typeof CrewMemberRole];
+
+
+export const CrewMemberRole = {
+  owner: 'owner',
+  member: 'member',
+} as const;
+
+export interface CrewMember {
+  userId: number;
+  displayName: string;
+  username: string;
+  role: CrewMemberRole;
+  joinedAt: string;
+}
+
+export interface TransferCrewOwnershipInput {
+  /** The member who takes over as owner */
+  userId: number;
+}
+
 export interface Invite {
   id: number;
   email: string;
