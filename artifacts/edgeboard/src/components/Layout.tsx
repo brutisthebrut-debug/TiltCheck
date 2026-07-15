@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { Button } from "./ui/button"
 import { BadgeWatcher } from "./BadgeWatcher"
+import { ArcCredit } from "./ArcCredit"
 import { CrewSwitcher } from "./CrewSwitcher"
 import { isRecapUnseen } from "@/lib/recapTeaser"
 
@@ -141,6 +142,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </nav>
+
+        {/* Arc credit */}
+        <div className="px-4 pb-2">
+          <ArcCredit />
+        </div>
 
         {/* Signed-in identity */}
         <div className="border-t border-border/50 p-4">
