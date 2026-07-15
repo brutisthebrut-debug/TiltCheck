@@ -128,6 +128,23 @@ export default function Stats() {
     { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey(insightsParams) } }
   )
   const isFiltered = filterSport !== "all" || filterRange !== "all"
+
+  // Build a short context label for card subtitles, e.g. "NBA · last 30 days"
+  function sliceLabel(): string {
+    const parts: string[] = []
+    if (filterSport !== "all") parts.push(filterSport)
+    if (filterRange !== "all") parts.push(RANGE_LABELS[filterRange] ?? "")
+    return parts.join(" · ")
+  }
+
+  // Subtitle for straight-bet cards
+  function straightSubtitle(): string {
+    if (filterSport !== "all" && filterRange !== "all")
+      return `${filterSport} straight bets · ${RANGE_LABELS[filterRange]}`
+    if (filterSport !== "all") return `${filterSport} straight bets`
+    if (filterRange !== "all") return `Straight bets · ${RANGE_LABELS[filterRange]}`
+    return "Across all straight bets"
+  }
   // keep old alias for the lessons empty-state copy
   const lessonsSport = filterSport
   const lessonsRange = filterRange
@@ -309,20 +326,41 @@ export default function Stats() {
             <p className="text-xs text-muted-foreground mt-1">
               Win Rate: {((summary.straightBetRecord.wins / Math.max(1, summary.straightBetRecord.wins + summary.straightBetRecord.losses)) * 100).toFixed(1)}%
             </p>
+            {isFiltered && (
+              <p className="text-xs text-muted-foreground/70 mt-0.5 truncate" data-testid="text-straight-bets-slice">
+                {straightSubtitle()}
+              </p>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="bg-card">
+        <Card className={`bg-card ${filterSport !== "all" ? "opacity-60" : ""}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Parlays</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">
-              {summary.parlayRecord.wins}-{summary.parlayRecord.losses}{summary.parlayRecord.pushes > 0 ? `-${summary.parlayRecord.pushes}` : ''}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Hit Rate: {((summary.parlayRecord.wins / Math.max(1, summary.parlayRecord.wins + summary.parlayRecord.losses)) * 100).toFixed(1)}%
-            </p>
+            {filterSport !== "all" ? (
+              <>
+                <div className="text-2xl font-bold font-mono text-muted-foreground">—</div>
+                <p className="text-xs text-muted-foreground mt-1" data-testid="text-parlays-sport-note">
+                  Parlays span sports and aren't included in this slice
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold font-mono">
+                  {summary.parlayRecord.wins}-{summary.parlayRecord.losses}{summary.parlayRecord.pushes > 0 ? `-${summary.parlayRecord.pushes}` : ''}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Hit Rate: {((summary.parlayRecord.wins / Math.max(1, summary.parlayRecord.wins + summary.parlayRecord.losses)) * 100).toFixed(1)}%
+                </p>
+                {filterRange !== "all" && (
+                  <p className="text-xs text-muted-foreground/70 mt-0.5 truncate" data-testid="text-parlays-slice">
+                    Parlays · {RANGE_LABELS[filterRange]}
+                  </p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -334,7 +372,9 @@ export default function Stats() {
             <div className="text-2xl font-bold font-mono text-chart-1 text-glow-success">
               +{formatCurrency(summary.bestBetProfit)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Highest single payout</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {isFiltered ? `Highest single payout · ${sliceLabel()}` : "Highest single payout"}
+            </p>
           </CardContent>
         </Card>
 
@@ -346,7 +386,7 @@ export default function Stats() {
             <div className="text-2xl font-bold font-mono">
               {summary.avgOdds > 0 ? '+' : ''}{Math.round(summary.avgOdds)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Across all straight bets</p>
+            <p className="text-xs text-muted-foreground mt-1">{straightSubtitle()}</p>
           </CardContent>
         </Card>
       </div>

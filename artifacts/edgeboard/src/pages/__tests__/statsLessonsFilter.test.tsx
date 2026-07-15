@@ -169,6 +169,7 @@ function renderStats() {
 beforeEach(() => {
   cleanup()
   vi.clearAllMocks()
+  localStorage.clear()
   mockUseGetStatsSummary.mockReturnValue(queryOk(summary))
   mockUseGetStatsBySport.mockReturnValue(queryOk(sportStats))
   mockUseGetConfidenceAnalysis.mockReturnValue(queryOk([]))
@@ -189,7 +190,7 @@ describe("Lessons range filter wiring", () => {
     renderStats()
     mockUseGetStatsInsights.mockClear()
 
-    fireEvent.click(screen.getByTestId("button-lessons-range-30"))
+    fireEvent.click(screen.getByTestId("button-stats-range-30"))
 
     // Hook must have been re-invoked with the since param
     const lastCall = mockUseGetStatsInsights.mock.calls.at(-1)
@@ -200,7 +201,7 @@ describe("Lessons range filter wiring", () => {
     renderStats()
     mockUseGetStatsInsights.mockClear()
 
-    fireEvent.click(screen.getByTestId("button-lessons-range-90"))
+    fireEvent.click(screen.getByTestId("button-stats-range-90"))
 
     const lastCall = mockUseGetStatsInsights.mock.calls.at(-1)
     expect(lastCall?.[0]).toEqual({ userId: 7, since: "2026-04-16" })
@@ -209,10 +210,10 @@ describe("Lessons range filter wiring", () => {
   it("removes the since param when switching back to all-time", () => {
     renderStats()
 
-    fireEvent.click(screen.getByTestId("button-lessons-range-30"))
+    fireEvent.click(screen.getByTestId("button-stats-range-30"))
     mockUseGetStatsInsights.mockClear()
 
-    fireEvent.click(screen.getByTestId("button-lessons-range-all"))
+    fireEvent.click(screen.getByTestId("button-stats-range-all"))
 
     const lastCall = mockUseGetStatsInsights.mock.calls.at(-1)
     expect(lastCall?.[0]).toEqual({ userId: 7 })
@@ -222,7 +223,7 @@ describe("Lessons range filter wiring", () => {
     renderStats()
     mockUseGetStatsInsights.mockClear()
 
-    fireEvent.click(screen.getByTestId("button-lessons-range-30"))
+    fireEvent.click(screen.getByTestId("button-stats-range-30"))
 
     const lastCall = mockUseGetStatsInsights.mock.calls.at(-1)
     // Second arg is the query options; its queryKey must contain the since value
@@ -270,7 +271,7 @@ describe("Lessons sport filter wiring", () => {
     fireEvent.change(screen.getByTestId("select-lessons-sport"), {
       target: { value: "NBA" },
     })
-    fireEvent.click(screen.getByTestId("button-lessons-range-90"))
+    fireEvent.click(screen.getByTestId("button-stats-range-90"))
 
     const lastCall = mockUseGetStatsInsights.mock.calls.at(-1)
     expect(lastCall?.[0]).toEqual({ userId: 7, sport: "NBA", since: "2026-04-16" })
@@ -284,7 +285,7 @@ describe("Lessons filtered empty state (card-lessons-empty)", () => {
     mockUseGetStatsInsights.mockReturnValue(queryOk(thinInsights))
     renderStats()
 
-    fireEvent.click(screen.getByTestId("button-lessons-range-30"))
+    fireEvent.click(screen.getByTestId("button-stats-range-30"))
 
     expect(screen.getByTestId("card-lessons-empty")).toBeTruthy()
   })
@@ -293,7 +294,7 @@ describe("Lessons filtered empty state (card-lessons-empty)", () => {
     mockUseGetStatsInsights.mockReturnValue(queryOk(thinInsights))
     renderStats()
 
-    fireEvent.click(screen.getByTestId("button-lessons-range-30"))
+    fireEvent.click(screen.getByTestId("button-stats-range-30"))
 
     expect(screen.getByText("Not much to learn from this slice")).toBeTruthy()
   })
