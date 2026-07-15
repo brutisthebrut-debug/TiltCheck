@@ -14,4 +14,11 @@ export type LeakProfileOverconfidence = {
   /** Win percentage of high-confidence (7+) settled plays */
   winRate: number;
   sample: number;
+  /**
+     * Win percentage of high-confidence plays settled inside the recent window (null when none)
+     * @nullable
+     */
+  recentWinRate: number | null;
+  /** High-confidence plays settled inside the recent window */
+  recentSample: number;
 } | null;

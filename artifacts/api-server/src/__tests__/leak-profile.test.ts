@@ -66,7 +66,9 @@ async function seedBet(userId: number, overrides: BetOverrides = {}) {
     status: "lost",
     gameDate: "2026-07-01",
     confidenceScore: 5,
-    settledAt: new Date("2026-07-02T00:00:00Z"),
+    // Default to a settle time inside the 30-day recent window so trend
+    // figures are deterministic regardless of the wall clock.
+    settledAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
     ...overrides,
   });
 }
@@ -99,6 +101,7 @@ describe("GET /stats/leak-profile", () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       settledCount: 0,
+      recentWindowDays: 30,
       avgStake: null,
       lastLossAt: null,
       worstSport: null,
@@ -140,7 +143,30 @@ describe("GET /stats/leak-profile", () => {
 
     const res = await request(app).get("/api/stats/leak-profile");
     expect(res.status).toBe(200);
-    expect(res.body.worstSport).toEqual({ sport: "NFL", netLoss: -100, bets: 5 });
+    expect(res.body.worstSport).toEqual({ sport: "NFL", netLoss: -100, bets: 5, recentNet: -100, recentBets: 5 });
+  });
+
+  it("splits the worst sport's damage into recent vs older so the trend is visible", async () => {
+    const { user, clerkUserId } = await createLinkedUser();
+    currentClerkUserId = clerkUserId;
+    const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    // 5 old NFL losses of $30 each = -$150 all-time
+    for (let i = 0; i < 5; i++) {
+      await seedBet(user.id, { sport: "NFL", status: "lost", stake: "30.00", settledAt: old });
+    }
+    // One recent NFL win: +$45.45 net inside the window
+    await seedBet(user.id, { sport: "NFL", status: "won", stake: "50.00", actualPayout: "95.45" });
+
+    const res = await request(app).get("/api/stats/leak-profile");
+    expect(res.status).toBe(200);
+    expect(res.body.recentWindowDays).toBe(30);
+    expect(res.body.worstSport).toEqual({
+      sport: "NFL",
+      netLoss: -104.55,
+      bets: 6,
+      recentNet: 45.45,
+      recentBets: 1,
+    });
   });
 
   it("flags overconfidence only when 7+ plays genuinely miss", async () => {
@@ -152,7 +178,7 @@ describe("GET /stats/leak-profile", () => {
       await seedBet(user.id, { confidenceScore: 9, status: "lost" });
     }
     const res = await request(app).get("/api/stats/leak-profile");
-    expect(res.body.overconfidence).toEqual({ winRate: 20, sample: 5 });
+    expect(res.body.overconfidence).toEqual({ winRate: 20, sample: 5, recentWinRate: 20, recentSample: 5 });
 
     // A user whose high-confidence plays hit fine gets no flag
     const { user: sharp, clerkUserId: sharpClerk } = await createLinkedUser();
@@ -178,7 +204,7 @@ describe("GET /stats/leak-profile", () => {
     await seedBet(user.id, { status: "lost", missReason: "na" });
 
     const res = await request(app).get("/api/stats/leak-profile");
-    expect(res.body.topMissReason).toEqual({ reason: "emotional", count: 3, netLoss: 120 });
+    expect(res.body.topMissReason).toEqual({ reason: "emotional", count: 3, netLoss: 120, recentCount: 3, recentNetLoss: 120 });
 
     // Below the 3-loss threshold → null
     const { user: fresh, clerkUserId: freshClerk } = await createLinkedUser();

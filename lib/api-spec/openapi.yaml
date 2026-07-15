@@ -1702,6 +1702,9 @@ components:
         settledCount:
           type: integer
           description: Settled straight bets counted toward the profile
+        recentWindowDays:
+          type: integer
+          description: Length in days of the recent window used for every recent* figure
         avgStake:
           type: ["number", "null"]
           description: Average stake across settled straight bets (null under 5 samples)
@@ -1719,7 +1722,13 @@ components:
               description: Net loss in dollars (negative number)
             bets:
               type: integer
-          required: [sport, netLoss, bets]
+            recentNet:
+              type: number
+              description: Net dollars in this sport over the recent window (negative = still losing)
+            recentBets:
+              type: integer
+              description: Settled bets in this sport inside the recent window
+          required: [sport, netLoss, bets, recentNet, recentBets]
         overconfidence:
           type: ["object", "null"]
           description: Present when 7+ confidence plays hit under 45% across 5+ samples
@@ -1729,7 +1738,13 @@ components:
               description: Win percentage of high-confidence (7+) settled plays
             sample:
               type: integer
-          required: [winRate, sample]
+            recentWinRate:
+              type: ["number", "null"]
+              description: Win percentage of high-confidence plays settled inside the recent window (null when none)
+            recentSample:
+              type: integer
+              description: High-confidence plays settled inside the recent window
+          required: [winRate, sample, recentWinRate, recentSample]
         topMissReason:
           type: ["object", "null"]
           description: Most common self-graded miss reason across settled losses (excluding normal variance)
@@ -1740,8 +1755,14 @@ components:
               type: integer
             netLoss:
               type: number
-          required: [reason, count, netLoss]
-      required: [settledCount, avgStake, lastLossAt, worstSport, overconfidence, topMissReason]
+            recentCount:
+              type: integer
+              description: Losses graded with this reason inside the recent window
+            recentNetLoss:
+              type: number
+              description: Dollars lost to this reason inside the recent window
+          required: [reason, count, netLoss, recentCount, recentNetLoss]
+      required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason]
 
     EdgeFinderLane:
       type: object

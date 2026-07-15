@@ -15,4 +15,8 @@ export type LeakProfileWorstSport = {
   /** Net loss in dollars (negative number) */
   netLoss: number;
   bets: number;
+  /** Net dollars in this sport over the recent window (negative = still losing) */
+  recentNet: number;
+  /** Settled bets in this sport inside the recent window */
+  recentBets: number;
 } | null;

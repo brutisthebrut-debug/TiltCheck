@@ -94,36 +94,59 @@ export default function Dashboard() {
   // present here is a real pattern, not noise.
   const topLeak = (() => {
     if (!leakProfile) return null;
+    const windowDays = leakProfile.recentWindowDays;
     if (leakProfile.worstSport) {
-      const { sport, netLoss, bets } = leakProfile.worstSport;
+      const { sport, netLoss, bets, recentNet, recentBets } = leakProfile.worstSport;
+      const trend =
+        recentBets === 0
+          ? { improving: true, text: `No ${sport} bets settled in the last ${windowDays} days — the leak's gone quiet.` }
+          : recentNet >= 0
+            ? { improving: true, text: `Up ${formatCurrency(recentNet)} on ${sport} over the last ${windowDays} days — slowing down.` }
+            : { improving: false, text: `${formatCurrency(recentNet)} more over the last ${windowDays} days — still bleeding.` };
       return {
         key: "worst-sport",
         label: `${sport} keeps cashing your checks`,
         figure: formatCurrency(netLoss),
         line: `${bets} settled ${sport} bets, and the book is still up on you. Your most expensive habit has a name.`,
+        trend,
         href: `/bets?mine=1&sport=${encodeURIComponent(sport)}`,
         cta: `See the ${sport} damage`,
       };
     }
     if (leakProfile.topMissReason) {
-      const { reason, count, netLoss } = leakProfile.topMissReason;
+      const { reason, count, netLoss, recentCount, recentNetLoss } = leakProfile.topMissReason;
       const label = MISS_REASON_LABELS[reason] ?? reason;
+      const trend =
+        recentCount === 0
+          ? { improving: true, text: `Zero "${label.toLowerCase()}" losses in the last ${windowDays} days — slowing down.` }
+          : {
+              improving: false,
+              text: `${recentCount} more (${formatCurrency(-recentNetLoss)}) in the last ${windowDays} days — still bleeding.`,
+            };
       return {
         key: "miss-reason",
         label: `"${label}" — again`,
         figure: formatCurrency(-netLoss),
         line: `You've graded ${count} losses "${label.toLowerCase()}". Once is a bad night. ${count} times is a pattern.`,
+        trend,
         href: "/stats",
         cta: "See the full pattern",
       };
     }
     if (leakProfile.overconfidence) {
-      const { winRate, sample } = leakProfile.overconfidence;
+      const { winRate, sample, recentWinRate, recentSample } = leakProfile.overconfidence;
+      const trend =
+        recentSample === 0 || recentWinRate == null
+          ? { improving: true, text: `No 7+ confidence plays settled in the last ${windowDays} days — the leak's gone quiet.` }
+          : recentWinRate > winRate
+            ? { improving: true, text: `Hitting ${recentWinRate}% over the last ${windowDays} days — slowing down.` }
+            : { improving: false, text: `${recentWinRate}% over ${recentSample} in the last ${windowDays} days — still bleeding.` };
       return {
         key: "overconfidence",
         label: "Your confidence is writing checks",
         figure: `${winRate}%`,
         line: `That's how your 7+ confidence picks actually hit, over ${sample} of them. The swagger isn't cashing.`,
+        trend,
         href: "/stats",
         cta: "See the numbers",
       };
@@ -379,6 +402,21 @@ export default function Dashboard() {
                   {topLeak.figure}
                 </div>
                 <p className="text-sm text-foreground/80 mt-1">{topLeak.line}</p>
+                <p
+                  className={`text-xs font-semibold mt-2 flex items-center gap-1.5 ${
+                    topLeak.trend.improving
+                      ? "text-chart-1 text-glow-success"
+                      : "text-chart-2 text-glow-destructive"
+                  }`}
+                  data-testid="text-leak-trend"
+                >
+                  {topLeak.trend.improving ? (
+                    <TrendingUp className="h-3.5 w-3.5 shrink-0 drop-shadow-[0_0_6px_hsl(var(--chart-1)/0.8)]" />
+                  ) : (
+                    <TrendingDown className="h-3.5 w-3.5 shrink-0 drop-shadow-[0_0_6px_hsl(var(--chart-2)/0.8)]" />
+                  )}
+                  {topLeak.trend.text}
+                </p>
               </div>
               <div className="shrink-0 self-end sm:self-auto flex items-center gap-1 text-xs text-chart-2 whitespace-nowrap">
                 {topLeak.cta}

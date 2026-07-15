@@ -600,6 +600,10 @@ export type LeakProfileWorstSport = {
   /** Net loss in dollars (negative number) */
   netLoss: number;
   bets: number;
+  /** Net dollars in this sport over the recent window (negative = still losing) */
+  recentNet: number;
+  /** Settled bets in this sport inside the recent window */
+  recentBets: number;
 } | null;
 
 /**
@@ -610,6 +614,13 @@ export type LeakProfileOverconfidence = {
   /** Win percentage of high-confidence (7+) settled plays */
   winRate: number;
   sample: number;
+  /**
+     * Win percentage of high-confidence plays settled inside the recent window (null when none)
+     * @nullable
+     */
+  recentWinRate: number | null;
+  /** High-confidence plays settled inside the recent window */
+  recentSample: number;
 } | null;
 
 /**
@@ -620,11 +631,17 @@ export type LeakProfileTopMissReason = {
   reason: string;
   count: number;
   netLoss: number;
+  /** Losses graded with this reason inside the recent window */
+  recentCount: number;
+  /** Dollars lost to this reason inside the recent window */
+  recentNetLoss: number;
 } | null;
 
 export interface LeakProfile {
   /** Settled straight bets counted toward the profile */
   settledCount: number;
+  /** Length in days of the recent window used for every recent* figure */
+  recentWindowDays: number;
   /**
      * Average stake across settled straight bets (null under 5 samples)
      * @nullable

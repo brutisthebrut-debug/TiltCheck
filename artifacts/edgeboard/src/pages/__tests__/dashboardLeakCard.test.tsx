@@ -73,13 +73,14 @@ const statsWithData = {
   longestWinStreak: 3,
 } as unknown as StatsSummary
 
-const worstSport = { sport: "NBA", netLoss: -230.5, bets: 12 }
-const topMissReason = { reason: "emotional", count: 4, netLoss: 180 }
-const overconfidence = { winRate: 38.5, sample: 13 }
+const worstSport = { sport: "NBA", netLoss: -230.5, bets: 12, recentNet: -80.25, recentBets: 4 }
+const topMissReason = { reason: "emotional", count: 4, netLoss: 180, recentCount: 2, recentNetLoss: 90 }
+const overconfidence = { winRate: 38.5, sample: 13, recentWinRate: 33.3, recentSample: 6 }
 
 function makeProfile(overrides: Partial<LeakProfile> = {}): LeakProfile {
   return {
     settledCount: 20,
+    recentWindowDays: 30,
     avgStake: 50,
     lastLossAt: "2026-07-10T00:00:00.000Z",
     worstSport: null,
@@ -189,6 +190,83 @@ describe("Your Leak card absence", () => {
     renderDashboard()
 
     expect(screen.queryByTestId("card-your-leak")).toBeNull()
+  })
+})
+
+// ── Trend line ───────────────────────────────────────────────────────────────
+//
+// The card's trend line compares the leak's recent-window damage against its
+// all-time figure: red "still bleeding" when the habit continued recently,
+// green "slowing down" when it didn't. Getting the direction wrong would tell
+// a bettor the opposite of the truth, so both copy and glow class are pinned.
+
+describe("Your Leak card trend", () => {
+  const trendEl = () => screen.getByTestId("text-leak-trend")
+
+  it("worst sport still losing recently reads still bleeding with the loss glow", () => {
+    setLeakProfile(makeProfile({ worstSport }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe("-$80.25 more over the last 30 days — still bleeding.")
+    expect(trendEl().className).toContain("text-chart-2")
+    expect(trendEl().className).toContain("text-glow-destructive")
+  })
+
+  it("worst sport up money recently reads slowing down with the win glow", () => {
+    setLeakProfile(makeProfile({ worstSport: { ...worstSport, recentNet: 40, recentBets: 3 } }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe("Up $40 on NBA over the last 30 days — slowing down.")
+    expect(trendEl().className).toContain("text-chart-1")
+    expect(trendEl().className).toContain("text-glow-success")
+  })
+
+  it("worst sport with no recent bets reads as gone quiet (improving)", () => {
+    setLeakProfile(makeProfile({ worstSport: { ...worstSport, recentNet: 0, recentBets: 0 } }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe("No NBA bets settled in the last 30 days — the leak's gone quiet.")
+    expect(trendEl().className).toContain("text-chart-1")
+  })
+
+  it("miss reason repeated recently reads still bleeding", () => {
+    setLeakProfile(makeProfile({ topMissReason }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe("2 more (-$90) in the last 30 days — still bleeding.")
+    expect(trendEl().className).toContain("text-chart-2")
+  })
+
+  it("miss reason with zero recent losses reads slowing down", () => {
+    setLeakProfile(makeProfile({ topMissReason: { ...topMissReason, recentCount: 0, recentNetLoss: 0 } }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe('Zero "emotional bet" losses in the last 30 days — slowing down.')
+    expect(trendEl().className).toContain("text-chart-1")
+  })
+
+  it("overconfidence hitting worse recently reads still bleeding", () => {
+    setLeakProfile(makeProfile({ overconfidence }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe("33.3% over 6 in the last 30 days — still bleeding.")
+    expect(trendEl().className).toContain("text-chart-2")
+  })
+
+  it("overconfidence hitting better recently reads slowing down", () => {
+    setLeakProfile(makeProfile({ overconfidence: { ...overconfidence, recentWinRate: 50, recentSample: 4 } }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe("Hitting 50% over the last 30 days — slowing down.")
+    expect(trendEl().className).toContain("text-chart-1")
+  })
+
+  it("overconfidence with no recent high-confidence plays reads as gone quiet", () => {
+    setLeakProfile(makeProfile({ overconfidence: { ...overconfidence, recentWinRate: null, recentSample: 0 } }))
+    renderDashboard()
+
+    expect(trendEl().textContent).toBe("No 7+ confidence plays settled in the last 30 days — the leak's gone quiet.")
+    expect(trendEl().className).toContain("text-chart-1")
   })
 })
 

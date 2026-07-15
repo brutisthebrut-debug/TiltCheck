@@ -440,6 +440,14 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
 
   const settledCount = bets.length;
 
+  // Recent window for trend reporting — the dashboard compares each leak's
+  // recent damage against its all-time figure to tell the bettor whether the
+  // habit is shrinking or getting worse.
+  const RECENT_WINDOW_DAYS = 30;
+  const recentCutoff = Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const isRecent = (r: { settledAt: Date | null }) =>
+    r.settledAt != null && r.settledAt.getTime() >= recentCutoff;
+
   // Average stake across settled straight bets — the baseline for spotting
   // an oversized "get it back" stake. Needs a real sample to mean anything.
   const avgStake =
@@ -468,24 +476,38 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
   const worstEntry = Object.entries(bySport)
     .filter(([, v]) => v.count >= 5 && v.net <= -50)
     .sort((a, b) => a[1].net - b[1].net)[0];
-  const worstSport = worstEntry
-    ? {
-        sport: worstEntry[0],
-        netLoss: Math.round(worstEntry[1].net * 100) / 100,
-        bets: worstEntry[1].count,
-      }
-    : null;
+  let worstSport: { sport: string; netLoss: number; bets: number; recentNet: number; recentBets: number } | null = null;
+  if (worstEntry) {
+    const recentRows = bets.filter((b) => hasValidOdds(b) && b.sport === worstEntry[0] && isRecent(b));
+    const recentNet = recentRows.reduce((s, b) => s + (Number(b.actualPayout ?? 0) - Number(b.stake)), 0);
+    worstSport = {
+      sport: worstEntry[0],
+      netLoss: Math.round(worstEntry[1].net * 100) / 100,
+      bets: worstEntry[1].count,
+      recentNet: Math.round(recentNet * 100) / 100,
+      recentBets: recentRows.length,
+    };
+  }
 
   // Overconfidence: how 7+ confidence plays actually hit. Only reported when
   // the sample is real and the hit rate is genuinely bad (<45%).
   const highConf = [...bets, ...parlays].filter(
     (r) => r.confidenceScore >= 7 && (r.status === "won" || r.status === "lost")
   );
-  let overconfidence: { winRate: number; sample: number } | null = null;
+  let overconfidence: { winRate: number; sample: number; recentWinRate: number | null; recentSample: number } | null = null;
   if (highConf.length >= 5) {
     const wins = highConf.filter((r) => r.status === "won").length;
     const winRate = Math.round((wins / highConf.length) * 1000) / 10;
-    if (winRate < 45) overconfidence = { winRate, sample: highConf.length };
+    if (winRate < 45) {
+      const recent = highConf.filter(isRecent);
+      const recentWins = recent.filter((r) => r.status === "won").length;
+      overconfidence = {
+        winRate,
+        sample: highConf.length,
+        recentWinRate: recent.length > 0 ? Math.round((recentWins / recent.length) * 1000) / 10 : null,
+        recentSample: recent.length,
+      };
+    }
   }
 
   // Most common self-graded miss reason across losses. Normal variance is
@@ -501,16 +523,30 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
   const topReasonEntry = Object.entries(reasonAgg).sort(
     (a, b) => b[1].count - a[1].count || b[1].netLoss - a[1].netLoss
   )[0];
-  const topMissReason =
-    topReasonEntry && topReasonEntry[1].count >= 3
-      ? {
-          reason: topReasonEntry[0],
-          count: topReasonEntry[1].count,
-          netLoss: Math.round(topReasonEntry[1].netLoss * 100) / 100,
-        }
-      : null;
+  let topMissReason: { reason: string; count: number; netLoss: number; recentCount: number; recentNetLoss: number } | null = null;
+  if (topReasonEntry && topReasonEntry[1].count >= 3) {
+    const recentRows = [...bets, ...parlays].filter(
+      (r) => r.status === "lost" && r.missReason === topReasonEntry[0] && isRecent(r)
+    );
+    const recentNetLoss = recentRows.reduce((s, r) => s + Number(r.stake), 0);
+    topMissReason = {
+      reason: topReasonEntry[0],
+      count: topReasonEntry[1].count,
+      netLoss: Math.round(topReasonEntry[1].netLoss * 100) / 100,
+      recentCount: recentRows.length,
+      recentNetLoss: Math.round(recentNetLoss * 100) / 100,
+    };
+  }
 
-  res.json({ settledCount, avgStake, lastLossAt, worstSport, overconfidence, topMissReason });
+  res.json({
+    settledCount,
+    recentWindowDays: RECENT_WINDOW_DAYS,
+    avgStake,
+    lastLossAt,
+    worstSport,
+    overconfidence,
+    topMissReason,
+  });
 });
 
 // GET /stats/edge-finder — the signed-in bettor's settled straight bets

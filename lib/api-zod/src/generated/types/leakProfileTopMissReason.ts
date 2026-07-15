@@ -14,4 +14,8 @@ export type LeakProfileTopMissReason = {
   reason: string;
   count: number;
   netLoss: number;
+  /** Losses graded with this reason inside the recent window */
+  recentCount: number;
+  /** Dollars lost to this reason inside the recent window */
+  recentNetLoss: number;
 } | null;

@@ -1118,21 +1118,28 @@ export const GetLeakProfileQueryParams = zod.object({
 
 export const GetLeakProfileResponse = zod.object({
   "settledCount": zod.number().describe('Settled straight bets counted toward the profile'),
+  "recentWindowDays": zod.number().describe('Length in days of the recent window used for every recent\* figure'),
   "avgStake": zod.number().nullable().describe('Average stake across settled straight bets (null under 5 samples)'),
   "lastLossAt": zod.string().nullable().describe('ISO timestamp of the most recent settled loss (bet or parlay)'),
   "worstSport": zod.object({
   "sport": zod.string(),
   "netLoss": zod.number().describe('Net loss in dollars (negative number)'),
-  "bets": zod.number()
+  "bets": zod.number(),
+  "recentNet": zod.number().describe('Net dollars in this sport over the recent window (negative = still losing)'),
+  "recentBets": zod.number().describe('Settled bets in this sport inside the recent window')
 }).nullable().describe('The sport losing the most money, when it has cost at least $50 over 5+ bets'),
   "overconfidence": zod.object({
   "winRate": zod.number().describe('Win percentage of high-confidence (7+) settled plays'),
-  "sample": zod.number()
+  "sample": zod.number(),
+  "recentWinRate": zod.number().nullable().describe('Win percentage of high-confidence plays settled inside the recent window (null when none)'),
+  "recentSample": zod.number().describe('High-confidence plays settled inside the recent window')
 }).nullable().describe('Present when 7+ confidence plays hit under 45% across 5+ samples'),
   "topMissReason": zod.object({
   "reason": zod.string(),
   "count": zod.number(),
-  "netLoss": zod.number()
+  "netLoss": zod.number(),
+  "recentCount": zod.number().describe('Losses graded with this reason inside the recent window'),
+  "recentNetLoss": zod.number().describe('Dollars lost to this reason inside the recent window')
 }).nullable().describe('Most common self-graded miss reason across settled losses (excluding normal variance)')
 })
 

@@ -12,6 +12,8 @@ import type { LeakProfileWorstSport } from './leakProfileWorstSport';
 export interface LeakProfile {
   /** Settled straight bets counted toward the profile */
   settledCount: number;
+  /** Length in days of the recent window used for every recent* figure */
+  recentWindowDays: number;
   /**
      * Average stake across settled straight bets (null under 5 samples)
      * @nullable
