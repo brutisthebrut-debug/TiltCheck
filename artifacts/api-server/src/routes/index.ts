@@ -14,11 +14,22 @@ import billingRouter from "./billing";
 import crewsRouter from "./crews";
 import { requireAuth } from "../middlewares/auth";
 import { demoReadOnly, demoSession } from "../middlewares/demo";
+import { authLimiter, narrativeLimiter, generalLimiter } from "../middlewares/rate-limit";
 
 const router: IRouter = Router();
 
-// Public
+// Public — health stays unthrottled so deploy probes can never be starved.
 router.use(healthRouter);
+
+// Everything else under /api shares the general budget (per account when
+// signed in, per client IP otherwise — demo browsing included). Tighter
+// budgets for the expensive spots stack on top below.
+router.use(generalLimiter);
+router.use("/users/claim", authLimiter);
+router.use("/stats/recap/narrative", narrativeLimiter);
+// The demo mount reuses the stats router, so its narrative path (cache-
+// bounded but still a paid model call when cold) gets the same tight budget.
+router.use("/demo/stats/recap/narrative", narrativeLimiter);
 
 // Public demo board — no sign-in, strictly read-only, and scoped to the
 // fictional demo crew (see middlewares/demo.ts and lib/scope.ts). Reuses the

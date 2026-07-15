@@ -13,3 +13,4 @@
 - [Dev DB schema drift](dev-db-schema-drift.md) — mass 42703 "column does not exist" test failures mean the dev DB lags the drizzle schema; run the db push before blaming your change.
 - [Crew scoping](crew-scoping.md) — social surfaces & by-userId lookups must use crew-aware scope helpers; world-only checks leak across crews; multi-user tests need a shared crew.
 - [Pro billing pattern](pro-billing-pattern.md) — Pro access only via server-verified Whop chain + 24h proUntil cache; checkout serialized by advisory lock; never upsell on status-fetch error.
+- [Rate limiting behind the Replit proxy](rate-limiting.md) — key per user else req.ip with trust proxy=1 (never first XFF hop); dormant under NODE_ENV=test; Clerk live keys auto-swap at publish.

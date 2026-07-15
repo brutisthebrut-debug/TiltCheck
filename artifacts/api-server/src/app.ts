@@ -13,6 +13,12 @@ import { logger, httpLogSerializers } from "./lib/logger";
 
 const app: Express = express();
 
+// The server always sits one hop behind the Replit proxy in both dev preview
+// and deployments. Trusting exactly that hop makes req.ip the real client
+// address (the entry the proxy appended), while a spoofed X-Forwarded-For
+// value sent by the client itself is ignored — rate limiting keys off req.ip.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
