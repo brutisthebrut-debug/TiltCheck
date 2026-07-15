@@ -1135,7 +1135,8 @@ export const GetRecapNarrativeQueryParams = zod.object({
 
 export const GetRecapNarrativeResponse = zod.object({
   "weekStart": zod.string().describe('Monday of the reviewed week (YYYY-MM-DD, UTC)'),
-  "narrative": zod.string().nullable().describe('The written review, or null when the week had no activity or generation is unavailable')
+  "narrative": zod.string().nullable().describe('The written review, or null when the week had no activity or generation is unavailable'),
+  "limitReached": zod.boolean().optional().describe('True when the narrative is null because the bettor used up today\'s budget for generating older weeks\' reviews. Already-generated weeks are unaffected — they always serve from the cache.')
 }).describe('AI-narrated review of a bettor\'s week, cached per user per week')
 
 

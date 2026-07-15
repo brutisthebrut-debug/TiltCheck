@@ -17,4 +17,6 @@ export interface RecapNarrative {
      * @nullable
      */
   narrative: string | null;
+  /** True when the narrative is null because the bettor used up today's budget for generating older weeks' reviews. Already-generated weeks are unaffected — they always serve from the cache. */
+  limitReached?: boolean;
 }

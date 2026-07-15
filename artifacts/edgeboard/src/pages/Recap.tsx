@@ -197,6 +197,21 @@ export default function Recap() {
                 ))}
               </CardContent>
             </Card>
+          ) : tape?.limitReached ? (
+            <Card className="border-dashed border-2 border-muted" data-testid="card-recap-tape-limit">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Clapperboard className="h-4 w-4 text-muted-foreground" />
+                  <CardDescription className="uppercase tracking-wider text-[11px]">The tape</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  You've hit today's limit for generating older weeks' reviews. Weeks you've
+                  already reviewed still load instantly — this one will be ready tomorrow.
+                </p>
+              </CardContent>
+            </Card>
           ) : null}
 
           {/* Best win */}

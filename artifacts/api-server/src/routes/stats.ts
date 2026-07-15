@@ -530,6 +530,30 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
     return;
   }
 
+  // Spend guard for members browsing deep history: the latest completed week
+  // always generates (that's the weekly tape), but older weeks draw from a
+  // daily budget of fresh generations per bettor. Cached weeks are free and
+  // never touch the budget — flipping back through already-generated history
+  // costs nothing. Only successful generations count (rows in the table), so
+  // provider failures don't burn budget.
+  if (weekStart !== latest) {
+    const todayStartUtc = new Date(`${today}T00:00:00Z`);
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(recapNarrativesTable)
+      .where(
+        and(
+          eq(recapNarrativesTable.userId, userId),
+          sql`${recapNarrativesTable.weekStart} <> ${latest}`,
+          sql`${recapNarrativesTable.createdAt} >= ${todayStartUtc}`,
+        ),
+      );
+    if ((row?.count ?? 0) >= HISTORY_NARRATIVE_DAILY_BUDGET) {
+      res.json({ weekStart, narrative: null, limitReached: true });
+      return;
+    }
+  }
+
   try {
     // Singleflight: concurrent first views of the same bettor-week share one
     // in-flight generation instead of each paying for their own.
@@ -572,5 +596,13 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
 
 // In-flight narrative generations, keyed `${userId}:${weekStart}`.
 const narrativeFlights = new Map<string, Promise<string>>();
+
+/**
+ * How many *older* (non-latest) weeks' narratives one bettor can freshly
+ * generate per UTC day. Keeps a deep-history browse from turning into an
+ * unbounded string of paid generations while still letting members work
+ * backward through their tape a few weeks at a time.
+ */
+export const HISTORY_NARRATIVE_DAILY_BUDGET = 4;
 
 export default router;

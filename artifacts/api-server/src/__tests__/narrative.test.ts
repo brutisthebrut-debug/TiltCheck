@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { assembleRecapFacts } from "../lib/narrative";
-import { computeWeeklyRecap } from "../lib/recap";
+import { computeWeeklyRecap, lastCompletedWeekStart, dayOf, addDays } from "../lib/recap";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ vi.mock("@workspace/integrations-openai-ai-server", () => ({
 }));
 
 import app from "../app";
+import { HISTORY_NARRATIVE_DAILY_BUDGET } from "../routes/stats";
 import { db, usersTable, betsTable, parlaysTable, recapNarrativesTable } from "@workspace/db";
 
 const WEEK = "2026-07-06"; // Mon Jul 6 – Sun Jul 12
@@ -128,7 +129,7 @@ async function createUser(displayName = "Narrative Tester") {
   return u;
 }
 
-async function addSettledBet(userId: number) {
+async function addSettledBet(userId: number, weekStart: string = WEEK) {
   await db.insert(betsTable).values({
     userId,
     sport: "NBA",
@@ -141,10 +142,10 @@ async function addSettledBet(userId: number) {
     actualPayout: "190.91",
     confidenceScore: 7,
     sportsbook: "Test",
-    gameDate: "2026-07-07",
+    gameDate: addDays(weekStart, 1),
     status: "won",
-    createdAt: new Date("2026-07-07T12:00:00Z"),
-    settledAt: new Date("2026-07-08T02:00:00Z"),
+    createdAt: new Date(`${addDays(weekStart, 1)}T12:00:00Z`),
+    settledAt: new Date(`${addDays(weekStart, 2)}T02:00:00Z`),
   });
 }
 
@@ -267,5 +268,101 @@ describe("GET /stats/recap/narrative", () => {
     await createUser();
     const res = await request(app).get(`/api/stats/recap/narrative?weekStart=2027-01-04`);
     expect(res.status).toBe(400);
+  });
+});
+
+// ── Endpoint: daily budget for generating older weeks ───────────────────────
+
+describe("GET /stats/recap/narrative — history generation budget", () => {
+  const LATEST = lastCompletedWeekStart(dayOf(new Date()));
+  // Older completed weeks, newest first: LATEST-1w, LATEST-2w, …
+  const olderWeek = (n: number) => addDays(LATEST, -7 * n);
+
+  beforeEach(async () => {
+    generateMock.mockReset();
+    generateMock.mockResolvedValue({
+      choices: [{ message: { content: "Fresh tape. Watch next week: the budget." } }],
+    });
+    const { parlayLegsTable, transactionsTable, userBadgesTable } = await import("@workspace/db");
+    await db.delete(recapNarrativesTable);
+    await db.delete(parlayLegsTable);
+    await db.delete(parlaysTable);
+    await db.delete(betsTable);
+    await db.delete(transactionsTable);
+    await db.delete(userBadgesTable);
+    await db.delete(usersTable);
+  });
+
+  /** Seed `n` already-generated historical narratives with a given createdAt. */
+  async function spendBudget(userId: number, n: number, createdAt: Date) {
+    for (let i = 0; i < n; i++) {
+      await db.insert(recapNarrativesTable).values({
+        userId,
+        weekStart: olderWeek(i + 2),
+        narrative: `Old tape #${i + 2}. Watch next week: nothing.`,
+        model: "test",
+        createdAt,
+      });
+    }
+  }
+
+  it("blocks a fresh historical generation once today's budget is spent — no paid call", async () => {
+    const user = await createUser();
+    await addSettledBet(user.id, olderWeek(1));
+    await spendBudget(user.id, HISTORY_NARRATIVE_DAILY_BUDGET, new Date());
+
+    const res = await request(app).get(`/api/stats/recap/narrative?weekStart=${olderWeek(1)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.narrative).toBeNull();
+    expect(res.body.limitReached).toBe(true);
+    expect(generateMock).not.toHaveBeenCalled();
+  });
+
+  it("generates historical weeks freely while under the budget", async () => {
+    const user = await createUser();
+    await addSettledBet(user.id, olderWeek(1));
+    await spendBudget(user.id, HISTORY_NARRATIVE_DAILY_BUDGET - 1, new Date());
+
+    const res = await request(app).get(`/api/stats/recap/narrative?weekStart=${olderWeek(1)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.narrative).toMatch(/Fresh tape/);
+    expect(res.body.limitReached).toBeUndefined();
+    expect(generateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("already-generated weeks stay free after the budget is spent — never pays twice", async () => {
+    const user = await createUser();
+    await spendBudget(user.id, HISTORY_NARRATIVE_DAILY_BUDGET, new Date());
+
+    // One of the spent weeks is exactly the one being revisited.
+    const revisit = olderWeek(2);
+    const res = await request(app).get(`/api/stats/recap/narrative?weekStart=${revisit}`);
+    expect(res.status).toBe(200);
+    expect(res.body.narrative).toMatch(/Old tape #2/);
+    expect(res.body.limitReached).toBeUndefined();
+    expect(generateMock).not.toHaveBeenCalled();
+  });
+
+  it("the latest completed week always generates, even with the history budget spent", async () => {
+    const user = await createUser();
+    await addSettledBet(user.id, LATEST);
+    await spendBudget(user.id, HISTORY_NARRATIVE_DAILY_BUDGET, new Date());
+
+    const res = await request(app).get(`/api/stats/recap/narrative?weekStart=${LATEST}`);
+    expect(res.status).toBe(200);
+    expect(res.body.narrative).toMatch(/Fresh tape/);
+    expect(generateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("the budget resets daily — yesterday's generations don't count", async () => {
+    const user = await createUser();
+    await addSettledBet(user.id, olderWeek(1));
+    const yesterday = new Date(Date.now() - 26 * 60 * 60 * 1000);
+    await spendBudget(user.id, HISTORY_NARRATIVE_DAILY_BUDGET, yesterday);
+
+    const res = await request(app).get(`/api/stats/recap/narrative?weekStart=${olderWeek(1)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.narrative).toMatch(/Fresh tape/);
+    expect(generateMock).toHaveBeenCalledTimes(1);
   });
 });
