@@ -20,4 +20,19 @@ export interface MemberComparison {
   avgConfidence: number;
   /** @nullable */
   hotSport?: string | null;
+  /**
+     * 0–100 — how well stated confidence matched results on settled won/lost plays inside the window (Brier-based, confidence/10 read as implied win probability). Null with no won/lost plays.
+     * @nullable
+     */
+  calibrationScore: number | null;
+  /**
+     * Percent of settled plays inside the window with a completed post-mortem (reasoning graded, miss reason set, or notes written). Null with no settled plays.
+     * @nullable
+     */
+  postmortemRate: number | null;
+  /**
+     * Percent of reasoning-graded plays inside the window the bettor called sound. Null when nothing was graded.
+     * @nullable
+     */
+  soundRate: number | null;
 }

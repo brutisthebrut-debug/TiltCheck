@@ -10,6 +10,60 @@ import { userScopeCondition, getSocialUsers } from "../lib/scope";
 
 const router: IRouter = Router();
 
+// ── Decision-quality metrics ────────────────────────────────────────────────
+// The board shouldn't only celebrate whoever ran hottest — these three numbers
+// measure the decisions, not the results. Shared by the leaderboard and the
+// head-to-head so the two views can never disagree.
+type JournaledPlay = {
+  status: string;
+  confidenceScore: number;
+  reasoningQuality: string | null;
+  whatHappened: string | null;
+  missReason: string | null;
+};
+
+export function computeDecisionQuality(settled: JournaledPlay[]): {
+  calibrationScore: number | null;
+  postmortemRate: number | null;
+  soundRate: number | null;
+} {
+  // Calibration: confidence/10 read as an implied win probability, scored
+  // Brier-style against won/lost outcomes (pushes prove nothing either way).
+  const decided = settled.filter((p) => p.status === "won" || p.status === "lost");
+  let calibrationScore: number | null = null;
+  if (decided.length > 0) {
+    const brier =
+      decided.reduce((acc, p) => {
+        const predicted = p.confidenceScore / 10;
+        const outcome = p.status === "won" ? 1 : 0;
+        return acc + (predicted - outcome) ** 2;
+      }, 0) / decided.length;
+    calibrationScore = Math.round((1 - brier) * 1000) / 10;
+  }
+
+  // Post-mortem completion: a settled play counts as reviewed once the bettor
+  // graded the reasoning, named a miss reason, or wrote what happened — the
+  // same definition the lesson library uses.
+  const reviewed = settled.filter(
+    (p) =>
+      p.reasoningQuality != null ||
+      (p.missReason != null && p.missReason !== "na") ||
+      (p.whatHappened != null && p.whatHappened.trim() !== ""),
+  );
+  const postmortemRate =
+    settled.length > 0 ? Math.round((reviewed.length / settled.length) * 1000) / 10 : null;
+
+  // Sound-reasoning rate: of the plays they actually graded, how many they
+  // called sound. Self-reported on purpose — the board keeps them honest.
+  const graded = settled.filter((p) => p.reasoningQuality === "sound" || p.reasoningQuality === "flawed");
+  const soundRate =
+    graded.length > 0
+      ? Math.round((graded.filter((p) => p.reasoningQuality === "sound").length / graded.length) * 1000) / 10
+      : null;
+
+  return { calibrationScore, postmortemRate, soundRate };
+}
+
 // GET /workspace
 router.get("/workspace", async (req, res): Promise<void> => {
   // Crew-scoped: members are the viewer's active crew, not the whole world.
@@ -117,6 +171,7 @@ router.get("/workspace/compare", requirePro, async (req, res): Promise<void> => 
         currentBankroll,
         avgConfidence,
         hotSport,
+        ...computeDecisionQuality(settled),
       };
     })
   );
@@ -248,6 +303,7 @@ router.get("/workspace/leaderboard", requireProfile, async (req, res): Promise<v
       bestSport,
       favoriteMistake,
       badges: badgesByUser.get(user.id) ?? [],
+      ...computeDecisionQuality(settled),
     };
   });
 

@@ -1697,7 +1697,10 @@ export const CompareWorkspaceMembersResponseItem = zod.object({
   "totalProfit": zod.number(),
   "currentBankroll": zod.number(),
   "avgConfidence": zod.number(),
-  "hotSport": zod.string().nullish()
+  "hotSport": zod.string().nullish(),
+  "calibrationScore": zod.number().nullable().describe('0–100 — how well stated confidence matched results on settled won\/lost plays inside the window (Brier-based, confidence\/10 read as implied win probability). Null with no won\/lost plays.'),
+  "postmortemRate": zod.number().nullable().describe('Percent of settled plays inside the window with a completed post-mortem (reasoning graded, miss reason set, or notes written). Null with no settled plays.'),
+  "soundRate": zod.number().nullable().describe('Percent of reasoning-graded plays inside the window the bettor called sound. Null when nothing was graded.')
 })
 export const CompareWorkspaceMembersResponse = zod.array(CompareWorkspaceMembersResponseItem)
 
@@ -1733,7 +1736,10 @@ export const GetWorkspaceLeaderboardResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "emoji": zod.string()
-}).describe('Compact badge reference for showing chips beside a bettor\'s name')).describe('The member\'s most recently earned badges (up to 3, newest first)')
+}).describe('Compact badge reference for showing chips beside a bettor\'s name')).describe('The member\'s most recently earned badges (up to 3, newest first)'),
+  "calibrationScore": zod.number().nullable().describe('0–100 — how well stated confidence matched results on settled won\/lost plays inside the window (Brier-based, confidence\/10 read as implied win probability). Null with no won\/lost plays.'),
+  "postmortemRate": zod.number().nullable().describe('Percent of settled plays inside the window with a completed post-mortem (reasoning graded, miss reason set, or notes written). Null with no settled plays.'),
+  "soundRate": zod.number().nullable().describe('Percent of reasoning-graded plays inside the window the bettor called sound. Null when nothing was graded.')
 }).describe('One crew member\'s ranked results over the requested window (settled plays only)')
 export const GetWorkspaceLeaderboardResponse = zod.array(GetWorkspaceLeaderboardResponseItem)
 

@@ -32,6 +32,22 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "all", label: "All Time" },
 ]
 
+// Two ways to win the board: run the hottest (richest) or make the best
+// decisions (sharpest). Profit ranking stays untouched — sharpest is a
+// client-side re-sort on the decision-quality numbers the API now returns.
+type RankBy = "richest" | "sharpest"
+
+/** Sharpest = calibration first, then post-mortem discipline, then honesty about sound calls. Nulls sink. */
+function sharpestSort(a: LeaderboardEntry, b: LeaderboardEntry): number {
+  if ((a.settledCount > 0) !== (b.settledCount > 0)) return a.settledCount > 0 ? -1 : 1
+  const cal = (e: LeaderboardEntry) => e.calibrationScore ?? -1
+  const pm = (e: LeaderboardEntry) => e.postmortemRate ?? -1
+  const sr = (e: LeaderboardEntry) => e.soundRate ?? -1
+  if (cal(a) !== cal(b)) return cal(b) - cal(a)
+  if (pm(a) !== pm(b)) return pm(b) - pm(a)
+  return sr(b) - sr(a)
+}
+
 const MISS_REASON_LABELS: Record<string, string> = {
   bad_read: "bad reads",
   bad_price: "bad prices",
@@ -73,6 +89,7 @@ function RankBadge({ rank }: { rank: number }) {
 export default function Workspace() {
   const { activeUser } = useUser()
   const [period, setPeriod] = useState<Period>("all")
+  const [rankBy, setRankBy] = useState<RankBy>("richest")
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const { data: board = [], isLoading, isError, refetch, isRefetching } = useGetWorkspaceLeaderboard(
@@ -169,23 +186,46 @@ export default function Workspace() {
             </button>
           )}
         </div>
-        <div className="flex rounded-lg border border-border/60 bg-card p-1" role="tablist" aria-label="Time period">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              role="tab"
-              aria-selected={period === p.value}
-              onClick={() => setPeriod(p.value)}
-              data-testid={`tab-period-${p.value}`}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
-                period === p.value
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-border/60 bg-card p-1" role="tablist" aria-label="Rank by">
+            {([
+              { value: "richest", label: "Richest" },
+              { value: "sharpest", label: "Sharpest" },
+            ] as { value: RankBy; label: string }[]).map((r) => (
+              <button
+                key={r.value}
+                role="tab"
+                aria-selected={rankBy === r.value}
+                onClick={() => setRankBy(r.value)}
+                data-testid={`tab-rank-${r.value}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                  rankBy === r.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex rounded-lg border border-border/60 bg-card p-1" role="tablist" aria-label="Time period">
+            {PERIODS.map((p) => (
+              <button
+                key={p.value}
+                role="tab"
+                aria-selected={period === p.value}
+                onClick={() => setPeriod(p.value)}
+                data-testid={`tab-period-${p.value}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-colors ${
+                  period === p.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -231,14 +271,17 @@ export default function Workspace() {
               <CardTitle className="text-base">Crew Rankings</CardTitle>
             </div>
             <CardDescription>
-              Settled results only — pending plays count as "in play", not rank. Tap a friend for the head-to-head.
+              {rankBy === "richest"
+                ? 'Settled results only — pending plays count as "in play", not rank. Tap a friend for the head-to-head.'
+                : "Ranked by calibration — how well their stated confidence matched reality. Anyone can run hot; being right about being right is the hard part."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {board.map((e) => {
+            {(rankBy === "richest" ? board : [...board].sort(sharpestSort)).map((e, i) => {
               const isYou = e.userId === activeUser?.id
               const isSelected = e.userId === selectedId
               const clickable = !isYou
+              const displayRank = rankBy === "richest" ? e.rank : i + 1
               return (
                 <button
                   key={e.userId}
@@ -254,7 +297,7 @@ export default function Workspace() {
                     isYou ? "ring-1 ring-primary/50" : ""
                   }`}
                 >
-                  <RankBadge rank={e.rank} />
+                  <RankBadge rank={displayRank} />
                   <span
                     className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-bold text-white"
                     style={{ backgroundColor: e.avatarColor }}
@@ -283,28 +326,56 @@ export default function Workspace() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{flavorLine(e)}</p>
                   </div>
-                  <div className="hidden sm:block text-right shrink-0">
-                    <div className="font-mono text-sm font-bold">
-                      {e.wins}-{e.losses}{e.pushes > 0 ? `-${e.pushes}` : ""}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Record</div>
-                  </div>
-                  <div className="text-right shrink-0 w-20">
-                    <div
-                      className={`font-mono text-sm font-bold ${
-                        e.profit > 0 ? "text-chart-1 text-glow-success" : e.profit < 0 ? "text-chart-2 text-glow-destructive" : ""
-                      }`}
-                    >
-                      {e.profit > 0 ? "+" : ""}{formatCurrency(e.profit, false)}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                      {e.roi > 0 ? "+" : ""}{e.roi.toFixed(1)}% ROI
-                    </div>
-                  </div>
-                  <div className="hidden md:block text-right shrink-0 w-16">
-                    <div className="font-mono text-sm">{e.inPlayCount}</div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wider">In Play</div>
-                  </div>
+                  {rankBy === "richest" ? (
+                    <>
+                      <div className="hidden sm:block text-right shrink-0">
+                        <div className="font-mono text-sm font-bold">
+                          {e.wins}-{e.losses}{e.pushes > 0 ? `-${e.pushes}` : ""}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Record</div>
+                      </div>
+                      <div className="text-right shrink-0 w-20">
+                        <div
+                          className={`font-mono text-sm font-bold ${
+                            e.profit > 0 ? "text-chart-1 text-glow-success" : e.profit < 0 ? "text-chart-2 text-glow-destructive" : ""
+                          }`}
+                        >
+                          {e.profit > 0 ? "+" : ""}{formatCurrency(e.profit, false)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          {e.roi > 0 ? "+" : ""}{e.roi.toFixed(1)}% ROI
+                        </div>
+                      </div>
+                      <div className="hidden md:block text-right shrink-0 w-16">
+                        <div className="font-mono text-sm">{e.inPlayCount}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">In Play</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="hidden sm:block text-right shrink-0 w-20">
+                        <div className="font-mono text-sm font-bold" data-testid={`text-postmortem-${e.userId}`}>
+                          {e.postmortemRate != null ? `${e.postmortemRate.toFixed(0)}%` : "—"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Reviewed</div>
+                      </div>
+                      <div className="text-right shrink-0 w-20">
+                        <div
+                          className={`font-mono text-sm font-bold ${e.calibrationScore != null && e.calibrationScore >= 75 ? "text-chart-1 text-glow-success" : ""}`}
+                          data-testid={`text-calibration-${e.userId}`}
+                        >
+                          {e.calibrationScore != null ? e.calibrationScore.toFixed(1) : "—"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Calibration</div>
+                      </div>
+                      <div className="hidden md:block text-right shrink-0 w-16">
+                        <div className="font-mono text-sm" data-testid={`text-sound-${e.userId}`}>
+                          {e.soundRate != null ? `${e.soundRate.toFixed(0)}%` : "—"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Sound</div>
+                      </div>
+                    </>
+                  )}
                 </button>
               )
             })}
@@ -355,16 +426,25 @@ export default function Workspace() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  {[
+                  {([
                     { label: "Net Profit", a: me.totalProfit, b: them.totalProfit, fmt: (v: number) => `${v > 0 ? "+" : ""}${formatCurrency(v, false)}` },
                     { label: "ROI", a: me.roi, b: them.roi, fmt: (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%` },
                     { label: "Win Rate", a: me.winRate, b: them.winRate, fmt: (v: number) => `${v.toFixed(1)}%` },
                     { label: "Bankroll", a: me.currentBankroll, b: them.currentBankroll, fmt: (v: number) => formatCurrency(v, false) },
-                  ].map((row) => (
-                    <div key={row.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md bg-muted/20 px-3 py-2">
-                      <span className={`font-mono text-sm font-bold ${row.a > row.b ? "text-primary" : ""}`}>{row.fmt(row.a)}</span>
+                    // Decision quality — who's actually sharp vs. who's the
+                    // best liar to themselves. Null means nothing to grade.
+                    { label: "Calibration", a: me.calibrationScore, b: them.calibrationScore, fmt: (v: number) => v.toFixed(1) },
+                    { label: "Post-Mortems", a: me.postmortemRate, b: them.postmortemRate, fmt: (v: number) => `${v.toFixed(0)}%` },
+                    { label: "Sound Calls", a: me.soundRate, b: them.soundRate, fmt: (v: number) => `${v.toFixed(0)}%` },
+                  ] as { label: string; a: number | null; b: number | null; fmt: (v: number) => string }[]).map((row) => (
+                    <div key={row.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md bg-muted/20 px-3 py-2" data-testid={`row-compare-${row.label.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
+                      <span className={`font-mono text-sm font-bold ${row.a != null && (row.b == null || row.a > row.b) ? "text-primary" : ""}`}>
+                        {row.a != null ? row.fmt(row.a) : "—"}
+                      </span>
                       <span className="text-[10px] text-muted-foreground uppercase tracking-wider text-center w-24">{row.label}</span>
-                      <span className={`font-mono text-sm font-bold text-right ${row.b > row.a ? "text-primary" : ""}`}>{row.fmt(row.b)}</span>
+                      <span className={`font-mono text-sm font-bold text-right ${row.b != null && (row.a == null || row.b > row.a) ? "text-primary" : ""}`}>
+                        {row.b != null ? row.fmt(row.b) : "—"}
+                      </span>
                     </div>
                   ))}
                 </div>

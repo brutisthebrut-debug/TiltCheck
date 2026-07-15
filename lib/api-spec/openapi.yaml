@@ -2747,7 +2747,24 @@ components:
           type: number
         hotSport:
           type: ["string", "null"]
-      required: [userId, userName, avatarColor, totalBets, wins, losses, winRate, roi, totalProfit, currentBankroll, avgConfidence]
+        calibrationScore:
+          type: ["number", "null"]
+          description: >-
+            0–100 — how well stated confidence matched results on settled
+            won/lost plays inside the window (Brier-based, confidence/10 read
+            as implied win probability). Null with no won/lost plays.
+        postmortemRate:
+          type: ["number", "null"]
+          description: >-
+            Percent of settled plays inside the window with a completed
+            post-mortem (reasoning graded, miss reason set, or notes written).
+            Null with no settled plays.
+        soundRate:
+          type: ["number", "null"]
+          description: >-
+            Percent of reasoning-graded plays inside the window the bettor
+            called sound. Null when nothing was graded.
+      required: [userId, userName, avatarColor, totalBets, wins, losses, winRate, roi, totalProfit, currentBankroll, avgConfidence, calibrationScore, postmortemRate, soundRate]
 
     LeaderboardEntry:
       type: object
@@ -2797,7 +2814,24 @@ components:
           description: The member's most recently earned badges (up to 3, newest first)
           items:
             $ref: "#/components/schemas/BadgeRef"
-      required: [rank, userId, userName, avatarColor, wins, losses, pushes, settledCount, profit, totalWagered, roi, inPlayCount, currentStreak, currentStreakType, badges]
+        calibrationScore:
+          type: ["number", "null"]
+          description: >-
+            0–100 — how well stated confidence matched results on settled
+            won/lost plays inside the window (Brier-based, confidence/10 read
+            as implied win probability). Null with no won/lost plays.
+        postmortemRate:
+          type: ["number", "null"]
+          description: >-
+            Percent of settled plays inside the window with a completed
+            post-mortem (reasoning graded, miss reason set, or notes written).
+            Null with no settled plays.
+        soundRate:
+          type: ["number", "null"]
+          description: >-
+            Percent of reasoning-graded plays inside the window the bettor
+            called sound. Null when nothing was graded.
+      required: [rank, userId, userName, avatarColor, wins, losses, pushes, settledCount, profit, totalWagered, roi, inPlayCount, currentStreak, currentStreakType, badges, calibrationScore, postmortemRate, soundRate]
 
     BadgeRef:
       type: object

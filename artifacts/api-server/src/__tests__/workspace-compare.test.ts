@@ -93,6 +93,9 @@ type CompareRow = {
   roi: number;
   totalProfit: number;
   totalBets: number;
+  calibrationScore: number | null;
+  postmortemRate: number | null;
+  soundRate: number | null;
 };
 
 async function fetchMine(ids: number[], period?: string): Promise<CompareRow[]> {
@@ -143,6 +146,32 @@ describe("GET /workspace/compare", () => {
     const [row] = await fetchMine([user.id]);
     expect(row.wins).toBe(1);
     expect(row.totalProfit).toBeCloseTo(100, 2);
+  });
+
+  it("returns decision-quality metrics alongside the money math", async () => {
+    const user = await createUser("Calibrated");
+    await db.insert(betsTable).values([
+      // won at confidence 8 -> squared error 0.04; graded sound
+      betRow(user.id, 150, "won", { actualPayout: "250.00", confidenceScore: 8, reasoningQuality: "sound" }),
+      // lost at confidence 6 -> squared error 0.36; unreviewed
+      betRow(user.id, -110, "lost", { confidenceScore: 6 }),
+    ]);
+
+    const [row] = await fetchMine([user.id]);
+    // brier = (0.04 + 0.36) / 2 = 0.2 -> score 80
+    expect(row.calibrationScore).toBe(80);
+    expect(row.postmortemRate).toBe(50);
+    expect(row.soundRate).toBe(100);
+  });
+
+  it("decision-quality metrics are null for a bettor with nothing settled", async () => {
+    const user = await createUser("NothingSettled");
+    await db.insert(betsTable).values([betRow(user.id, 120, "pending")]);
+
+    const [row] = await fetchMine([user.id]);
+    expect(row.calibrationScore).toBeNull();
+    expect(row.postmortemRate).toBeNull();
+    expect(row.soundRate).toBeNull();
   });
 
   it("honors the period window on settledAt", async () => {

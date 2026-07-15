@@ -115,6 +115,9 @@ type Row = {
   currentStreakType: string;
   bestSport: string | null;
   favoriteMistake: string | null;
+  calibrationScore: number | null;
+  postmortemRate: number | null;
+  soundRate: number | null;
 };
 
 async function fetchMine(ids: number[], period?: string): Promise<Row[]> {
@@ -215,6 +218,52 @@ describe("GET /workspace/leaderboard", () => {
     expect(row.currentStreak).toBe(2);
     expect(row.bestSport).toBe("NFL");
     expect(row.favoriteMistake).toBe("emotional");
+  });
+
+  it("computes decision-quality metrics from journaled settled plays", async () => {
+    const user = await createUser("Sharp");
+    await db.insert(betsTable).values([
+      // won at confidence 8 -> squared error 0.04; graded sound (reviewed)
+      betRow(user.id, 150, "won", { actualPayout: "250.00", confidenceScore: 8, reasoningQuality: "sound" }),
+      // lost at confidence 6 -> squared error 0.36; graded flawed (reviewed)
+      betRow(user.id, -110, "lost", { confidenceScore: 6, reasoningQuality: "flawed" }),
+      // push — excluded from calibration; "na" reason + whitespace notes is NOT a review
+      betRow(user.id, -110, "push", { actualPayout: "100.00", confidenceScore: 9, missReason: "na", whatHappened: "   " }),
+      // lost at confidence 5 -> squared error 0.25; reviewed via miss reason alone
+      betRow(user.id, -110, "lost", { confidenceScore: 5, missReason: "bad_read" }),
+    ]);
+
+    const [row] = await fetchMine([user.id], "all");
+    // brier = (0.04 + 0.36 + 0.25) / 3 -> score (1 - 0.21667) * 100 = 78.3
+    expect(row.calibrationScore).toBe(78.3);
+    // 3 of 4 settled plays reviewed
+    expect(row.postmortemRate).toBe(75);
+    // 2 graded, 1 sound
+    expect(row.soundRate).toBe(50);
+  });
+
+  it("decision-quality metrics are null with nothing settled and honor the window", async () => {
+    const user = await createUser("NullMetrics");
+    await db.insert(betsTable).values([
+      betRow(user.id, 120, "pending"),
+      // fully journaled win, settled 31 days ago — outside week, inside all
+      betRow(user.id, 150, "won", {
+        actualPayout: "250.00",
+        confidenceScore: 10,
+        reasoningQuality: "sound",
+        settledAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+      }),
+    ]);
+
+    const [weekRow] = await fetchMine([user.id], "week");
+    expect(weekRow.calibrationScore).toBeNull();
+    expect(weekRow.postmortemRate).toBeNull();
+    expect(weekRow.soundRate).toBeNull();
+
+    const [allRow] = await fetchMine([user.id], "all");
+    expect(allRow.calibrationScore).toBe(100); // confidence 10, won -> perfect
+    expect(allRow.postmortemRate).toBe(100);
+    expect(allRow.soundRate).toBe(100);
   });
 
   it("rejects an invalid period", async () => {
