@@ -4,6 +4,7 @@ import * as z from "zod"
 import { useLocation } from "wouter"
 import { useCreateBet, useGetLeakProfile, getGetLeakProfileQueryKey, getListBetsQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
+import { useProStatus } from "@/hooks/use-pro"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { 
@@ -83,10 +84,12 @@ export default function NewBet() {
   const watchConfidence = form.watch("confidenceScore")
 
   // The bettor's own history, turned into one pointed heads-up before they
-  // repeat their most common mistake. Never blocks the bet.
+  // repeat their most common mistake. Never blocks the bet. Pro-only: free
+  // accounts simply get no warning, never an error.
+  const { isPro } = useProStatus()
   const { data: leakProfile } = useGetLeakProfile(
     { userId: activeUser?.id },
-    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
   )
 
   const leakWarning = (() => {

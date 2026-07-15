@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
 const PITCH =
-  "Our crew logs every bet on EdgeBoard — the reasoning, the receipts, the leaks. Come put your record where your mouth is:"
+  "Our crew logs every bet on TiltCheck — the reasoning, the receipts, the leaks. Come put your record where your mouth is:"
 
 function inviteLink(): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, "")

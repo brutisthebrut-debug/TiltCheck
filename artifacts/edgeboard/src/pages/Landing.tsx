@@ -25,7 +25,7 @@ const PILLARS = [
   {
     icon: TrendingDown,
     title: "FIND THE LEAK",
-    text: "EdgeBoard surfaces your most expensive bad habit: tilt bets, bad prices, markets you misread.",
+    text: "TiltCheck surfaces your most expensive bad habit: tilt bets, bad prices, markets you misread.",
   },
 ]
 
@@ -58,7 +58,7 @@ function DashboardMock() {
         <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-green-500/70" />
         <span className="ml-3 text-[10px] uppercase tracking-widest text-muted-foreground">
-          edgeboard // dashboard
+          tiltcheck // dashboard
         </span>
       </div>
 
@@ -137,7 +137,7 @@ export default function Landing() {
       <header className="flex items-center justify-between px-6 py-4 border-b border-border/60">
         <div className="flex items-center gap-2 font-bold tracking-tight text-primary">
           <Layers className="h-5 w-5" />
-          <span>EDGEBOARD</span>
+          <span>TILTCHECK</span>
         </div>
         <Button asChild variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10">
           <Link href="/sign-in">Sign in</Link>
@@ -162,7 +162,7 @@ export default function Landing() {
           </h1>
 
           <p className="mt-6 max-w-xl text-base md:text-lg text-muted-foreground leading-relaxed">
-            EdgeBoard is a flight recorder for your betting decisions. It doesn&apos;t give you
+            TiltCheck is a flight recorder for your betting decisions. It doesn&apos;t give you
             picks &mdash; it shows you the patterns behind your wins, losses, and the lies you tell
             yourself at &minus;110.
           </p>
@@ -243,7 +243,7 @@ export default function Landing() {
       </main>
 
       <footer className="px-6 py-5 text-center text-xs text-muted-foreground/60 border-t border-border/60">
-        EDGEBOARD // decision tracking for people who grade their own homework
+        TILTCHECK // decision tracking for people who grade their own homework
       </footer>
     </div>
   )

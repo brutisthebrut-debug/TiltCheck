@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react
 import { Route, Switch, Link } from 'wouter';
 import { setUrlRewrite } from '@workspace/api-client-react';
 import { setOddsFormatServerSync } from '@/hooks/use-odds-format';
+import { setBillingServerSync } from '@/hooks/use-pro';
 import { Layout } from '@/components/Layout';
 import { UserProvider } from '@/contexts/UserContext';
 import { toast } from '@/hooks/use-toast';
@@ -38,6 +39,9 @@ export default function DemoApp() {
     // Odds-format choice stays on this device — never PATCH the read-only
     // demo API, never let the demo persona's preference overwrite it.
     setOddsFormatServerSync(false);
+    // The demo world is always Pro (the pitch shows the full product) and the
+    // read-only demo API has no billing routes to ask.
+    setBillingServerSync(false);
     return new QueryClient({
       mutationCache: new MutationCache({
         onError: (_error, _variables, _context, mutation) => {
@@ -57,9 +61,11 @@ export default function DemoApp() {
   useEffect(() => {
     setUrlRewrite(demoRewrite);
     setOddsFormatServerSync(false);
+    setBillingServerSync(false);
     return () => {
       setUrlRewrite(null);
       setOddsFormatServerSync(true);
+      setBillingServerSync(true);
     };
   }, []);
 
@@ -82,6 +88,7 @@ export default function DemoApp() {
               <Route path="/workspace" component={Workspace} />
               <Route path="/bankroll" component={Bankroll} />
               <Route path="/recap" component={Recap} />
+              <Route path="/account" component={DemoNudge} />
               <Route path="/founder" component={DemoNudge} />
               <Route component={DemoNudge} />
             </Switch>

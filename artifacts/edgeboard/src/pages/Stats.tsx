@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
+import { UpgradeCard } from "@/components/UpgradeCard"
+import { useProStatus } from "@/hooks/use-pro"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
@@ -37,9 +39,12 @@ export default function Stats() {
     { query: { enabled: !!activeUser?.id, queryKey: getGetConfidenceAnalysisQueryKey({ userId: activeUser?.id }) } }
   )
 
+  // Lessons are a Pro surface — keep the query off for free accounts so the
+  // 402 never surfaces as an error state.
+  const { isPro, isProLoading, isProUnknown } = useProStatus()
   const { data: insights } = useGetStatsInsights(
     { userId: activeUser?.id },
-    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey({ userId: activeUser?.id }) } }
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey({ userId: activeUser?.id }) } }
   )
 
   const isLoading = isSummaryLoading || isSportLoading || isConfidenceLoading
@@ -292,7 +297,13 @@ export default function Stats() {
           <Lightbulb className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold tracking-tight">Lessons</h2>
         </div>
-        {!insights || insights.reviewedCount < 3 ? (
+        {!isPro ? (
+          isProLoading ? (
+            <Card className="animate-pulse bg-muted/50 h-32" />
+          ) : isProUnknown ? null : (
+            <UpgradeCard compact feature="The Lessons feed" />
+          )
+        ) : !insights || insights.reviewedCount < 3 ? (
           <Card className="border-dashed border-2 border-muted">
             <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">

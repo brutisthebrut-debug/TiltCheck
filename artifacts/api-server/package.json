@@ -13,11 +13,12 @@
   "dependencies": {
     "@clerk/express": "^2.1.40",
     "@clerk/shared": "^4.25.2",
+    "@whop/sdk": "^0.0.40",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/integrations-openai-ai-server": "workspace:*",
     "@workspace/odds": "workspace:*",
     "@workspace/weeks": "workspace:*",
-    "@workspace/integrations-openai-ai-server": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",

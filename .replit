@@ -48,3 +48,5 @@ channel = "stable-25_05"
 
 [userenv.shared]
 FOUNDER_EMAIL = "brutisthebrut@gmail.com"
+WHOP_COMPANY_ID = "biz_1Qil06p1o50SGq"
+WHOP_PLAN_ID = "plan_XndYGZ7A9ZWng"

@@ -23,6 +23,8 @@ import {
 } from "@workspace/api-client-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InviteCard } from "@/components/InviteCard"
+import { UpgradeCard } from "@/components/UpgradeCard"
+import { useProStatus } from "@/hooks/use-pro"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -84,9 +86,12 @@ export default function Dashboard() {
   );
   const earnedBadges = badges.filter(b => b.earnedAt != null);
 
+  // Leak read + tilt check are Pro surfaces — the query stays off for free
+  // accounts so the 402 never hits the retry-card machinery.
+  const { isPro, isProLoading, isProUnknown } = useProStatus();
   const { data: leakProfile, isError: isLeakProfileError, refetch: refetchLeakProfile, isRefetching: isLeakProfileRefetching } = useGetLeakProfile(
     { userId: activeUser?.id },
-    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
   );
 
   // The smaller widgets normally hide themselves when they have nothing to
@@ -472,6 +477,13 @@ export default function Dashboard() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Free accounts see the velvet rope where the leak read would sit.
+          If the plan check itself failed, show nothing — never pitch an
+          upgrade to someone who may already be paying. */}
+      {!isPro && !isProLoading && !isProUnknown && (
+        <UpgradeCard compact feature="Your leak read" />
       )}
 
       {/* Your Leak — the one recurring mistake that's costing real money.

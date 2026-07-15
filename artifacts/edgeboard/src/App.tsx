@@ -23,6 +23,7 @@ import EdgeFinder from './pages/EdgeFinder';
 import Workspace from './pages/Workspace';
 import Bankroll from './pages/Bankroll';
 import Recap from './pages/Recap';
+import Account from './pages/Account';
 import Founder from './pages/Founder';
 import DemoApp from './pages/DemoApp';
 
@@ -178,6 +179,7 @@ function ProfileGate() {
         <Route path="/workspace" component={Workspace} />
         <Route path="/bankroll" component={Bankroll} />
         <Route path="/recap" component={Recap} />
+        <Route path="/account" component={Account} />
         <Route path="/founder" component={Founder} />
         <Route component={NotFound} />
       </Switch>
@@ -208,7 +210,7 @@ function ClerkProviderWithRoutes() {
         signIn: {
           start: {
             title: 'Back to the board',
-            subtitle: 'Sign in to your EdgeBoard',
+            subtitle: 'Sign in to TiltCheck',
           },
         },
         signUp: {

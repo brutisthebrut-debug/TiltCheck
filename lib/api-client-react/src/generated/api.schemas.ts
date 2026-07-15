@@ -39,6 +39,40 @@ export interface User {
   oddsFormat: UserOddsFormat;
 }
 
+/**
+ * Why the account is (or isn't) Pro
+ */
+export type BillingStatusSource = typeof BillingStatusSource[keyof typeof BillingStatusSource];
+
+
+export const BillingStatusSource = {
+  subscription: 'subscription',
+  founder: 'founder',
+  demo: 'demo',
+  none: 'none',
+} as const;
+
+export interface BillingStatus {
+  isPro: boolean;
+  /**
+     * End of the server-verified subscription horizon (ISO timestamp); null when Pro comes from founder/demo status or the account isn't Pro
+     * @nullable
+     */
+  proUntil: string | null;
+  /** Why the account is (or isn't) Pro */
+  source: BillingStatusSource;
+}
+
+export interface BillingCheckoutInput {
+  /** Absolute http(s) URL the hosted checkout redirects back to after payment */
+  returnUrl: string;
+}
+
+export interface BillingCheckout {
+  /** Whop hosted checkout URL to send the buyer to */
+  checkoutUrl: string;
+}
+
 export interface Invite {
   id: number;
   email: string;

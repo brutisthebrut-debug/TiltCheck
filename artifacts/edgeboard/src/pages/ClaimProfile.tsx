@@ -62,7 +62,7 @@ export default function ClaimProfile() {
     const status = (e as { status?: number })?.status
     const code = (e as { data?: { error?: string } })?.data?.error
     if (status === 403 && code === "not_invited") {
-      setError("EdgeBoard is a private beta — this email isn't on the guest list. Ask whoever runs the board to add you.")
+      setError("TiltCheck is a private beta — this email isn't on the guest list. Ask whoever runs the board to add you.")
     } else if (status === 403) {
       setError("The board's at capacity right now. Ask whoever runs it to open more seats.")
     } else if (status === 409) {
@@ -133,7 +133,7 @@ export default function ClaimProfile() {
       <div className="dark min-h-[100dvh] bg-background text-foreground font-mono flex flex-col items-center justify-center px-4 py-10">
         <div className="flex items-center gap-2 font-bold tracking-tight text-primary mb-2">
           <Layers className="h-6 w-6" />
-          <span className="text-xl">EDGEBOARD</span>
+          <span className="text-xl">TILTCHECK</span>
         </div>
         <p className="text-sm text-muted-foreground mb-8 text-center max-w-md">
           You&apos;re in, {claimedUser.displayName}. Set your baseline so the numbers mean something from bet one.
@@ -236,7 +236,7 @@ export default function ClaimProfile() {
     <div className="dark min-h-[100dvh] bg-background text-foreground font-mono flex flex-col items-center justify-center px-4 py-10">
       <div className="flex items-center gap-2 font-bold tracking-tight text-primary mb-2">
         <Layers className="h-6 w-6" />
-        <span className="text-xl">EDGEBOARD</span>
+        <span className="text-xl">TILTCHECK</span>
       </div>
       <p className="text-sm text-muted-foreground mb-8 text-center">
         Signed in as {clerkUser?.primaryEmailAddress?.emailAddress ?? "your account"}. Who are you on the board?

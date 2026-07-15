@@ -28,7 +28,7 @@ export function ExportCsvButton({
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `edgeboard-${filenameStem}-${dayOf(new Date())}.csv`
+      a.download = `tiltcheck-${filenameStem}-${dayOf(new Date())}.csv`
       document.body.appendChild(a)
       a.click()
       a.remove()

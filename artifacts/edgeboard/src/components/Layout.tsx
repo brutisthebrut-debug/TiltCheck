@@ -13,6 +13,7 @@ import {
   LogOut,
   Crown,
   Crosshair,
+  CircleUser,
 } from "lucide-react"
 import { Button } from "./ui/button"
 import { BadgeWatcher } from "./BadgeWatcher"
@@ -54,9 +55,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   // Founder-only page joins the sidebar nav; the mobile bottom bar keeps the
   // core six (founders can reach the dash from the desktop nav or /founder).
-  const sidebarNavItems = activeUser?.isFounder
-    ? [...navItems, { name: "Founder", href: "/founder", icon: Crown }]
-    : navItems
+  // Account (Pro status + billing) rides the sidebar too — mobile reaches it
+  // from the header avatar.
+  const sidebarNavItems = [
+    ...(activeUser?.isFounder ? [...navItems, { name: "Founder", href: "/founder", icon: Crown }] : navItems),
+    { name: "Account", href: "/account", icon: CircleUser },
+  ]
 
   const handleSignOut = () => signOut({ redirectUrl: basePath || "/" })
 
@@ -67,7 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex h-16 items-center px-6 border-b border-border/50 bg-card/50 backdrop-blur-sm">
           <div className="flex items-center gap-2 font-mono font-bold tracking-tight text-primary text-glow-primary">
             <Layers className="h-6 w-6 drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
-            <span className="text-xl">EDGEBOARD</span>
+            <span className="text-xl">TILTCHECK</span>
           </div>
         </div>
 
@@ -145,7 +149,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <header className="flex h-14 items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-md px-4 md:hidden">
         <div className="flex items-center gap-2 font-mono font-bold text-primary text-glow-primary">
           <Layers className="h-5 w-5 drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
-          <span>EDGEBOARD</span>
+          <span>TILTCHECK</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -161,12 +165,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Crown className="h-4 w-4" />
             </Link>
           )}
-          <span
+          <Link
+            href="/account"
+            aria-label="Account"
+            data-testid="link-account-mobile"
             className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
             style={{ backgroundColor: activeUser?.avatarColor ?? "#6366f1" }}
           >
             {activeUser?.displayName?.charAt(0).toUpperCase() ?? "?"}
-          </span>
+          </Link>
           <Button
             variant="ghost"
             size="icon"

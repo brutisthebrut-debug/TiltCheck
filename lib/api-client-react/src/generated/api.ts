@@ -29,6 +29,9 @@ import type {
   BetInput,
   BetSettlement,
   BetUpdate,
+  BillingCheckout,
+  BillingCheckoutInput,
+  BillingStatus,
   ClaimProfileInput,
   CompareWorkspaceMembersParams,
   ConfidenceBucket,
@@ -3684,6 +3687,156 @@ export function useGetWorkspaceLeaderboard<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getGetBillingStatusUrl = () => {
+
+
+
+
+  return `/api/billing/status`
+}
+
+/**
+ * Server-verified subscription status. When the cached horizon has expired, the server re-checks the payment provider and stores the new horizon — Pro access is never granted from client state, redirects, or checkout IDs. Founders are always Pro; the demo board reports Pro so the public demo shows the full product.
+ * @summary TiltCheck Pro status for the signed-in bettor
+ */
+export const getBillingStatus = async ( options?: RequestInit): Promise<BillingStatus> => {
+
+  return customFetch<BillingStatus>(getGetBillingStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBillingStatusQueryKey = () => {
+    return [
+    `/api/billing/status`
+    ] as const;
+    }
+
+
+export const getGetBillingStatusQueryOptions = <TData = Awaited<ReturnType<typeof getBillingStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillingStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBillingStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBillingStatus>>> = ({ signal }) => getBillingStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBillingStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBillingStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getBillingStatus>>>
+export type GetBillingStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary TiltCheck Pro status for the signed-in bettor
+ */
+
+export function useGetBillingStatus<TData = Awaited<ReturnType<typeof getBillingStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillingStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBillingStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateBillingCheckoutUrl = () => {
+
+
+
+
+  return `/api/billing/checkout`
+}
+
+/**
+ * Creates a Whop hosted-checkout session bound to this bettor and returns the URL to redirect to. The checkout configuration id is stored on the profile so the resulting payment can be verified server-side after the redirect — the redirect itself never grants access.
+ * @summary Create a hosted checkout session for TiltCheck Pro
+ */
+export const createBillingCheckout = async (billingCheckoutInput: BillingCheckoutInput, options?: RequestInit): Promise<BillingCheckout> => {
+
+  return customFetch<BillingCheckout>(getCreateBillingCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(billingCheckoutInput)
+  }
+);}
+
+
+
+
+
+export const getCreateBillingCheckoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBillingCheckout>>, TError,{data: BodyType<BillingCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBillingCheckout>>, TError,{data: BodyType<BillingCheckoutInput>}, TContext> => {
+
+const mutationKey = ['createBillingCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBillingCheckout>>, {data: BodyType<BillingCheckoutInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createBillingCheckout(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBillingCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createBillingCheckout>>>
+    export type CreateBillingCheckoutMutationBody = BodyType<BillingCheckoutInput>
+    export type CreateBillingCheckoutMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a hosted checkout session for TiltCheck Pro
+ */
+export const useCreateBillingCheckout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBillingCheckout>>, TError,{data: BodyType<BillingCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBillingCheckout>>,
+        TError,
+        {data: BodyType<BillingCheckoutInput>},
+        TContext
+      > => {
+      return useMutation(getCreateBillingCheckoutMutationOptions(options));
+    }
 
 export const getGetAdminOverviewUrl = () => {
 

@@ -22,6 +22,8 @@ tags:
     description: Shared workspace operations
   - name: users
     description: User operations
+  - name: billing
+    description: TiltCheck Pro subscription operations
 
 paths:
   /healthz:
@@ -1134,6 +1136,66 @@ paths:
         "403":
           description: Signed in but no bettor profile linked yet
 
+  # ── Billing ────────────────────────────────────────────────────────────────
+  /billing/status:
+    get:
+      operationId: getBillingStatus
+      tags: [billing]
+      summary: TiltCheck Pro status for the signed-in bettor
+      description: >
+        Server-verified subscription status. When the cached horizon has
+        expired, the server re-checks the payment provider and stores the new
+        horizon — Pro access is never granted from client state, redirects, or
+        checkout IDs. Founders are always Pro; the demo board reports Pro so
+        the public demo shows the full product.
+      responses:
+        "200":
+          description: Verified subscription status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingStatus"
+        "401":
+          description: Not signed in
+        "403":
+          description: Signed in but no bettor profile linked yet
+        "503":
+          description: Payment provider unreachable and no valid cached horizon
+
+  /billing/checkout:
+    post:
+      operationId: createBillingCheckout
+      tags: [billing]
+      summary: Create a hosted checkout session for TiltCheck Pro
+      description: >
+        Creates a Whop hosted-checkout session bound to this bettor and returns
+        the URL to redirect to. The checkout configuration id is stored on the
+        profile so the resulting payment can be verified server-side after the
+        redirect — the redirect itself never grants access.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingCheckoutInput"
+      responses:
+        "200":
+          description: Hosted checkout created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingCheckout"
+        "400":
+          description: Invalid return URL
+        "401":
+          description: Not signed in
+        "403":
+          description: Signed in but no bettor profile linked yet
+        "409":
+          description: Already subscribed (founders included — Pro comes with the crown)
+        "503":
+          description: Payment provider unreachable
+
   /admin/overview:
     get:
       operationId: getAdminOverview
@@ -1241,6 +1303,36 @@ components:
           enum: [american, decimal, fractional]
           description: Preferred odds display format — follows the user across devices
       required: [id, username, displayName, avatarColor, startingBankroll, createdAt, isFounder, oddsFormat]
+
+    BillingStatus:
+      type: object
+      properties:
+        isPro:
+          type: boolean
+        proUntil:
+          type: ["string", "null"]
+          description: End of the server-verified subscription horizon (ISO timestamp); null when Pro comes from founder/demo status or the account isn't Pro
+        source:
+          type: string
+          enum: [subscription, founder, demo, none]
+          description: Why the account is (or isn't) Pro
+      required: [isPro, proUntil, source]
+
+    BillingCheckoutInput:
+      type: object
+      properties:
+        returnUrl:
+          type: string
+          description: Absolute http(s) URL the hosted checkout redirects back to after payment
+      required: [returnUrl]
+
+    BillingCheckout:
+      type: object
+      properties:
+        checkoutUrl:
+          type: string
+          description: Whop hosted checkout URL to send the buyer to
+      required: [checkoutUrl]
 
     Invite:
       type: object

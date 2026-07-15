@@ -18,6 +18,7 @@ import { computeWeeklyRecap, mondayOf, lastCompletedWeekStart, dayOf } from "../
 import { assembleRecapFacts, generateRecapNarrative, NARRATIVE_MODEL } from "../lib/narrative";
 import { logger } from "../lib/logger";
 import { requireProfile } from "../middlewares/auth";
+import { requirePro } from "../middlewares/billing";
 import { userScopeCondition, userInScope } from "../lib/scope";
 import { isDemoRequest } from "../middlewares/demo";
 
@@ -294,7 +295,7 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
 });
 
 // GET /stats/insights
-router.get("/stats/insights", async (req, res): Promise<void> => {
+router.get("/stats/insights", requirePro, async (req, res): Promise<void> => {
   const query = GetStatsInsightsQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
@@ -419,7 +420,7 @@ router.get("/stats/insights", async (req, res): Promise<void> => {
 // aggregated across their whole settled history so the bet form can warn
 // before they repeat their most common mistake. Private: this is self-audit
 // data, so a userId param is only accepted when it matches the session user.
-router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void> => {
+router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): Promise<void> => {
   const query = GetLeakProfileQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
@@ -631,7 +632,7 @@ router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void
 // greys them out rather than pretending small samples mean something.
 const EDGE_MIN_SAMPLE = 5;
 
-router.get("/stats/edge-finder", requireProfile, async (req, res): Promise<void> => {
+router.get("/stats/edge-finder", requireProfile, requirePro, async (req, res): Promise<void> => {
   const query = GetEdgeFinderQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });

@@ -10,6 +10,7 @@ import statsRouter from "./stats";
 import badgesRouter from "./badges";
 import workspaceRouter from "./workspace";
 import adminRouter from "./admin";
+import billingRouter from "./billing";
 import { requireAuth } from "../middlewares/auth";
 import { demoReadOnly, demoSession } from "../middlewares/demo";
 
@@ -48,5 +49,8 @@ router.use(statsRouter);
 router.use(badgesRouter);
 router.use(workspaceRouter);
 router.use(adminRouter);
+// Billing is deliberately NOT mounted on the demo router — the demo world
+// reports Pro via its own bypass in requirePro, never through checkout.
+router.use(billingRouter);
 
 export default router;

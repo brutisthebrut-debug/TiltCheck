@@ -43,6 +43,8 @@ async function createUser(displayName: string) {
       avatarColor: "#6366f1",
       startingBankroll: "1000",
       clerkUserId,
+      // Compare (and insights) are Pro-gated — give test users a live horizon.
+      proUntil: new Date("2099-01-01T00:00:00Z"),
     })
     .returning();
   createdUserIds.push(row.id);

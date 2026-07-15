@@ -43,7 +43,8 @@ async function createLinkedUser() {
   const clerkUserId = `clerk_${username}`;
   const [row] = await db
     .insert(usersTable)
-    .values({ username, displayName: username, clerkUserId })
+    // Edge finder is a Pro-gated endpoint — give test users a live horizon.
+    .values({ username, displayName: username, clerkUserId, proUntil: new Date("2099-01-01T00:00:00Z") })
     .returning();
   createdUserIds.push(row.id);
   return { user: row, clerkUserId };

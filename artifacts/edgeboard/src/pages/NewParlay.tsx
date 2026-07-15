@@ -4,6 +4,7 @@ import * as z from "zod"
 import { useLocation } from "wouter"
 import { useCreateParlay, useGetLeakProfile, getGetLeakProfileQueryKey, getListParlaysQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
+import { useProStatus } from "@/hooks/use-pro"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { 
@@ -104,9 +105,11 @@ export default function NewParlay() {
 
   // Tilt check — a parlay slip mid-spiral is the classic "get it all back
   // in one ticket" move, so the session-level warning shows here too.
+  // Pro-only: free accounts simply get no warning, never an error.
+  const { isPro } = useProStatus()
   const { data: leakProfile } = useGetLeakProfile(
     { userId: activeUser?.id },
-    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
   )
   const tiltSpiral = leakProfile?.tiltSpiral ?? null
 

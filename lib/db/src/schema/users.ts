@@ -23,6 +23,14 @@ export const usersTable = pgTable("users", {
   // Preferred odds display format ("american" | "decimal"). Stored on the
   // profile so the choice follows the user across devices.
   oddsFormat: text("odds_format").notNull().default("american"),
+  // TiltCheck Pro: end of the server-verified subscription horizon. Written
+  // only by the billing routes after the payment provider confirms an active
+  // membership — never from client state. Acts as a bounded cache (max ~24h)
+  // so gated endpoints stay DB-only and a cancelled sub expires within a day.
+  proUntil: timestamp("pro_until", { withTimezone: true }),
+  // Whop hosted-checkout configuration created for this bettor. Payments made
+  // through it are how the server verifies the purchase after the redirect.
+  whopCheckoutConfigId: text("whop_checkout_config_id"),
   // Demo crew member: fictional data shown on the public demo board only.
   // Every real-user query is scoped to isDemo=false and every demo query to
   // isDemo=true, so the two worlds never mix.

@@ -4,5 +4,5 @@
     <path d="M7 20 L20 27 L33 20"/>
     <path d="M7 27 L20 34 L33 27"/>
   </g>
-  <text x="42" y="27" font-family="'Space Mono', monospace" font-weight="700" font-size="19" letter-spacing="1.5" fill="hsl(0, 0%, 95%)">EDGE<tspan fill="hsl(220, 90%, 60%)">BOARD</tspan></text>
+  <text x="42" y="27" font-family="'Space Mono', monospace" font-weight="700" font-size="19" letter-spacing="1.5" fill="hsl(0, 0%, 95%)">TILT<tspan fill="hsl(220, 90%, 60%)">CHECK</tspan></text>
 </svg>

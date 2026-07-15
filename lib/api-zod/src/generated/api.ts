@@ -1516,6 +1516,30 @@ export const GetWorkspaceLeaderboardResponse = zod.array(GetWorkspaceLeaderboard
 
 
 /**
+ * Server-verified subscription status. When the cached horizon has expired, the server re-checks the payment provider and stores the new horizon — Pro access is never granted from client state, redirects, or checkout IDs. Founders are always Pro; the demo board reports Pro so the public demo shows the full product.
+ * @summary TiltCheck Pro status for the signed-in bettor
+ */
+export const GetBillingStatusResponse = zod.object({
+  "isPro": zod.boolean(),
+  "proUntil": zod.string().nullable().describe('End of the server-verified subscription horizon (ISO timestamp); null when Pro comes from founder\/demo status or the account isn\'t Pro'),
+  "source": zod.enum(['subscription', 'founder', 'demo', 'none']).describe('Why the account is (or isn\'t) Pro')
+})
+
+
+/**
+ * Creates a Whop hosted-checkout session bound to this bettor and returns the URL to redirect to. The checkout configuration id is stored on the profile so the resulting payment can be verified server-side after the redirect — the redirect itself never grants access.
+ * @summary Create a hosted checkout session for TiltCheck Pro
+ */
+export const CreateBillingCheckoutBody = zod.object({
+  "returnUrl": zod.string().describe('Absolute http(s) URL the hosted checkout redirects back to after payment')
+})
+
+export const CreateBillingCheckoutResponse = zod.object({
+  "checkoutUrl": zod.string().describe('Whop hosted checkout URL to send the buyer to')
+})
+
+
+/**
  * @summary Founder dashboard overview — seats, invites, and crew activity
  */
 export const GetAdminOverviewResponse = zod.object({

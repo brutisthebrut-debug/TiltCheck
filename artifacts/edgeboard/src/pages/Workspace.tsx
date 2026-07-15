@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
 import { Trophy, Flame, Snowflake, Swords, Users, Crown, X, Layers } from "lucide-react"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
+import { UpgradeCard } from "@/components/UpgradeCard"
+import { useProStatus } from "@/hooks/use-pro"
 
 type Period = "week" | "month" | "all"
 
@@ -72,9 +74,12 @@ export default function Workspace() {
     { period },
     { query: { queryKey: getGetWorkspaceLeaderboardQueryKey({ period }) } },
   )
+  // Head-to-head is a Pro surface — the compare query stays off for free
+  // accounts so the 402 never hits the error machinery.
+  const { isPro, isProLoading, isProUnknown } = useProStatus()
   const { data: comparisons = [] } = useCompareWorkspaceMembers(
     { period },
-    { query: { queryKey: getCompareWorkspaceMembersQueryKey({ period }) } },
+    { query: { enabled: isPro, queryKey: getCompareWorkspaceMembersQueryKey({ period }) } },
   )
   const { data: friendBets = [], isLoading: isFriendBetsLoading } = useListBets(
     { userId: selectedId, limit: 5 },
@@ -253,7 +258,10 @@ export default function Workspace() {
         </Card>
       )}
 
-      {/* Head-to-head drill-in */}
+      {/* Head-to-head drill-in — velvet rope for free accounts */}
+      {selectedEntry && !isPro && !isProLoading && !isProUnknown && (
+        <UpgradeCard compact feature="Head-to-head compare" />
+      )}
       {selectedEntry && them && (
         <div className="space-y-4" data-testid="section-head-to-head">
           <div className="flex items-center justify-between">

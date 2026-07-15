@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
+import { UpgradeCard } from "@/components/UpgradeCard"
+import { useProStatus } from "@/hooks/use-pro"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { Crosshair, TrendingUp, TrendingDown, Plus, ArrowRight, ShieldQuestion } from "lucide-react"
@@ -69,17 +71,21 @@ export default function EdgeFinder() {
   const [sport, setSport] = useState<string | null>(null)
   const hasFilters = period !== "all" || sport != null
 
+  // Edge Finder is the flagship Pro surface — queries stay off for free
+  // accounts so the 402 never reads as a connection problem.
+  const { isPro, isProLoading, isProUnknown, isProRefreshing, refreshPro } = useProStatus()
+
   const filterParams = { userId: activeUser?.id, period, sport: sport ?? undefined }
   const { data, isLoading, isError, refetch, isRefetching } = useGetEdgeFinder(
     filterParams,
-    { query: { enabled: !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey(filterParams) } }
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey(filterParams) } }
   )
 
   // Unfiltered slice just to know which sports exist — keeps the sport
   // dropdown stable while a sport filter is applied.
   const { data: allTime } = useGetEdgeFinder(
     { userId: activeUser?.id },
-    { query: { enabled: !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey({ userId: activeUser?.id }) } }
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey({ userId: activeUser?.id }) } }
   )
   const sportOptions = (allTime?.sport ?? []).map((l) => l.key).sort()
 
@@ -94,6 +100,32 @@ export default function EdgeFinder() {
           isRetrying={isRefetching}
           testId="card-edge-finder-error"
         />
+      </div>
+    )
+  }
+
+  if (!isPro && !isProLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Edge Finder</h1>
+          <p className="text-muted-foreground mt-1">
+            Your best lanes — by sport, bet type, odds band, and day — cut from your own graded record.
+          </p>
+        </div>
+        {isProUnknown ? (
+          // The plan check failed — never pitch an upgrade to someone who may
+          // already be paying. Neutral retry instead.
+          <QueryErrorCard
+            title="Couldn't verify your plan."
+            message="Connection hiccup on the billing check — your subscription hasn't gone anywhere."
+            onRetry={() => refreshPro()}
+            isRetrying={isProRefreshing}
+            testId="card-billing-error"
+          />
+        ) : (
+          <UpgradeCard feature="Edge Finder" />
+        )}
       </div>
     )
   }

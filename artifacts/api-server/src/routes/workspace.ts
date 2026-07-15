@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { requirePro } from "../middlewares/billing";
 import { eq, desc, and, inArray, sum } from "drizzle-orm";
 import { db, usersTable, betsTable, parlaysTable, transactionsTable, userBadgesTable } from "@workspace/db";
 import { GetWorkspaceLeaderboardQueryParams, CompareWorkspaceMembersQueryParams } from "@workspace/api-zod";
@@ -38,7 +39,7 @@ router.get("/workspace", async (req, res): Promise<void> => {
 // Same math rules as the leaderboard so the two views can never disagree:
 // settled straight bets AND parlays (won/lost/push), dead-zone-odds rows
 // excluded, and the same settledAt window (week/month/all).
-router.get("/workspace/compare", async (req, res): Promise<void> => {
+router.get("/workspace/compare", requirePro, async (req, res): Promise<void> => {
   const query = CompareWorkspaceMembersQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
