@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { formatCurrency } from "@/lib/format"
 import { getApiErrorMessage } from "@/lib/api-error"
-import { createBetBodyOddsMax } from "@workspace/api-zod"
+import { createBetBodyOddsMax, createBetBodyStakeMax } from "@workspace/api-zod"
 import { isValidAmericanOdds, payoutFromAmerican } from "@workspace/odds"
 import { OddsInput } from "@/components/OddsInput"
 import { OddsFormatToggle } from "@/components/OddsFormatToggle"
@@ -39,7 +39,10 @@ const formSchema = z.object({
       Math.abs(v) <= createBetBodyOddsMax,
     { message: "Enter the price your book shows (e.g. -110, 1.91, or 10/11)" }
   ),
-  stake: z.coerce.number().positive("Stake must be greater than 0"),
+  stake: z.coerce
+    .number()
+    .positive("Stake must be greater than 0")
+    .max(createBetBodyStakeMax, "Stake can't be more than $1,000,000"),
   gameDate: z.string().min(1, "Game date is required"),
   confidenceScore: z.number().min(1).max(10),
   rationale: z.string().optional(),

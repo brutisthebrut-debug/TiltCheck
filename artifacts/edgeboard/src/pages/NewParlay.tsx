@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { formatCurrency } from "@/lib/format"
 import { getApiErrorMessage } from "@/lib/api-error"
-import { createParlayBodyLegsItemOddsMax } from "@workspace/api-zod"
+import { createParlayBodyLegsItemOddsMax, createParlayBodyStakeMax } from "@workspace/api-zod"
 import {
   combineDecimalExact,
   combineDecimalBookStyle,
@@ -50,7 +50,10 @@ const legSchema = z.object({
 
 const formSchema = z.object({
   name: z.string().min(1, "Parlay name is required"),
-  stake: z.coerce.number().positive("Stake must be greater than 0"),
+  stake: z.coerce
+    .number()
+    .positive("Stake must be greater than 0")
+    .max(createParlayBodyStakeMax, "Stake can't be more than $1,000,000"),
   confidenceScore: z.number().min(1).max(10),
   rationale: z.string().optional(),
   sportsbook: z.string().optional(),
