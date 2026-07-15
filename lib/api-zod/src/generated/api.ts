@@ -1277,7 +1277,9 @@ export const GetBankrollHistoryResponse = zod.object({
  * @summary Overall performance summary for a user
  */
 export const GetStatsSummaryQueryParams = zod.object({
-  "userId": zod.coerce.number().nullish()
+  "userId": zod.coerce.number().nullish(),
+  "sport": zod.coerce.string().nullish().describe('Limit to straight bets in this sport (parlays are excluded from a sport slice)'),
+  "since": zod.coerce.string().nullish().describe('Only include plays settled on or after this date (YYYY-MM-DD)')
 })
 
 export const GetStatsSummaryResponse = zod.object({
@@ -1316,7 +1318,9 @@ export const GetStatsSummaryResponse = zod.object({
  * @summary Win/loss and ROI broken down by sport
  */
 export const GetStatsBySportQueryParams = zod.object({
-  "userId": zod.coerce.number().nullish()
+  "userId": zod.coerce.number().nullish(),
+  "sport": zod.coerce.string().nullish().describe('Limit to a single sport (returns a single-row array for that sport)'),
+  "since": zod.coerce.string().nullish().describe('Only include plays settled on or after this date (YYYY-MM-DD)')
 })
 
 export const GetStatsBySportResponseItem = zod.object({
@@ -1362,7 +1366,9 @@ export const GetRecentActivityResponse = zod.array(GetRecentActivityResponseItem
  * @summary How well confidence scores predict outcomes
  */
 export const GetConfidenceAnalysisQueryParams = zod.object({
-  "userId": zod.coerce.number().nullish()
+  "userId": zod.coerce.number().nullish(),
+  "sport": zod.coerce.string().nullish().describe('Limit to straight bets in this sport'),
+  "since": zod.coerce.string().nullish().describe('Only include plays settled on or after this date (YYYY-MM-DD)')
 })
 
 export const GetConfidenceAnalysisResponseItem = zod.object({

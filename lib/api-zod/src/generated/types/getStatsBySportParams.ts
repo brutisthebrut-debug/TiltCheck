@@ -11,4 +11,14 @@ export type GetStatsBySportParams = {
  * @nullable
  */
 userId?: number | null;
+/**
+ * Limit to a single sport (returns a single-row array for that sport)
+ * @nullable
+ */
+sport?: string | null;
+/**
+ * Only include plays settled on or after this date (YYYY-MM-DD)
+ * @nullable
+ */
+since?: string | null;
 };

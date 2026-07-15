@@ -11,4 +11,14 @@ export type GetConfidenceAnalysisParams = {
  * @nullable
  */
 userId?: number | null;
+/**
+ * Limit to straight bets in this sport
+ * @nullable
+ */
+sport?: string | null;
+/**
+ * Only include plays settled on or after this date (YYYY-MM-DD)
+ * @nullable
+ */
+since?: string | null;
 };

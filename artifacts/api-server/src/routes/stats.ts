@@ -38,6 +38,14 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
+  const sportFilter = query.data.sport ?? null;
+  const sinceParam = query.data.since ?? null;
+  if (sinceParam != null && !isRealCalendarDate(sinceParam)) {
+    res.status(400).json({ error: "since must be a real calendar date (YYYY-MM-DD)" });
+    return;
+  }
+  const sinceDate = sinceParam != null ? new Date(`${sinceParam}T00:00:00.000Z`) : null;
+
   let userId = query.data.userId;
   if (userId == null) {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
@@ -50,8 +58,21 @@ router.get("/stats/summary", async (req, res): Promise<void> => {
     return;
   }
 
-  const allBets = await db.select().from(betsTable).where(eq(betsTable.userId, userId));
-  const allParlays = await db.select().from(parlaysTable).where(eq(parlaysTable.userId, userId));
+  const allBets = await db.select().from(betsTable).where(
+    and(
+      eq(betsTable.userId, userId),
+      ...(sportFilter != null ? [eq(betsTable.sport, sportFilter)] : []),
+      ...(sinceDate != null ? [gte(betsTable.settledAt, sinceDate)] : []),
+    )
+  );
+  // A sport slice is straight-bets-only — a parlay spans sports so it can't
+  // belong to any single sport's summary.
+  const allParlays = sportFilter != null ? [] : await db.select().from(parlaysTable).where(
+    and(
+      eq(parlaysTable.userId, userId),
+      ...(sinceDate != null ? [gte(parlaysTable.settledAt, sinceDate)] : []),
+    )
+  );
   const bets = allBets.filter(hasValidOdds);
   const parlays = allParlays.filter(hasValidOdds);
 
@@ -148,6 +169,14 @@ router.get("/stats/by-sport", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
+  const sportFilter = query.data.sport ?? null;
+  const sinceParam = query.data.since ?? null;
+  if (sinceParam != null && !isRealCalendarDate(sinceParam)) {
+    res.status(400).json({ error: "since must be a real calendar date (YYYY-MM-DD)" });
+    return;
+  }
+  const sinceDate = sinceParam != null ? new Date(`${sinceParam}T00:00:00.000Z`) : null;
+
   let userId = query.data.userId;
   if (userId == null) {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
@@ -162,7 +191,12 @@ router.get("/stats/by-sport", async (req, res): Promise<void> => {
 
   const bets = (
     await db.select().from(betsTable).where(
-      and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
+      and(
+        eq(betsTable.userId, userId),
+        inArray(betsTable.status, ["won", "lost", "push"]),
+        ...(sportFilter != null ? [eq(betsTable.sport, sportFilter)] : []),
+        ...(sinceDate != null ? [gte(betsTable.settledAt, sinceDate)] : []),
+      )
     )
   ).filter(hasValidOdds);
 
@@ -264,6 +298,14 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
     res.status(400).json({ error: query.error.message });
     return;
   }
+  const sportFilter = query.data.sport ?? null;
+  const sinceParam = query.data.since ?? null;
+  if (sinceParam != null && !isRealCalendarDate(sinceParam)) {
+    res.status(400).json({ error: "since must be a real calendar date (YYYY-MM-DD)" });
+    return;
+  }
+  const sinceDate = sinceParam != null ? new Date(`${sinceParam}T00:00:00.000Z`) : null;
+
   let userId = query.data.userId;
   if (userId == null) {
     const [u] = await db.select().from(usersTable).where(userScopeCondition(req)).orderBy(usersTable.id).limit(1);
@@ -278,7 +320,12 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
 
   const bets = (
     await db.select().from(betsTable).where(
-      and(eq(betsTable.userId, userId), inArray(betsTable.status, ["won", "lost", "push"]))
+      and(
+        eq(betsTable.userId, userId),
+        inArray(betsTable.status, ["won", "lost", "push"]),
+        ...(sportFilter != null ? [eq(betsTable.sport, sportFilter)] : []),
+        ...(sinceDate != null ? [gte(betsTable.settledAt, sinceDate)] : []),
+      )
     )
   ).filter(hasValidOdds);
 

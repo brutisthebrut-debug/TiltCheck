@@ -34,11 +34,11 @@ function sinceForRange(range: string): string | undefined {
   return addDays(dayOf(new Date()), -parseInt(range, 10))
 }
 
-function lessonsStorageKey(userId: string | undefined) {
-  return userId ? `edgeboard:lessons-filter:${userId}` : null
+function lessonsStorageKey(userId: number | undefined) {
+  return userId != null ? `edgeboard:lessons-filter:${userId}` : null
 }
 
-function readLessonsFilter(userId: string | undefined): { sport: string; range: string } {
+function readLessonsFilter(userId: number | undefined): { sport: string; range: string } {
   const key = lessonsStorageKey(userId)
   if (!key) return { sport: "all", range: "all" }
   try {
@@ -56,62 +56,82 @@ function readLessonsFilter(userId: string | undefined): { sport: string; range: 
 
 export default function Stats() {
   const { activeUser } = useUser()
-  const [lessonsSport, setLessonsSport] = useState<string>(() => readLessonsFilter(activeUser?.id).sport)
-  const [lessonsRange, setLessonsRange] = useState<string>(() => readLessonsFilter(activeUser?.id).range)
+  // Page-level filters: every section (summary, charts, lessons) follows these.
+  // Persisted per-user in localStorage so the slice survives a page reload.
+  const [filterSport, setFilterSport] = useState<string>(() => readLessonsFilter(activeUser?.id).sport)
+  const [filterRange, setFilterRange] = useState<string>(() => readLessonsFilter(activeUser?.id).range)
 
   // Re-initialize from localStorage when the active user changes (e.g. account switch)
   useEffect(() => {
     const saved = readLessonsFilter(activeUser?.id)
-    setLessonsSport(saved.sport)
-    setLessonsRange(saved.range)
+    setFilterSport(saved.sport)
+    setFilterRange(saved.range)
   }, [activeUser?.id])
 
   // Persist the current filter to localStorage whenever it changes
   useEffect(() => {
     const key = lessonsStorageKey(activeUser?.id)
     if (!key) return
-    localStorage.setItem(key, JSON.stringify({ sport: lessonsSport, range: lessonsRange }))
-  }, [activeUser?.id, lessonsSport, lessonsRange])
+    localStorage.setItem(key, JSON.stringify({ sport: filterSport, range: filterRange }))
+  }, [activeUser?.id, filterSport, filterRange])
 
-  const { data: summary, isLoading: isSummaryLoading, isError: isSummaryError, refetch: refetchSummary, isRefetching: isSummaryRefetching } = useGetStatsSummary(
-    { userId: activeUser?.id },
-    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsSummaryQueryKey({ userId: activeUser?.id }) } }
-  )
-
-  const { data: sportStats = [], isLoading: isSportLoading, isError: isSportError, refetch: refetchSport, isRefetching: isSportRefetching } = useGetStatsBySport(
+  // Collect all unique sports from the unfiltered by-sport fetch (used to
+  // populate the sport picker — always shows all sports regardless of filter).
+  const { data: allSportStats = [] } = useGetStatsBySport(
     { userId: activeUser?.id },
     { query: { enabled: !!activeUser?.id, queryKey: getGetStatsBySportQueryKey({ userId: activeUser?.id }) } }
   )
 
+  const filterSince = sinceForRange(filterRange)
+  const sharedFilterParams = {
+    ...(filterSport !== "all" ? { sport: filterSport } : {}),
+    ...(filterSince ? { since: filterSince } : {}),
+  }
+
+  const summaryParams = { userId: activeUser?.id, ...sharedFilterParams }
+  const { data: summary, isLoading: isSummaryLoading, isError: isSummaryError, refetch: refetchSummary, isRefetching: isSummaryRefetching } = useGetStatsSummary(
+    summaryParams,
+    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsSummaryQueryKey(summaryParams) } }
+  )
+
+  const sportParams = { userId: activeUser?.id, ...sharedFilterParams }
+  const { data: sportStats = [], isLoading: isSportLoading, isError: isSportError, refetch: refetchSport, isRefetching: isSportRefetching } = useGetStatsBySport(
+    sportParams,
+    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsBySportQueryKey(sportParams) } }
+  )
+
+  const confidenceParams = { userId: activeUser?.id, ...sharedFilterParams }
   const { data: confidenceData = [], isLoading: isConfidenceLoading, isError: isConfidenceError, refetch: refetchConfidence, isRefetching: isConfidenceRefetching } = useGetConfidenceAnalysis(
-    { userId: activeUser?.id },
-    { query: { enabled: !!activeUser?.id, queryKey: getGetConfidenceAnalysisQueryKey({ userId: activeUser?.id }) } }
+    confidenceParams,
+    { query: { enabled: !!activeUser?.id, queryKey: getGetConfidenceAnalysisQueryKey(confidenceParams) } }
   )
 
   // If the persisted sport no longer appears in the bettor's data, fall back gracefully
   useEffect(() => {
-    if (!isSportLoading && sportStats.length > 0 && lessonsSport !== "all") {
+    if (!isSportLoading && sportStats.length > 0 && filterSport !== "all") {
       const knownSports = sportStats.map((s) => s.sport)
-      if (!knownSports.includes(lessonsSport)) {
-        setLessonsSport("all")
+      if (!knownSports.includes(filterSport)) {
+        setFilterSport("all")
       }
     }
-  }, [isSportLoading, sportStats, lessonsSport])
+  }, [isSportLoading, sportStats, filterSport])
 
   // Lessons are a Pro surface — keep the query off for free accounts so the
   // 402 never surfaces as an error state.
   const { isPro, isProLoading, isProUnknown } = useProStatus()
-  const lessonsSince = sinceForRange(lessonsRange)
   const insightsParams = {
     userId: activeUser?.id,
-    ...(lessonsSport !== "all" ? { sport: lessonsSport } : {}),
-    ...(lessonsSince ? { since: lessonsSince } : {}),
+    ...sharedFilterParams,
   }
   const { data: insights, isLoading: isInsightsLoading } = useGetStatsInsights(
     insightsParams,
     { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey(insightsParams) } }
   )
-  const lessonsFiltered = lessonsSport !== "all" || lessonsRange !== "all"
+  const isFiltered = filterSport !== "all" || filterRange !== "all"
+  // keep old alias for the lessons empty-state copy
+  const lessonsSport = filterSport
+  const lessonsRange = filterRange
+  const lessonsFiltered = isFiltered
 
   const isLoading = isSummaryLoading || isSportLoading || isConfidenceLoading
   const isError = isSummaryError || isSportError || isConfidenceError
@@ -158,7 +178,7 @@ export default function Stats() {
   const hasEnoughData = gradedBets >= INSIGHTS_THRESHOLD
   const totalBets = gradedBets + (summary.pending ?? 0)
 
-  if (totalBets === 0) {
+  if (totalBets === 0 && !isFiltered) {
     return (
       <div className="space-y-8 animate-in fade-in-50 duration-500">
         <div>
@@ -212,9 +232,46 @@ export default function Stats() {
 
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground mt-1">Deep dive into your betting performance.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-muted-foreground mt-1">Deep dive into your betting performance.</p>
+        </div>
+        {/* Page-level slice controls — every section follows these */}
+        <div className="flex flex-wrap items-center gap-2" data-testid="stats-filter-controls">
+          <Select value={filterSport} onValueChange={setFilterSport}>
+            <SelectTrigger className="h-8 w-[140px]" data-testid="select-stats-sport">
+              <SelectValue placeholder="All sports" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sports</SelectItem>
+              {[...allSportStats].map((s) => s.sport).sort().map((sport) => (
+                <SelectItem key={sport} value={sport}>{sport}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex rounded-md border overflow-hidden">
+            {[
+              { value: "30", label: "30d" },
+              { value: "90", label: "90d" },
+              { value: "all", label: "All time" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFilterRange(opt.value)}
+                data-testid={`button-stats-range-${opt.value}`}
+                className={`px-3 h-8 text-xs font-medium transition-colors ${
+                  filterRange === opt.value
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Insight unlock progress banner */}
@@ -329,8 +386,8 @@ export default function Stats() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-muted-foreground border border-dashed rounded-md">
-                No sport data yet
+              <div className="h-full flex items-center justify-center text-muted-foreground border border-dashed rounded-md text-sm text-center px-4">
+                {isFiltered ? "No graded bets in this slice — widen the filter." : "No sport data yet"}
               </div>
             )}
           </CardContent>
@@ -366,8 +423,8 @@ export default function Stats() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-muted-foreground border border-dashed rounded-md">
-                No confidence data yet
+              <div className="h-full flex items-center justify-center text-muted-foreground border border-dashed rounded-md text-sm text-center px-4">
+                {isFiltered ? "No graded bets in this slice — widen the filter." : "No confidence data yet"}
               </div>
             )}
           </CardContent>
@@ -385,42 +442,6 @@ export default function Stats() {
             Lesson Library
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-          {isPro && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={lessonsSport} onValueChange={setLessonsSport}>
-                <SelectTrigger className="h-8 w-[140px]" data-testid="select-lessons-sport">
-                  <SelectValue placeholder="All sports" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All sports</SelectItem>
-                  {[...sportStats].map((s) => s.sport).sort().map((sport) => (
-                    <SelectItem key={sport} value={sport}>{sport}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex rounded-md border overflow-hidden">
-                {[
-                  { value: "30", label: "30d" },
-                  { value: "90", label: "90d" },
-                  { value: "all", label: "All time" },
-                ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setLessonsRange(opt.value)}
-                    data-testid={`button-lessons-range-${opt.value}`}
-                    className={`px-3 h-8 text-xs font-medium transition-colors ${
-                      lessonsRange === opt.value
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:bg-muted/50"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
         {!isPro ? (
           isProLoading ? (
@@ -589,8 +610,17 @@ export default function Stats() {
         <CardContent>
           {sortedSportData.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground border border-dashed rounded-md">
-              <p className="text-sm">No graded bets yet.</p>
-              <p className="text-xs mt-1">Grade a bet to see sport-level breakdown.</p>
+              {isFiltered ? (
+                <>
+                  <p className="text-sm">No graded bets in this slice.</p>
+                  <p className="text-xs mt-1">Widen the filter to see the breakdown.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm">No graded bets yet.</p>
+                  <p className="text-xs mt-1">Grade a bet to see sport-level breakdown.</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">

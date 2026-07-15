@@ -1176,6 +1176,16 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: sport
+          in: query
+          description: Limit to straight bets in this sport (parlays are excluded from a sport slice)
+          schema:
+            type: ["string", "null"]
+        - name: since
+          in: query
+          description: Only include plays settled on or after this date (YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
       responses:
         "200":
           description: Performance summary
@@ -1194,6 +1204,16 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: sport
+          in: query
+          description: Limit to a single sport (returns a single-row array for that sport)
+          schema:
+            type: ["string", "null"]
+        - name: since
+          in: query
+          description: Only include plays settled on or after this date (YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
       responses:
         "200":
           description: Stats by sport
@@ -1235,6 +1255,16 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: sport
+          in: query
+          description: Limit to straight bets in this sport
+          schema:
+            type: ["string", "null"]
+        - name: since
+          in: query
+          description: Only include plays settled on or after this date (YYYY-MM-DD)
+          schema:
+            type: ["string", "null"]
       responses:
         "200":
           description: Confidence analysis buckets

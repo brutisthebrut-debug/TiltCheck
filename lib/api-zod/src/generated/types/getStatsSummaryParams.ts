@@ -11,4 +11,14 @@ export type GetStatsSummaryParams = {
  * @nullable
  */
 userId?: number | null;
+/**
+ * Limit to straight bets in this sport (parlays are excluded from a sport slice)
+ * @nullable
+ */
+sport?: string | null;
+/**
+ * Only include plays settled on or after this date (YYYY-MM-DD)
+ * @nullable
+ */
+since?: string | null;
 };
