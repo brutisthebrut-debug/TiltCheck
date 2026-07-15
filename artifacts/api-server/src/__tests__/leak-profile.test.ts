@@ -107,6 +107,7 @@ describe("GET /stats/leak-profile", () => {
       worstSport: null,
       overconfidence: null,
       topMissReason: null,
+      trendFlip: false,
     });
   });
 
@@ -213,5 +214,78 @@ describe("GET /stats/leak-profile", () => {
     await seedBet(fresh.id, { status: "lost", missReason: "emotional" });
     const freshRes = await request(app).get("/api/stats/leak-profile");
     expect(freshRes.body.topMissReason).toBeNull();
+  });
+
+  describe("trendFlip one-time celebration", () => {
+    it("stays false while the reported leak is still bleeding", async () => {
+      const { user, clerkUserId } = await createLinkedUser();
+      currentClerkUserId = clerkUserId;
+      // 5 recent NFL losses — worst sport reported, trend negative
+      for (let i = 0; i < 5; i++) {
+        await seedBet(user.id, { sport: "NFL", status: "lost", stake: "20.00" });
+      }
+      const res = await request(app).get("/api/stats/leak-profile");
+      expect(res.status).toBe(200);
+      expect(res.body.worstSport).not.toBeNull();
+      expect(res.body.trendFlip).toBe(false);
+
+      const [row] = await db.select().from(usersTable).where(inArray(usersTable.id, [user.id]));
+      expect(row.leakTrendCelebratedAt).toBeNull();
+    });
+
+    it("fires exactly once when the worst sport's recent window goes non-negative", async () => {
+      const { user, clerkUserId } = await createLinkedUser();
+      currentClerkUserId = clerkUserId;
+      const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+      // 5 old NFL losses = the leak; one recent NFL win = flipped window
+      for (let i = 0; i < 5; i++) {
+        await seedBet(user.id, { sport: "NFL", status: "lost", stake: "30.00", settledAt: old });
+      }
+      await seedBet(user.id, { sport: "NFL", status: "won", stake: "50.00", actualPayout: "95.45" });
+
+      const first = await request(app).get("/api/stats/leak-profile");
+      expect(first.status).toBe(200);
+      expect(first.body.worstSport.recentNet).toBeGreaterThanOrEqual(0);
+      expect(first.body.trendFlip).toBe(true);
+
+      // Persisted per user — the second visit doesn't repeat the celebration
+      const second = await request(app).get("/api/stats/leak-profile");
+      expect(second.status).toBe(200);
+      expect(second.body.trendFlip).toBe(false);
+
+      const [row] = await db.select().from(usersTable).where(inArray(usersTable.id, [user.id]));
+      expect(row.leakTrendCelebratedAt).not.toBeNull();
+    });
+
+    it("fires when the top miss reason's recent losses hit zero", async () => {
+      const { user, clerkUserId } = await createLinkedUser();
+      currentClerkUserId = clerkUserId;
+      const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+      // 3 old "emotional" losses, none recent → improving miss-reason leak
+      for (let i = 0; i < 3; i++) {
+        await seedBet(user.id, { status: "lost", missReason: "emotional", stake: "40.00", settledAt: old });
+      }
+      const res = await request(app).get("/api/stats/leak-profile");
+      expect(res.status).toBe(200);
+      expect(res.body.worstSport).toBeNull();
+      expect(res.body.topMissReason).not.toBeNull();
+      expect(res.body.topMissReason.recentCount).toBe(0);
+      expect(res.body.trendFlip).toBe(true);
+    });
+
+    it("stays false when no leak is reported at all, even with a winning window", async () => {
+      const { user, clerkUserId } = await createLinkedUser();
+      currentClerkUserId = clerkUserId;
+      await seedBet(user.id, { status: "won" });
+      const res = await request(app).get("/api/stats/leak-profile");
+      expect(res.status).toBe(200);
+      expect(res.body.worstSport).toBeNull();
+      expect(res.body.topMissReason).toBeNull();
+      expect(res.body.overconfidence).toBeNull();
+      expect(res.body.trendFlip).toBe(false);
+
+      const [row] = await db.select().from(usersTable).where(inArray(usersTable.id, [user.id]));
+      expect(row.leakTrendCelebratedAt).toBeNull();
+    });
   });
 });

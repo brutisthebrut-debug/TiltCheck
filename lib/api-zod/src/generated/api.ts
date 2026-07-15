@@ -1140,7 +1140,8 @@ export const GetLeakProfileResponse = zod.object({
   "netLoss": zod.number(),
   "recentCount": zod.number().describe('Losses graded with this reason inside the recent window'),
   "recentNetLoss": zod.number().describe('Dollars lost to this reason inside the recent window')
-}).nullable().describe('Most common self-graded miss reason across settled losses (excluding normal variance)')
+}).nullable().describe('Most common self-graded miss reason across settled losses (excluding normal variance)'),
+  "trendFlip": zod.boolean().describe('True only on the first response where the reported leak\'s trend has flipped from bleeding to non-negative — a one-time celebratory acknowledgement. The flip is recorded per user server-side, so later responses return false and the celebration never repeats.')
 })
 
 

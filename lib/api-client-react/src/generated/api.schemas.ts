@@ -667,6 +667,8 @@ export interface LeakProfile {
      * @nullable
      */
   topMissReason: LeakProfileTopMissReason;
+  /** True only on the first response where the reported leak's trend has flipped from bleeding to non-negative — a one-time celebratory acknowledgement. The flip is recorded per user server-side, so later responses return false and the celebration never repeats. */
+  trendFlip: boolean;
 }
 
 export interface EdgeFinderLane {

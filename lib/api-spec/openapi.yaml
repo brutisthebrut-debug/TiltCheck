@@ -1762,7 +1762,14 @@ components:
               type: number
               description: Dollars lost to this reason inside the recent window
           required: [reason, count, netLoss, recentCount, recentNetLoss]
-      required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason]
+        trendFlip:
+          type: boolean
+          description: >-
+            True only on the first response where the reported leak's trend has
+            flipped from bleeding to non-negative — a one-time celebratory
+            acknowledgement. The flip is recorded per user server-side, so
+            later responses return false and the celebration never repeats.
+      required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason, trendFlip]
 
     EdgeFinderLane:
       type: object

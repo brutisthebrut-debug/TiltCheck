@@ -12,6 +12,11 @@ export const usersTable = pgTable("users", {
   startingBankroll: numeric("starting_bankroll", { precision: 12, scale: 2 }).notNull().default("1000"),
   // Monday (YYYY-MM-DD, UTC) of the last recap week this user opened; null = never
   recapSeenWeek: text("recap_seen_week"),
+  // When the leak card's one-time "trend flipped" celebration was shown for
+  // this user's reported leak; null = never celebrated. Set server-side the
+  // first time the leak-profile endpoint reports an improving trend, so the
+  // acknowledgement never repeats on later visits.
+  leakTrendCelebratedAt: timestamp("leak_trend_celebrated_at", { withTimezone: true }),
   // Founder = owner of the board: can manage beta invites and see the founder
   // dashboard. Assigned to the first account that links a profile.
   isFounder: boolean("is_founder").notNull().default(false),

@@ -154,6 +154,11 @@ export default function Dashboard() {
     return null;
   })();
 
+  // One-time trend-flip celebration: the server sets trendFlip on the single
+  // response where the reported leak's trend first reads non-negative, and
+  // records it per user so it never repeats on later visits.
+  const leakCelebrating = !!leakProfile?.trendFlip && !!topLeak?.trend.improving;
+
   const isLoading = isUserLoading || isStatsLoading || isActivityLoading || isBankrollLoading;
   const isError = isStatsError || isActivityError || isBankrollError;
   const isRetrying = isStatsRefetching || isActivityRefetching || isBankrollRefetching;
@@ -386,13 +391,32 @@ export default function Dashboard() {
       {topLeak && (
         <Link href={topLeak.href} data-testid={`link-your-leak-${topLeak.key}`}>
           <Card
-            className="border-chart-2/40 bg-chart-2/10 glow-destructive transition-all duration-300 hover:scale-[1.01] hover:bg-chart-2/15 cursor-pointer"
+            className={`transition-all duration-300 hover:scale-[1.01] cursor-pointer ${
+              leakCelebrating
+                ? "border-chart-1/50 bg-chart-1/10 glow-success hover:bg-chart-1/15"
+                : "border-chart-2/40 bg-chart-2/10 glow-destructive hover:bg-chart-2/15"
+            }`}
             data-testid="card-your-leak"
           >
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.8)]" />
-                <CardTitle className="text-base text-chart-2 text-glow-destructive">Your Leak</CardTitle>
+                {leakCelebrating ? (
+                  <Trophy className="h-5 w-5 text-chart-1 drop-shadow-[0_0_8px_hsl(var(--chart-1)/0.8)]" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 text-chart-2 drop-shadow-[0_0_8px_hsl(var(--chart-2)/0.8)]" />
+                )}
+                <CardTitle className={`text-base ${leakCelebrating ? "text-chart-1 text-glow-success" : "text-chart-2 text-glow-destructive"}`}>
+                  Your Leak
+                </CardTitle>
+                {leakCelebrating && (
+                  <Badge
+                    className="border-chart-1/50 bg-chart-1/15 text-chart-1 text-glow-success"
+                    variant="outline"
+                    data-testid="badge-leak-trend-flip"
+                  >
+                    Trend flipped
+                  </Badge>
+                )}
               </div>
               <CardDescription className="text-foreground/80">{topLeak.label}</CardDescription>
             </CardHeader>
@@ -417,8 +441,13 @@ export default function Dashboard() {
                   )}
                   {topLeak.trend.text}
                 </p>
+                {leakCelebrating && (
+                  <p className="text-xs text-chart-1 text-glow-success mt-2" data-testid="text-leak-trend-flip">
+                    First green window since this leak showed up. That's the whole point — keep it boring.
+                  </p>
+                )}
               </div>
-              <div className="shrink-0 self-end sm:self-auto flex items-center gap-1 text-xs text-chart-2 whitespace-nowrap">
+              <div className={`shrink-0 self-end sm:self-auto flex items-center gap-1 text-xs whitespace-nowrap ${leakCelebrating ? "text-chart-1" : "text-chart-2"}`}>
                 {topLeak.cta}
                 <ArrowRight className="h-4 w-4" />
               </div>
