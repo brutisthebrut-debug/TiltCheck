@@ -83,6 +83,7 @@ vi.mock("@/lib/shareCard", () => ({
 
 vi.mock("@/components/StatsShareCard", () => ({
   StatsShareCard: vi.fn().mockReturnValue(null),
+  StatsShareCardPortrait: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock("@/contexts/UserContext", () => ({

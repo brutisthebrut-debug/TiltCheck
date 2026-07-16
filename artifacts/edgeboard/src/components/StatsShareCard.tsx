@@ -237,6 +237,264 @@ export const StatsShareCard = React.forwardRef<HTMLDivElement, { data: StatsCard
   }
 )
 
+// ── Portrait (9:16) variant — 1080 × 1920 for Instagram Stories / TikTok ───
+
+export const StatsShareCardPortrait = React.forwardRef<HTMLDivElement, { data: StatsCardData }>(
+  function StatsShareCardPortrait({ data }, ref) {
+    const roiColor  = data.roi > 0 ? C.green : data.roi < 0 ? C.pink : C.muted
+    const streakLabel =
+      data.currentStreakType === "none" || data.currentStreak === 0
+        ? "—"
+        : `${data.currentStreakType === "win" ? "W" : "L"}${data.currentStreak}`
+    const streakColor =
+      data.currentStreakType === "win"
+        ? C.green
+        : data.currentStreakType === "loss"
+        ? C.pink
+        : C.muted
+    const initial = (data.displayName[0] ?? "?").toUpperCase()
+    const totalDecided = data.wins + data.losses
+
+    return (
+      <div
+        ref={ref}
+        style={{
+          width: 1080,
+          height: 1920,
+          background: C.bg,
+          fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+          position: "relative",
+          overflow: "hidden",
+          boxSizing: "border-box",
+          flexShrink: 0,
+        }}
+      >
+        {/* ── Background grid decoration ─────────────────────────────────── */}
+        <div style={{
+          position: "absolute", inset: 0,
+          backgroundImage: `
+            linear-gradient(${C.border}33 1px, transparent 1px),
+            linear-gradient(90deg, ${C.border}33 1px, transparent 1px)
+          `,
+          backgroundSize: "72px 72px",
+          opacity: 0.5,
+        }} />
+
+        {/* ── Cyan glow blob top ─────────────────────────────────────────── */}
+        <div style={{
+          position: "absolute", top: -220, left: -140,
+          width: 760, height: 760,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${C.primary}18 0%, transparent 70%)`,
+          pointerEvents: "none",
+        }} />
+
+        {/* ── Pink glow blob bottom ──────────────────────────────────────── */}
+        <div style={{
+          position: "absolute", bottom: -260, right: -160,
+          width: 800, height: 800,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${C.pink}14 0%, transparent 70%)`,
+          pointerEvents: "none",
+        }} />
+
+        {/* ── Content container ─────────────────────────────────────────── */}
+        <div style={{
+          position: "relative", zIndex: 1,
+          padding: "96px 80px 88px",
+          height: "100%",
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+        }}>
+
+          {/* ── Branding top ──────────────────────────────────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {/* TC logo mark */}
+              <div style={{
+                width: 64, height: 64,
+                borderRadius: 14,
+                background: `linear-gradient(135deg, ${C.primary}, ${C.green})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 26, fontWeight: 800, color: C.bg, letterSpacing: "-0.5px",
+                flexShrink: 0,
+              }}>TC</div>
+              <span style={{
+                fontSize: 34, fontWeight: 700, color: C.fg,
+                letterSpacing: "-0.4px",
+              }}>TiltCheck</span>
+              <span style={{
+                marginLeft: 4,
+                padding: "6px 16px",
+                borderRadius: 10,
+                background: `${C.primary}20`,
+                border: `2px solid ${C.primary}40`,
+                fontSize: 20, fontWeight: 600, color: C.primary,
+                letterSpacing: "0.4px",
+              }}>EdgeBoard</span>
+            </div>
+
+            {/* Filter context */}
+            {data.filterLabel !== "All time" && (
+              <div style={{
+                padding: "8px 26px",
+                borderRadius: 32,
+                background: `${C.border}cc`,
+                border: `1px solid ${C.border}`,
+                fontSize: 22, fontWeight: 500, color: C.muted,
+                letterSpacing: "0.1px",
+              }}>{data.filterLabel}</div>
+            )}
+          </div>
+
+          {/* ── Avatar + name middle ──────────────────────────────────────── */}
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 28, marginTop: 100, marginBottom: 96, textAlign: "center",
+          }}>
+            <div style={{
+              width: 160, height: 160,
+              borderRadius: "50%",
+              background: data.avatarColor,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 68, fontWeight: 800, color: "#fff",
+              flexShrink: 0,
+              boxShadow: `0 0 0 6px ${C.bg}, 0 0 0 10px ${data.avatarColor}60`,
+            }}>{initial}</div>
+            <div>
+              <div style={{ fontSize: 60, fontWeight: 800, color: C.fg, letterSpacing: "-1.4px", lineHeight: 1.1 }}>
+                {data.displayName}
+              </div>
+              <div style={{ fontSize: 26, color: C.muted, marginTop: 14, letterSpacing: "0.2px" }}>
+                {totalDecided > 0
+                  ? `${data.wins}W – ${data.losses}L${data.pushes > 0 ? ` – ${data.pushes}P` : ""} · ${data.filterLabel}`
+                  : data.filterLabel}
+              </div>
+            </div>
+          </div>
+
+          {/* ── 2×2 metrics grid ──────────────────────────────────────────── */}
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 24, flex: 1,
+          }}>
+            <div style={{ display: "flex", gap: 24, flex: 1 }}>
+              {/* ROI */}
+              <PortraitMetricCard
+                label="ROI"
+                value={totalDecided > 0 ? pct(data.roi) : "—"}
+                valueColor={totalDecided > 0 ? roiColor : C.muted}
+                sub={totalDecided > 0 ? `on ${totalDecided} graded` : "no graded bets yet"}
+                glow={data.roi > 0 ? C.green : data.roi < 0 ? C.pink : undefined}
+              />
+              {/* Win Rate */}
+              <PortraitMetricCard
+                label="Win Rate"
+                value={totalDecided > 0 ? `${data.winRate.toFixed(1)}%` : "—"}
+                valueColor={data.winRate >= 52 ? C.green : data.winRate >= 45 ? C.fg : C.muted}
+                sub={`${data.wins}W / ${data.losses}L`}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 24, flex: 1 }}>
+              {/* Current Streak */}
+              <PortraitMetricCard
+                label="Current Streak"
+                value={streakLabel}
+                valueColor={streakColor}
+                sub={
+                  data.currentStreakType === "win"
+                    ? `${data.currentStreak}-game win streak`
+                    : data.currentStreakType === "loss"
+                    ? `${data.currentStreak}-game loss streak`
+                    : "No active streak"
+                }
+                glow={data.currentStreakType === "win" && data.currentStreak >= 3 ? C.green : undefined}
+              />
+              {/* Best Sport */}
+              <PortraitMetricCard
+                label={data.bestSport ? `Best · ${data.bestSport}` : "Best Sport"}
+                value={data.bestSport && data.bestSportRoi != null ? pct(data.bestSportRoi) : "—"}
+                valueColor={data.bestSportRoi != null && data.bestSportRoi > 0 ? C.green : C.muted}
+                sub={data.bestSport ? `ROI in ${data.bestSport}` : "no sport data"}
+              />
+            </div>
+          </div>
+
+          {/* ── Watermark bottom ──────────────────────────────────────────── */}
+          <div style={{
+            marginTop: 72,
+            paddingTop: 44,
+            borderTop: `1px solid ${C.border}`,
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+          }}>
+            <span style={{ fontSize: 26, color: C.mutedDark, letterSpacing: "0.2px" }}>
+              Track your edge at <span style={{ color: C.primary }}>EdgeBoard</span>
+            </span>
+            <span style={{ fontSize: 22, color: C.mutedDark, fontFamily: "'Space Mono', monospace" }}>
+              tiltcheck.io
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+)
+
+// ── Portrait metric card (larger type for 1080×1920 canvas) ────────────────
+
+function PortraitMetricCard({
+  label,
+  value,
+  valueColor,
+  sub,
+  glow,
+}: {
+  label: string
+  value: string
+  valueColor: string
+  sub: string
+  glow?: string
+}) {
+  return (
+    <div style={{
+      flex: 1,
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderRadius: 24,
+      padding: "44px 40px",
+      display: "flex", flexDirection: "column", gap: 16,
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Glow blob behind big value */}
+      {glow && (
+        <div style={{
+          position: "absolute", top: -40, right: -40,
+          width: 220, height: 220,
+          borderRadius: "50%",
+          background: `radial-gradient(circle, ${glow}18 0%, transparent 70%)`,
+          pointerEvents: "none",
+        }} />
+      )}
+      <div style={{ fontSize: 22, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "2px" }}>
+        {label}
+      </div>
+      <div style={{
+        fontSize: 76, fontWeight: 800, color: valueColor,
+        fontFamily: "'Space Mono', 'Courier New', monospace",
+        lineHeight: 1.1,
+        letterSpacing: "-2px",
+        textShadow: glow ? `0 0 40px ${glow}60` : undefined,
+      }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 24, color: C.mutedDark, marginTop: "auto" }}>
+        {sub}
+      </div>
+    </div>
+  )
+}
+
 // ── Individual metric card ─────────────────────────────────────────────────
 
 function MetricCard({

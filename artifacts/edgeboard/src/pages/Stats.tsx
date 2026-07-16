@@ -14,7 +14,7 @@ import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
 import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp, Users, EyeOff, Share2, Download } from "lucide-react"
-import { StatsShareCard } from "@/components/StatsShareCard"
+import { StatsShareCard, StatsShareCardPortrait } from "@/components/StatsShareCard"
 import { exportAndShare } from "@/lib/shareCard"
 
 const BAND_CONFIG: Record<string, { label: string; color: string; pct: number }> = {
@@ -252,6 +252,13 @@ export default function Stats() {
   const lessonsRange = filterRange
   const lessonsFiltered = isFiltered
 
+  // ── Share card hooks (must run before any early return) ─────────────────
+  const cardRef = useRef<HTMLDivElement>(null)
+  const portraitCardRef = useRef<HTMLDivElement>(null)
+  const [isSharing, setIsSharing] = useState(false)
+  // Export format: landscape (1200×630, Twitter/X) or story (1080×1920, IG Stories / TikTok)
+  const [shareFormat, setShareFormat] = useState<"landscape" | "story">("landscape")
+
   const isLoading = isSummaryLoading || isSportLoading || isConfidenceLoading
   const isError = isSummaryError || isSportError || isConfidenceError
   const isRetrying = isSummaryRefetching || isSportRefetching || isConfidenceRefetching
@@ -350,9 +357,6 @@ export default function Stats() {
   const sortedSportData = [...sportStats].sort((a, b) => b.totalWagered - a.totalWagered).slice(0, 7)
 
   // ── Share card ──────────────────────────────────────────────────────────
-  const cardRef = useRef<HTMLDivElement>(null)
-  const [isSharing, setIsSharing] = useState(false)
-
   // Best sport = highest ROI among sports with at least 3 decided bets
   const bestSportRow = [...sportStats]
     .filter((s) => s.wins + s.losses >= 3)
@@ -375,10 +379,12 @@ export default function Stats() {
   }
 
   async function handleShare() {
-    if (!cardRef.current) return
+    const el = shareFormat === "story" ? portraitCardRef.current : cardRef.current
+    if (!el) return
     setIsSharing(true)
     try {
-      await exportAndShare(cardRef.current, `tiltcheck-${(activeUser?.displayName ?? "stats").toLowerCase().replace(/\s+/g, "-")}.png`)
+      const slug = (activeUser?.displayName ?? "stats").toLowerCase().replace(/\s+/g, "-")
+      await exportAndShare(el, `tiltcheck-${slug}${shareFormat === "story" ? "-story" : ""}.png`)
     } catch (err) {
       console.warn("Share failed", err)
     } finally {
@@ -400,6 +406,7 @@ export default function Stats() {
       }}
     >
       <StatsShareCard ref={cardRef} data={cardData} />
+      <StatsShareCardPortrait ref={portraitCardRef} data={cardData} />
     </div>
 
     <div className="space-y-8 animate-in fade-in-50 duration-500">
@@ -434,6 +441,28 @@ export default function Stats() {
                 data-testid={`button-stats-range-${opt.value}`}
                 className={`px-3 h-8 text-xs font-medium transition-colors ${
                   filterRange === opt.value
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {/* Share format toggle: Landscape (Twitter/X) vs Story (IG/TikTok) */}
+          <div className="flex rounded-md border overflow-hidden" data-testid="stats-share-format-toggle">
+            {[
+              { value: "landscape" as const, label: "Landscape" },
+              { value: "story" as const, label: "Story" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setShareFormat(opt.value)}
+                data-testid={`button-share-format-${opt.value}`}
+                title={opt.value === "story" ? "1080×1920 · Instagram Stories, TikTok" : "1200×630 · Twitter/X, desktop"}
+                className={`px-3 h-8 text-xs font-medium transition-colors ${
+                  shareFormat === opt.value
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground hover:bg-muted/50"
                 }`}
