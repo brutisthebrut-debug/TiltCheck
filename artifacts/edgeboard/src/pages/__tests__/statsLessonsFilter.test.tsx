@@ -76,6 +76,15 @@ vi.mock("@workspace/api-client-react", () => ({
   getGetStatsPeerBenchmarksQueryKey: () => ["stats-peer-benchmarks"],
 }))
 
+// ── Stub share utilities so html2canvas never runs in tests ───────────────────
+vi.mock("@/lib/shareCard", () => ({
+  exportAndShare: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock("@/components/StatsShareCard", () => ({
+  StatsShareCard: vi.fn().mockReturnValue(null),
+}))
+
 vi.mock("@/contexts/UserContext", () => ({
   useUser: () => ({
     activeUser: { id: 7, displayName: "Test Bettor" },

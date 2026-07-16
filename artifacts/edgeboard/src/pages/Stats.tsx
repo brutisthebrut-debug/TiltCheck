@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { dayOf, addDays } from "@workspace/weeks"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { UpgradeCard } from "@/components/UpgradeCard"
@@ -13,7 +13,9 @@ import { useProStatus } from "@/hooks/use-pro"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
-import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp, Users, EyeOff } from "lucide-react"
+import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp, Users, EyeOff, Share2, Download } from "lucide-react"
+import { StatsShareCard } from "@/components/StatsShareCard"
+import { exportAndShare } from "@/lib/shareCard"
 
 const BAND_CONFIG: Record<string, { label: string; color: string; pct: number }> = {
   top_10:     { label: "Top 10%",     color: "bg-chart-1",        pct: 95 },
@@ -347,14 +349,66 @@ export default function Stats() {
 
   const sortedSportData = [...sportStats].sort((a, b) => b.totalWagered - a.totalWagered).slice(0, 7)
 
+  // ── Share card ──────────────────────────────────────────────────────────
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [isSharing, setIsSharing] = useState(false)
+
+  // Best sport = highest ROI among sports with at least 3 decided bets
+  const bestSportRow = [...sportStats]
+    .filter((s) => s.wins + s.losses >= 3)
+    .sort((a, b) => b.roi - a.roi)[0] ?? null
+
+  const cardData = {
+    displayName: activeUser?.displayName ?? "Bettor",
+    avatarColor: activeUser?.avatarColor ?? "#6366f1",
+    roi: summary.roi,
+    winRate: summary.winRate,
+    currentStreak: summary.currentStreak,
+    currentStreakType: summary.currentStreakType,
+    wins: summary.straightBetRecord.wins + summary.parlayRecord.wins,
+    losses: summary.straightBetRecord.losses + summary.parlayRecord.losses,
+    pushes: summary.straightBetRecord.pushes + summary.parlayRecord.pushes,
+    bestSport: bestSportRow?.sport ?? null,
+    bestSportRoi: bestSportRow?.roi ?? null,
+    totalWagered: summary.totalWagered,
+    filterLabel: sliceLabel() || "All time",
+  }
+
+  async function handleShare() {
+    if (!cardRef.current) return
+    setIsSharing(true)
+    try {
+      await exportAndShare(cardRef.current, `tiltcheck-${(activeUser?.displayName ?? "stats").toLowerCase().replace(/\s+/g, "-")}.png`)
+    } catch (err) {
+      console.warn("Share failed", err)
+    } finally {
+      setIsSharing(false)
+    }
+  }
+
   return (
+    <>
+    {/* Off-screen card — rendered outside the document flow so it doesn't affect layout */}
+    <div
+      aria-hidden="true"
+      style={{
+        position: "fixed",
+        top: 0,
+        left: "-9999px",
+        pointerEvents: "none",
+        zIndex: -1,
+      }}
+    >
+      <StatsShareCard ref={cardRef} data={cardData} />
+    </div>
+
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground mt-1">Deep dive into your betting performance.</p>
         </div>
-        {/* Page-level slice controls — every section follows these */}
+        {/* Page-level slice controls + share button */}
         <div className="flex flex-wrap items-center gap-2" data-testid="stats-filter-controls">
           <Select value={filterSport} onValueChange={setFilterSport}>
             <SelectTrigger className="h-8 w-[140px]" data-testid="select-stats-sport">
@@ -388,6 +442,22 @@ export default function Stats() {
               </button>
             ))}
           </div>
+          {/* Share my stats button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShare}
+            disabled={isSharing}
+            data-testid="button-share-stats"
+            className="h-8 gap-1.5 text-xs"
+          >
+            {isSharing ? (
+              <Download className="h-3.5 w-3.5 animate-pulse" />
+            ) : (
+              <Share2 className="h-3.5 w-3.5" />
+            )}
+            {isSharing ? "Generating…" : "Share my stats"}
+          </Button>
         </div>
       </div>
 
@@ -843,5 +913,6 @@ export default function Stats() {
         </CardContent>
       </Card>
     </div>
+    </>
   )
 }

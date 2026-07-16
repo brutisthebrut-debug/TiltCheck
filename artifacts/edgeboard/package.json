@@ -85,6 +85,7 @@
   },
   "dependencies": {
     "@clerk/react": "^6.12.2",
-    "@clerk/themes": "^2.4.57"
+    "@clerk/themes": "^2.4.57",
+    "html2canvas": "^1.4.1"
   }
 }
