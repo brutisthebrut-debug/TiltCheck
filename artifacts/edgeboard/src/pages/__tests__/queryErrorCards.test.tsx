@@ -75,6 +75,7 @@ const activeUser = {
   id: 1,
   name: "Test Bettor",
   displayName: "Test Bettor",
+  username: "testbettor",
   // Already seen every possible week → the Recap page never fires its
   // mark-seen mutation during these render-only tests.
   recapSeenWeek: "9999-12-27",
@@ -104,6 +105,25 @@ vi.mock("wouter", () => ({
   Redirect: () => null,
 }))
 
+// Account pulls in Clerk (sign-out on delete) and the push-notification
+// lifecycle hook; neither matters for the error-card behavior under test.
+vi.mock("@clerk/react", () => ({
+  useClerk: () => ({ signOut: vi.fn() }),
+}))
+
+vi.mock("@/hooks/useNotifications", () => ({
+  useNotifications: () => ({
+    supported: false,
+    permission: "default",
+    subscribed: false,
+    prefs: { notifyOverdue: true, notifyTilt: true, notifyCrewActivity: true },
+    loading: false,
+    requestAndSubscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+    updatePref: vi.fn(),
+  }),
+}))
+
 // ── Pages under test ─────────────────────────────────────────────────────────
 // Imported after the mocks above (vi.mock is hoisted, so order here is safe).
 
@@ -116,6 +136,7 @@ import Parlays from "../Parlays"
 import BetDetail from "../BetDetail"
 import ParlayDetail from "../ParlayDetail"
 import Recap from "../Recap"
+import Account from "../Account"
 
 function renderPage(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -144,6 +165,10 @@ const PAGE_CASES: Array<{ page: string; element: React.ReactElement; testId: str
   { page: "BetDetail", element: <BetDetail />, testId: "card-bet-detail-error" },
   { page: "ParlayDetail", element: <ParlayDetail />, testId: "card-parlay-detail-error" },
   { page: "Recap", element: <Recap />, testId: "card-recap-error" },
+  // Account's primary query is the server-verified billing status; when it
+  // fails the plan is unknown, so the page must show a neutral retry card
+  // instead of a skeleton (or worse, an upgrade pitch at a paying user).
+  { page: "Account", element: <Account />, testId: "card-account-error" },
 ]
 
 describe("every page shows its retry card when its primary query fails", () => {
@@ -173,6 +198,15 @@ describe("clicking Retry", () => {
 
     fireEvent.click(await screen.findByTestId("card-dashboard-error-retry"))
     for (const spy of spies) expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it("refetches the billing status (Account)", async () => {
+    renderPage(<Account />)
+    const spy = h.refetchSpies["useGetBillingStatus"]
+    spy.mockClear()
+
+    fireEvent.click(await screen.findByTestId("card-account-error-retry"))
+    expect(spy).toHaveBeenCalledTimes(1)
   })
 
   it("restores normal content once the response succeeds (Bets)", async () => {

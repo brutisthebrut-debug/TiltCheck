@@ -4,6 +4,7 @@ import { useClerk } from "@clerk/react"
 import { useUser } from "@/contexts/UserContext"
 import { useProStatus } from "@/hooks/use-pro"
 import { UpgradeCard } from "@/components/UpgradeCard"
+import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { ResponsibleGamblingNote } from "@/components/TrustFooter"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -343,16 +344,15 @@ export default function Account() {
       {isProLoading ? (
         <Card className="animate-pulse bg-muted/50 h-40" />
       ) : isProUnknown ? (
-        <Card className="border-dashed border-muted" data-testid="card-billing-error">
-          <CardContent className="flex flex-col items-start gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Couldn't verify your plan — connection hiccup on the billing check. Your subscription hasn't gone anywhere.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => refreshPro()} disabled={isProRefreshing} data-testid="button-recheck-billing">
-              {isProRefreshing ? "Checking..." : "Re-check"}
-            </Button>
-          </CardContent>
-        </Card>
+        // The plan check failed — never pitch an upgrade to someone who may
+        // already be paying. Neutral retry instead.
+        <QueryErrorCard
+          title="Your plan status didn't load."
+          message="Connection hiccup on the billing check — your subscription hasn't gone anywhere."
+          onRetry={() => refreshPro()}
+          isRetrying={isProRefreshing}
+          testId="card-account-error"
+        />
       ) : isPro ? (
         <Card className="border-primary/40 bg-primary/5 glow-primary" data-testid="card-pro-status">
           <CardHeader>
