@@ -18,4 +18,6 @@ export interface UpdateUserInput {
   avatarColor?: string;
   /** Preferred odds display format — follows the user across devices */
   oddsFormat?: UpdateUserInputOddsFormat;
+  /** Include my data in anonymous peer benchmarks (opt-out) */
+  includedInBenchmarks?: boolean;
 }

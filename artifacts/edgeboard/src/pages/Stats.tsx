@@ -1,5 +1,6 @@
 import { useUser } from "@/contexts/UserContext"
-import { useGetStatsSummary, useGetStatsBySport, useGetConfidenceAnalysis, useGetStatsInsights, getGetStatsSummaryQueryKey, getGetStatsBySportQueryKey, getGetConfidenceAnalysisQueryKey, getGetStatsInsightsQueryKey } from "@workspace/api-client-react"
+import { useGetStatsSummary, useGetStatsBySport, useGetConfidenceAnalysis, useGetStatsInsights, useGetStatsPeerBenchmarks, getGetStatsSummaryQueryKey, getGetStatsBySportQueryKey, getGetConfidenceAnalysisQueryKey, getGetStatsInsightsQueryKey, getGetStatsPeerBenchmarksQueryKey } from "@workspace/api-client-react"
+import type { PeerBenchmark } from "@workspace/api-client-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,7 +13,104 @@ import { useProStatus } from "@/hooks/use-pro"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
-import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp } from "lucide-react"
+import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp, Users, EyeOff } from "lucide-react"
+
+const BAND_CONFIG: Record<string, { label: string; color: string; pct: number }> = {
+  top_10:     { label: "Top 10%",     color: "bg-chart-1",        pct: 95 },
+  top_25:     { label: "Top 25%",     color: "bg-chart-1/70",     pct: 80 },
+  median:     { label: "Middle 50%",  color: "bg-muted-foreground/50", pct: 50 },
+  bottom_25:  { label: "Bottom 25%",  color: "bg-chart-2/70",     pct: 20 },
+  bottom_10:  { label: "Bottom 10%",  color: "bg-chart-2",        pct: 5  },
+}
+
+function PeerBenchmarkGrid({
+  benchmarks,
+  sampleSize,
+}: {
+  benchmarks: PeerBenchmark[]
+  sampleSize: number
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {benchmarks.map((b) => {
+          const bandCfg = b.band ? BAND_CONFIG[b.band] ?? null : null
+          const pct = b.percentile ?? bandCfg?.pct ?? 50
+          const valueStr =
+            b.userValue != null
+              ? `${b.higherIsBetter && b.userValue > 0 ? "+" : ""}${b.userValue.toFixed(1)}${b.unit}`
+              : "—"
+
+          return (
+            <Card key={b.metric} className="bg-card">
+              <CardContent className="pt-4 pb-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {b.label}
+                  </div>
+                  {bandCfg && (
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] px-1.5 py-0 shrink-0 border-0 ${
+                        b.band === "top_10" || b.band === "top_25"
+                          ? "bg-chart-1/15 text-chart-1"
+                          : b.band === "bottom_10" || b.band === "bottom_25"
+                          ? "bg-chart-2/15 text-chart-2"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {bandCfg.label}
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-2xl font-bold font-mono">
+                  {b.userValue != null ? (
+                    <span className={
+                      b.higherIsBetter
+                        ? b.userValue > 0 ? "text-chart-1" : b.userValue < 0 ? "text-chart-2" : ""
+                        : b.userValue > 50 ? "text-chart-2" : b.userValue > 25 ? "" : "text-chart-1"
+                    }>{valueStr}</span>
+                  ) : (
+                    <span className="text-muted-foreground text-lg">Not enough data</span>
+                  )}
+                </div>
+                {/* Percentile bar */}
+                <div className="space-y-1">
+                  <div className="h-2 rounded-full bg-muted overflow-hidden relative">
+                    <div
+                      className={`h-full rounded-full transition-all ${bandCfg ? bandCfg.color : "bg-muted-foreground/30"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                    {/* Median marker */}
+                    <div className="absolute top-0 left-1/2 w-px h-full bg-border/80" />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground/70">
+                    <span>{b.higherIsBetter ? "Worst" : "Best"}</span>
+                    <span>Median</span>
+                    <span>{b.higherIsBetter ? "Best" : "Worst"}</span>
+                  </div>
+                </div>
+                {b.percentile != null && (
+                  <p className="text-xs text-muted-foreground">
+                    Better than {b.percentile}% of TiltCheck bettors
+                  </p>
+                )}
+                {b.userValue == null && (
+                  <p className="text-xs text-muted-foreground">
+                    Grade more bets to unlock this metric
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+      <p className="text-xs text-muted-foreground text-right">
+        Anonymized · {sampleSize.toLocaleString()} bettors · updated weekly · excludes demo data
+      </p>
+    </div>
+  )
+}
 
 const MISS_REASON_LABELS: Record<string, string> = {
   bad_read: "Bad read",
@@ -116,9 +214,11 @@ export default function Stats() {
     }
   }, [isSportLoading, sportStats, filterSport])
 
-  // Lessons are a Pro surface — keep the query off for free accounts so the
-  // 402 never surfaces as an error state.
+  // Lessons + peer benchmarks are Pro surfaces — keep queries off for free accounts.
   const { isPro, isProLoading, isProUnknown } = useProStatus()
+  const { data: peerBenchmarks, isLoading: isPeerLoading } = useGetStatsPeerBenchmarks(
+    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsPeerBenchmarksQueryKey() } }
+  )
   const insightsParams = {
     userId: activeUser?.id,
     ...sharedFilterParams,
@@ -639,6 +739,50 @@ export default function Stats() {
             </Card>
           </div>
           </div>
+        )}
+      </div>
+
+      {/* ── vs. The Field (Pro) ────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold tracking-tight">vs. The Field</h2>
+          <Badge variant="outline" className="border-primary/50 bg-primary/15 text-primary text-[10px] px-1.5 py-0">Pro</Badge>
+        </div>
+        {!isPro ? (
+          isProLoading ? (
+            <Card className="animate-pulse bg-muted/50 h-32" />
+          ) : isProUnknown ? null : (
+            <UpgradeCard compact feature="Anonymous peer benchmarking" />
+          )
+        ) : isPeerLoading ? (
+          <Card className="animate-pulse bg-muted/50 h-44" />
+        ) : !peerBenchmarks ? null : peerBenchmarks.optedOut ? (
+          <Card className="border-dashed border-2 border-muted">
+            <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+              <EyeOff className="h-8 w-8 text-muted-foreground/50" />
+              <div>
+                <h3 className="font-semibold">You've opted out of benchmarking</h3>
+                <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+                  Turn "Include my data in anonymous benchmarks" back on in Account settings to see how you rank against the field.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : peerBenchmarks.sampleSize < 5 ? (
+          <Card className="border-dashed border-2 border-muted">
+            <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+              <Users className="h-8 w-8 text-muted-foreground/50" />
+              <div>
+                <h3 className="font-semibold">Not enough data yet</h3>
+                <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+                  Percentiles are computed once enough bettors have graded plays. Check back soon.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <PeerBenchmarkGrid benchmarks={peerBenchmarks.benchmarks} sampleSize={peerBenchmarks.sampleSize} />
         )}
       </div>
 

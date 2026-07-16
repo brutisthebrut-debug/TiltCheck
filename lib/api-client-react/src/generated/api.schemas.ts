@@ -41,6 +41,8 @@ export interface User {
   isFounder: boolean;
   /** Preferred odds display format — follows the user across devices */
   oddsFormat: UserOddsFormat;
+  /** Whether this user's data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true. */
+  includedInBenchmarks: boolean;
 }
 
 /**
@@ -262,6 +264,93 @@ export interface ActiveChallengeStandings {
   daysRemaining: number;
 }
 
+/**
+ * Percentile breakpoints for a single metric across the opted-in population
+ */
+export interface PeerBenchmarkBreakpoints {
+  /** 10th percentile (bottom 10% of the population) */
+  p10: number;
+  /** 25th percentile (bottom quartile) */
+  p25: number;
+  /** Median */
+  p50: number;
+  /** 75th percentile (top quartile) */
+  p75: number;
+  /** 90th percentile (top 10%) */
+  p90: number;
+}
+
+export type PeerBenchmarkMetric = typeof PeerBenchmarkMetric[keyof typeof PeerBenchmarkMetric];
+
+
+export const PeerBenchmarkMetric = {
+  roi: 'roi',
+  win_rate: 'win_rate',
+  calibration: 'calibration',
+  postmortem_rate: 'postmortem_rate',
+  tilt_frequency: 'tilt_frequency',
+} as const;
+
+/**
+ * The quartile band the user falls in. top_10 = top 10%, top_25 = top 25% (but not top 10%), median = middle 50%, bottom_25 = bottom 25% (but not bottom 10%), bottom_10 = bottom 10%. null when userValue is null or sampleSize is too small.
+ * @nullable
+ */
+export type PeerBenchmarkBand = typeof PeerBenchmarkBand[keyof typeof PeerBenchmarkBand] | null;
+
+
+export const PeerBenchmarkBand = {
+  top_10: 'top_10',
+  top_25: 'top_25',
+  median: 'median',
+  bottom_25: 'bottom_25',
+  bottom_10: 'bottom_10',
+} as const;
+
+/**
+ * A single metric's benchmark — the user's value plus their standing in the population
+ */
+export interface PeerBenchmark {
+  metric: PeerBenchmarkMetric;
+  /** Human-readable metric name (e.g. "Overall ROI") */
+  label: string;
+  /**
+     * The user's computed value for this metric; null when insufficient data
+     * @nullable
+     */
+  userValue: number | null;
+  /**
+     * User's estimated percentile rank (0–100); null when userValue is null
+     * @nullable
+     */
+  percentile: number | null;
+  /**
+     * The quartile band the user falls in. top_10 = top 10%, top_25 = top 25% (but not top 10%), median = middle 50%, bottom_25 = bottom 25% (but not bottom 10%), bottom_10 = bottom 10%. null when userValue is null or sampleSize is too small.
+     * @nullable
+     */
+  band: PeerBenchmarkBand;
+  breakpoints: PeerBenchmarkBreakpoints;
+  /** Display unit for values (e.g. "%" or "") */
+  unit: string;
+  /** Whether a higher value is better for this metric (false for tilt_frequency) */
+  higherIsBetter: boolean;
+}
+
+/**
+ * Peer benchmark response — the user's metrics versus the anonymized population
+ */
+export interface PeerBenchmarks {
+  /** True when the user has opted out of benchmarking — benchmarks array will be empty */
+  optedOut: boolean;
+  /** Number of users whose data was used to compute the percentile breakpoints */
+  sampleSize: number;
+  /**
+     * ISO timestamp of the last percentile computation; null before the first computation
+     * @nullable
+     */
+  computedAt: string | null;
+  benchmarks: PeerBenchmark[];
+}
+
 export interface Invite {
   id: number;
   email: string;
@@ -345,6 +434,8 @@ export interface UpdateUserInput {
   avatarColor?: string;
   /** Preferred odds display format — follows the user across devices */
   oddsFormat?: UpdateUserInputOddsFormat;
+  /** Include my data in anonymous peer benchmarks (opt-out) */
+  includedInBenchmarks?: boolean;
 }
 
 export type BetBetType = typeof BetBetType[keyof typeof BetBetType];

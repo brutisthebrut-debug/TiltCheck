@@ -28,7 +28,8 @@ export const GetCurrentUserResponse = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })
 
 
@@ -52,7 +53,8 @@ export const MarkRecapSeenResponse = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })
 
 
@@ -69,7 +71,8 @@ export const MarkLeakCelebrationSeenResponse = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })
 
 
@@ -85,7 +88,8 @@ export const ListUnclaimedUsersResponseItem = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })
 export const ListUnclaimedUsersResponse = zod.array(ListUnclaimedUsersResponseItem)
 
@@ -110,7 +114,8 @@ export const ClaimProfileResponse = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })
 
 
@@ -127,7 +132,8 @@ export const ListUsersResponseItem = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
@@ -148,7 +154,8 @@ export const UpdateUserBody = zod.object({
   "startingBankroll": zod.number().gt(updateUserBodyStartingBankrollExclusiveMin).optional(),
   "displayName": zod.string().min(1).optional(),
   "avatarColor": zod.string().optional(),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).optional().describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).optional().describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().optional().describe('Include my data in anonymous peer benchmarks (opt-out)')
 }).describe('All fields optional; only provided fields are updated')
 
 export const UpdateUserResponse = zod.object({
@@ -160,7 +167,8 @@ export const UpdateUserResponse = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })
 
 
@@ -1811,6 +1819,33 @@ export const PreBetCheckResponse = zod.object({
 
 
 /**
+ * Pro-only. Returns the signed-in bettor's key metrics (ROI, win rate, calibration, post-mortem rate, tilt frequency) compared against pre-computed platform-wide percentile breakpoints. Percentiles are computed weekly across all opted-in, non-demo users with ≥10 settled plays. The bettor's percentile band is computed server-side — raw per-user data is never exposed. Returns `opted_out: true` when the user has disabled benchmarking on their account.
+ * @summary Get the bettor's metrics ranked against anonymized platform-wide percentiles (Pro)
+ */
+export const GetStatsPeerBenchmarksResponse = zod.object({
+  "optedOut": zod.boolean().describe('True when the user has opted out of benchmarking — benchmarks array will be empty'),
+  "sampleSize": zod.number().describe('Number of users whose data was used to compute the percentile breakpoints'),
+  "computedAt": zod.string().nullable().describe('ISO timestamp of the last percentile computation; null before the first computation'),
+  "benchmarks": zod.array(zod.object({
+  "metric": zod.enum(['roi', 'win_rate', 'calibration', 'postmortem_rate', 'tilt_frequency']),
+  "label": zod.string().describe('Human-readable metric name (e.g. \"Overall ROI\")'),
+  "userValue": zod.number().nullable().describe('The user\'s computed value for this metric; null when insufficient data'),
+  "percentile": zod.number().nullable().describe('User\'s estimated percentile rank (0–100); null when userValue is null'),
+  "band": zod.union([zod.literal('top_10'),zod.literal('top_25'),zod.literal('median'),zod.literal('bottom_25'),zod.literal('bottom_10'),zod.literal(null)]).nullable().describe('The quartile band the user falls in. top_10 = top 10%, top_25 = top 25% (but not top 10%), median = middle 50%, bottom_25 = bottom 25% (but not bottom 10%), bottom_10 = bottom 10%. null when userValue is null or sampleSize is too small.\n'),
+  "breakpoints": zod.object({
+  "p10": zod.number().describe('10th percentile (bottom 10% of the population)'),
+  "p25": zod.number().describe('25th percentile (bottom quartile)'),
+  "p50": zod.number().describe('Median'),
+  "p75": zod.number().describe('75th percentile (top quartile)'),
+  "p90": zod.number().describe('90th percentile (top 10%)')
+}).describe('Percentile breakpoints for a single metric across the opted-in population'),
+  "unit": zod.string().describe('Display unit for values (e.g. \"%\" or \"\")'),
+  "higherIsBetter": zod.boolean().describe('Whether a higher value is better for this metric (false for tilt_frequency)')
+}).describe('A single metric\'s benchmark — the user\'s value plus their standing in the population'))
+}).describe('Peer benchmark response — the user\'s metrics versus the anonymized population')
+
+
+/**
  * @summary Get workspace info and members
  */
 export const GetWorkspaceResponse = zod.object({
@@ -1825,7 +1860,8 @@ export const GetWorkspaceResponse = zod.object({
   "createdAt": zod.string(),
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
-  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices')
+  "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
 })),
   "totalBets": zod.number(),
   "createdAt": zod.string()

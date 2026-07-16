@@ -8,3 +8,4 @@ export * from "./crews";
 export * from "./recapNarratives";
 export * from "./pushSubscriptions";
 export * from "./crewChallenges";
+export * from "./platformStats";

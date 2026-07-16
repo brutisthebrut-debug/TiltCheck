@@ -40,6 +40,11 @@ export const usersTable = pgTable("users", {
   // Every real-user query is scoped to isDemo=false and every demo query to
   // isDemo=true, so the two worlds never mix.
   isDemo: boolean("is_demo").notNull().default(false),
+  // Peer benchmarking opt-out. When false the user's data is excluded from
+  // the platform-wide percentile computation AND they can't see their own
+  // benchmarks (because their sample would be biased — they see the pool
+  // they opted into). Defaults true so new users are included automatically.
+  includedInBenchmarks: boolean("included_in_benchmarks").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -18,16 +18,75 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { useDeleteCurrentUser } from "@workspace/api-client-react"
+import { useDeleteCurrentUser, useUpdateUser, getGetStatsPeerBenchmarksQueryKey } from "@workspace/api-client-react"
 import { getApiErrorMessage } from "@/lib/api-error"
-import { Sparkles, ExternalLink, Crown, Check, ShieldCheck, Trash2, Bell, BellOff, BellRing } from "lucide-react"
+import { Sparkles, ExternalLink, Crown, Check, ShieldCheck, Trash2, Bell, BellOff, BellRing, Users } from "lucide-react"
 import { useNotifications } from "@/hooks/useNotifications"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { useQueryClient } from "@tanstack/react-query"
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
 const DELETE_PHRASE = "DELETE"
+
+/** Anonymous peer benchmark opt-out section. */
+function BenchmarkPrivacySection() {
+  const { activeUser, refreshUser } = useUser()
+  const queryClient = useQueryClient()
+  const [saving, setSaving] = useState(false)
+  const updateUser = useUpdateUser()
+
+  if (!activeUser) return null
+
+  const toggle = async (value: boolean) => {
+    setSaving(true)
+    try {
+      await updateUser.mutateAsync({ id: activeUser.id, data: { includedInBenchmarks: value } })
+      // Refresh the user context so the toggle reflects immediately
+      refreshUser?.()
+      // Invalidate peer benchmark cache so the Stats page picks up the change
+      queryClient.invalidateQueries({ queryKey: getGetStatsPeerBenchmarksQueryKey() })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card data-testid="card-benchmark-privacy">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          Anonymous Benchmarking
+        </CardTitle>
+        <CardDescription>
+          When enabled, your data is included in the anonymized pool used to compute platform-wide
+          percentile rankings. Only percentile bands are exposed — no individual results, no
+          identifying information. Opt out any time.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between gap-4">
+          <Label htmlFor="benchmark-opt-in" className="flex flex-col gap-0.5 cursor-pointer">
+            <span className="text-sm font-medium">Include my data in anonymous benchmarks</span>
+            <span className="text-xs text-muted-foreground font-normal">
+              {activeUser.includedInBenchmarks
+                ? "Your data is included. You can see where you rank on the Stats page (Pro)."
+                : "Opted out. Your data is excluded and benchmarks won't show on Stats."}
+            </span>
+          </Label>
+          <Switch
+            id="benchmark-opt-in"
+            checked={activeUser.includedInBenchmarks}
+            onCheckedChange={toggle}
+            disabled={saving}
+            data-testid="switch-benchmark-opt-in"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 /** Push notification preferences section on the Account page. */
 function NotificationsSection() {
@@ -394,6 +453,8 @@ export default function Account() {
           <ResponsibleGamblingNote />
         </CardContent>
       </Card>
+
+      <BenchmarkPrivacySection />
 
       <NotificationsSection />
 

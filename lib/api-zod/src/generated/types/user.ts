@@ -27,4 +27,6 @@ export interface User {
   isFounder: boolean;
   /** Preferred odds display format — follows the user across devices */
   oddsFormat: UserOddsFormat;
+  /** Whether this user's data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true. */
+  includedInBenchmarks: boolean;
 }

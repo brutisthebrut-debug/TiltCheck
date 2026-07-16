@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, inArray, gte, sql, lte } from "drizzle-orm";
 import { db, betsTable, parlaysTable, usersTable, transactionsTable, recapNarrativesTable, crewChallengesTable, crewMembersTable } from "@workspace/db";
+import { buildPeerBenchmarks } from "../lib/peerBenchmarks";
 import { metricLabel, formatMetricValue, type ChallengeMetric } from "../lib/challengeStandings";
 import {
   GetStatsSummaryQueryParams,
@@ -1304,6 +1305,29 @@ router.post(
     }
   }
 );
+
+// GET /stats/peer-benchmarks — anonymous platform-wide percentile comparison (Pro)
+router.get("/stats/peer-benchmarks", requireProfile, requirePro, async (req, res): Promise<void> => {
+  const me = req.currentUser!;
+
+  // Opted-out users get a clean response — they're not in the sample and
+  // can't view benchmarks (the pool they'd compare against excludes them).
+  if (!me.includedInBenchmarks) {
+    res.json({ optedOut: true, sampleSize: 0, computedAt: null, benchmarks: [] });
+    return;
+  }
+
+  // Lazy refresh + per-user benchmark computation. Best-effort: if the
+  // aggregate job fails (e.g. no users yet), we still return the user's
+  // own values with null percentile bands.
+  try {
+    const result = await buildPeerBenchmarks(me.id);
+    res.json({ optedOut: false, ...result });
+  } catch (err) {
+    logger.warn({ err, userId: me.id }, "Peer benchmark computation failed");
+    res.json({ optedOut: false, sampleSize: 0, computedAt: null, benchmarks: [] });
+  }
+});
 
 // In-flight narrative generations, keyed `${userId}:${weekStart}`.
 const narrativeFlights = new Map<string, Promise<string>>();

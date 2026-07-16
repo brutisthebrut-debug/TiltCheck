@@ -77,6 +77,7 @@ import type {
   ParlayLegUpdate,
   ParlaySettlement,
   ParlayUpdate,
+  PeerBenchmarks,
   PreBetCheckInput,
   PreBetCheckResult,
   RecapNarrative,
@@ -4736,6 +4737,84 @@ export const usePreBetCheck = <TError = ErrorType<void>,
       > => {
       return useMutation(getPreBetCheckMutationOptions(options));
     }
+
+export const getGetStatsPeerBenchmarksUrl = () => {
+
+
+
+
+  return `/api/stats/peer-benchmarks`
+}
+
+/**
+ * Pro-only. Returns the signed-in bettor's key metrics (ROI, win rate, calibration, post-mortem rate, tilt frequency) compared against pre-computed platform-wide percentile breakpoints. Percentiles are computed weekly across all opted-in, non-demo users with ≥10 settled plays. The bettor's percentile band is computed server-side — raw per-user data is never exposed. Returns `opted_out: true` when the user has disabled benchmarking on their account.
+ * @summary Get the bettor's metrics ranked against anonymized platform-wide percentiles (Pro)
+ */
+export const getStatsPeerBenchmarks = async ( options?: RequestInit): Promise<PeerBenchmarks> => {
+
+  return customFetch<PeerBenchmarks>(getGetStatsPeerBenchmarksUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStatsPeerBenchmarksQueryKey = () => {
+    return [
+    `/api/stats/peer-benchmarks`
+    ] as const;
+    }
+
+
+export const getGetStatsPeerBenchmarksQueryOptions = <TData = Awaited<ReturnType<typeof getStatsPeerBenchmarks>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsPeerBenchmarks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStatsPeerBenchmarksQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStatsPeerBenchmarks>>> = ({ signal }) => getStatsPeerBenchmarks({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStatsPeerBenchmarks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStatsPeerBenchmarksQueryResult = NonNullable<Awaited<ReturnType<typeof getStatsPeerBenchmarks>>>
+export type GetStatsPeerBenchmarksQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the bettor's metrics ranked against anonymized platform-wide percentiles (Pro)
+ */
+
+export function useGetStatsPeerBenchmarks<TData = Awaited<ReturnType<typeof getStatsPeerBenchmarks>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStatsPeerBenchmarks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStatsPeerBenchmarksQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetWorkspaceUrl = () => {
 

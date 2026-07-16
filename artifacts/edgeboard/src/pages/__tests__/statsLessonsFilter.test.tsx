@@ -68,10 +68,12 @@ vi.mock("@workspace/api-client-react", () => ({
   useGetStatsBySport: (...args: unknown[]) => mockUseGetStatsBySport(...args),
   useGetConfidenceAnalysis: (...args: unknown[]) => mockUseGetConfidenceAnalysis(...args),
   useGetStatsInsights: (...args: unknown[]) => mockUseGetStatsInsights(...args),
+  useGetStatsPeerBenchmarks: () => ({ data: undefined, isLoading: false }),
   getGetStatsSummaryQueryKey: (p: unknown) => ["stats-summary", p],
   getGetStatsBySportQueryKey: (p: unknown) => ["stats-by-sport", p],
   getGetConfidenceAnalysisQueryKey: (p: unknown) => ["confidence-analysis", p],
   getGetStatsInsightsQueryKey: (p: unknown) => ["stats-insights", p],
+  getGetStatsPeerBenchmarksQueryKey: () => ["stats-peer-benchmarks"],
 }))
 
 vi.mock("@/contexts/UserContext", () => ({

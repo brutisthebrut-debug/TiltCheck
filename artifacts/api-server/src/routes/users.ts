@@ -433,12 +433,13 @@ router.patch("/users/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { startingBankroll, displayName, avatarColor, oddsFormat } = parsed.data;
+  const { startingBankroll, displayName, avatarColor, oddsFormat, includedInBenchmarks } = parsed.data;
   const updateValues: Record<string, unknown> = {};
   if (startingBankroll !== undefined) updateValues.startingBankroll = String(startingBankroll);
   if (displayName !== undefined) updateValues.displayName = displayName;
   if (avatarColor !== undefined) updateValues.avatarColor = avatarColor;
   if (oddsFormat !== undefined) updateValues.oddsFormat = oddsFormat;
+  if (includedInBenchmarks !== undefined) updateValues.includedInBenchmarks = includedInBenchmarks;
 
   if (Object.keys(updateValues).length === 0) {
     res.status(400).json({ error: "No fields to update" });
@@ -468,6 +469,7 @@ function formatUser(u: typeof usersTable.$inferSelect): {
   recapSeenWeek: string | null;
   isFounder: boolean;
   oddsFormat: string;
+  includedInBenchmarks: boolean;
 } {
   return {
     id: u.id,
@@ -479,6 +481,7 @@ function formatUser(u: typeof usersTable.$inferSelect): {
     recapSeenWeek: u.recapSeenWeek,
     isFounder: u.isFounder,
     oddsFormat: u.oddsFormat,
+    includedInBenchmarks: u.includedInBenchmarks,
   };
 }
 
