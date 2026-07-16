@@ -15,7 +15,65 @@ import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
 import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp, Users, EyeOff, Share2, Download } from "lucide-react"
 import { StatsShareCard, StatsShareCardPortrait } from "@/components/StatsShareCard"
+import type { StatsCardData } from "@/components/StatsShareCard"
 import { exportAndShare } from "@/lib/shareCard"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+
+/**
+ * Scaled-down live preview of the share card. The real full-size cards stay
+ * off-screen for export; this renders a second copy shrunk with a CSS
+ * transform so the bettor sees exactly what they're about to share.
+ * Landscape = 1200×630, story = 1080×1920.
+ */
+function ScaledCardPreview({ data, format }: { data: StatsCardData; format: "landscape" | "story" }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(0)
+  const cardWidth = format === "story" ? 1080 : 1200
+  const cardHeight = format === "story" ? 1920 : 630
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const update = () => setScale(el.clientWidth / cardWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [cardWidth])
+
+  return (
+    <div
+      ref={containerRef}
+      className={`overflow-hidden rounded-lg border border-border ${format === "story" ? "w-full max-w-[240px] mx-auto" : "w-full"}`}
+      style={{ aspectRatio: `${cardWidth} / ${cardHeight}` }}
+      data-testid="share-card-preview"
+    >
+      {scale > 0 && (
+        <div
+          style={{
+            width: cardWidth,
+            height: cardHeight,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          {format === "story" ? (
+            <StatsShareCardPortrait data={data} />
+          ) : (
+            <StatsShareCard data={data} />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const BAND_CONFIG: Record<string, { label: string; color: string; pct: number }> = {
   top_10:     { label: "Top 10%",     color: "bg-chart-1",        pct: 95 },
@@ -216,6 +274,14 @@ export default function Stats() {
     }
   }, [isSportLoading, sportStats, filterSport])
 
+  // ── Share card state (must stay above the early returns — hooks order) ──
+  const cardRef = useRef<HTMLDivElement>(null)
+  const portraitCardRef = useRef<HTMLDivElement>(null)
+  const [isSharing, setIsSharing] = useState(false)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  // Export format: landscape (1200×630, Twitter/X) or story (1080×1920, IG Stories / TikTok)
+  const [shareFormat, setShareFormat] = useState<"landscape" | "story">("landscape")
+
   // Lessons + peer benchmarks are Pro surfaces — keep queries off for free accounts.
   const { isPro, isProLoading, isProUnknown } = useProStatus()
   const { data: peerBenchmarks, isLoading: isPeerLoading } = useGetStatsPeerBenchmarks(
@@ -251,13 +317,6 @@ export default function Stats() {
   const lessonsSport = filterSport
   const lessonsRange = filterRange
   const lessonsFiltered = isFiltered
-
-  // ── Share card hooks (must run before any early return) ─────────────────
-  const cardRef = useRef<HTMLDivElement>(null)
-  const portraitCardRef = useRef<HTMLDivElement>(null)
-  const [isSharing, setIsSharing] = useState(false)
-  // Export format: landscape (1200×630, Twitter/X) or story (1080×1920, IG Stories / TikTok)
-  const [shareFormat, setShareFormat] = useState<"landscape" | "story">("landscape")
 
   const isLoading = isSummaryLoading || isSportLoading || isConfidenceLoading
   const isError = isSummaryError || isSportError || isConfidenceError
@@ -378,13 +437,20 @@ export default function Stats() {
     filterLabel: sliceLabel() || "All time",
   }
 
-  async function handleShare() {
+  // Step 1: open the preview so the bettor can eyeball the card first
+  function handleShare() {
+    setIsPreviewOpen(true)
+  }
+
+  // Step 2: confirmed from the preview modal — do the actual export
+  async function handleConfirmShare() {
     const el = shareFormat === "story" ? portraitCardRef.current : cardRef.current
     if (!el) return
     setIsSharing(true)
     try {
       const slug = (activeUser?.displayName ?? "stats").toLowerCase().replace(/\s+/g, "-")
       await exportAndShare(el, `tiltcheck-${slug}${shareFormat === "story" ? "-story" : ""}.png`)
+      setIsPreviewOpen(false)
     } catch (err) {
       console.warn("Share failed", err)
     } finally {
@@ -408,6 +474,42 @@ export default function Stats() {
       <StatsShareCard ref={cardRef} data={cardData} />
       <StatsShareCardPortrait ref={portraitCardRef} data={cardData} />
     </div>
+
+    {/* Share preview modal — confirm before generating the image */}
+    <Dialog open={isPreviewOpen} onOpenChange={(open) => { if (!isSharing) setIsPreviewOpen(open) }}>
+      <DialogContent className="sm:max-w-2xl" data-testid="dialog-share-preview">
+        <DialogHeader>
+          <DialogTitle>Share my stats</DialogTitle>
+          <DialogDescription>
+            This is the card you're about to share — {cardData.filterLabel === "All time" ? "all-time numbers" : cardData.filterLabel}. Looks right?
+          </DialogDescription>
+        </DialogHeader>
+        <ScaledCardPreview data={cardData} format={shareFormat} />
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setIsPreviewOpen(false)}
+            disabled={isSharing}
+            data-testid="button-share-cancel"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmShare}
+            disabled={isSharing}
+            data-testid="button-share-confirm"
+            className="gap-1.5"
+          >
+            {isSharing ? (
+              <Download className="h-4 w-4 animate-pulse" />
+            ) : (
+              <Share2 className="h-4 w-4" />
+            )}
+            {isSharing ? "Generating…" : "Download / Share"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       <div className="flex flex-wrap items-start justify-between gap-4">
