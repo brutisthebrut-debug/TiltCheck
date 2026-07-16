@@ -404,6 +404,23 @@ export function estimatePercentile(
   return 50;
 }
 
+/**
+ * #189: the single ROI band for the Leak Profile callout. Null when the peer
+ * pool is too small (<5 contributors) or the user has no computable ROI.
+ * Callers are responsible for the opt-out / demo gating — this only computes.
+ */
+export async function getRoiBand(userId: number): Promise<string | null> {
+  const [bpMap, userVals] = await Promise.all([
+    getOrRefreshPercentiles(),
+    computeUserMetricValues(userId),
+  ]);
+  const bp = bpMap.get("roi");
+  if (!bp || bp.sampleSize < 5) return null;
+  const value = userVals["roi"];
+  if (value == null) return null;
+  return computeBand(value, "roi", bp);
+}
+
 /** Compute the full peer benchmark response for a single user. */
 export async function buildPeerBenchmarks(userId: number): Promise<{
   sampleSize: number;

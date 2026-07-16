@@ -65,8 +65,12 @@ vi.mock("@workspace/api-client-react", () => ({
 
 // ── Stub share utilities so html2canvas never runs in tests ───────────────────
 const mockExportAndShare = vi.fn().mockResolvedValue(undefined)
+const mockExportToClipboard = vi.fn().mockResolvedValue(undefined)
+const mockCanCopyImage = vi.fn().mockReturnValue(true)
 vi.mock("@/lib/shareCard", () => ({
   exportAndShare: (...args: unknown[]) => mockExportAndShare(...args),
+  exportToClipboard: (...args: unknown[]) => mockExportToClipboard(...args),
+  canCopyImage: () => mockCanCopyImage(),
 }))
 
 vi.mock("@/components/StatsShareCard", async () => {

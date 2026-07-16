@@ -476,6 +476,15 @@ export default function Workspace() {
                     </div>
                   ))}
                 </div>
+                {/* #156: calibration is the one row nobody can decode on sight — spell it out. */}
+                <p className="mt-3 text-xs text-muted-foreground leading-relaxed" data-testid="text-calibration-explainer">
+                  <span className="font-medium text-foreground/80">What's Calibration?</span>{" "}
+                  Your win rate on plays you called confident (7+) minus your win rate on the ones
+                  you didn't (3 or under). Positive means your gut actually ranks bets — when you
+                  say you love a play, you win it more often. Near zero or negative means your
+                  confidence score isn't telling you anything. Shows "—" until you've settled at
+                  least 3 plays in each bucket.
+                </p>
               </CardContent>
             </Card>
           ) : (

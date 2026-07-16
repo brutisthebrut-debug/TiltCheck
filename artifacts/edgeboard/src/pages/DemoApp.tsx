@@ -3,6 +3,7 @@ import { QueryClientProvider, MutationCache } from '@tanstack/react-query';
 import { Route, Switch, Link } from 'wouter';
 import { UrlRewriteScopedQueryClient } from '@workspace/api-client-react';
 import { setOddsFormatServerSync } from '@/hooks/use-odds-format';
+import { setLessonsFiltersServerSync } from '@/hooks/use-lessons-filters';
 import { setBillingServerSync } from '@/hooks/use-pro';
 import { setCrewActionsEnabled } from '@/hooks/use-crews';
 import { Layout } from '@/components/Layout';
@@ -42,6 +43,7 @@ export default function DemoApp() {
     // Odds-format choice stays on this device — never PATCH the read-only
     // demo API, never let the demo persona's preference overwrite it.
     setOddsFormatServerSync(false);
+    setLessonsFiltersServerSync(false);
     // The demo world is always Pro (the pitch shows the full product) and the
     // read-only demo API has no billing routes to ask.
     setBillingServerSync(false);
@@ -65,10 +67,12 @@ export default function DemoApp() {
 
   useEffect(() => {
     setOddsFormatServerSync(false);
+    setLessonsFiltersServerSync(false);
     setBillingServerSync(false);
     setCrewActionsEnabled(false);
     return () => {
       setOddsFormatServerSync(true);
+      setLessonsFiltersServerSync(true);
       setBillingServerSync(true);
       setCrewActionsEnabled(true);
     };

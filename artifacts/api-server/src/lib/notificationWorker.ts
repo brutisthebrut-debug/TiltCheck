@@ -21,6 +21,7 @@ import {
 import { and, eq, lt, gte, inArray, isNotNull } from "drizzle-orm";
 import { dayOf } from "@workspace/weeks";
 import { logger } from "./logger";
+import { getOrRefreshPercentiles } from "./peerBenchmarks";
 
 // ── VAPID setup ────────────────────────────────────────────────────────────
 
@@ -76,7 +77,15 @@ const TILT_MIN_LOSSES = 2;
 const TILT_MIN_PLAYS = 3;
 const TILT_STAKE_RATIO = 1.5;
 
-async function hasTiltSpiral(userId: number): Promise<boolean> {
+/** Details of an active tilt spiral, used to explain WHY the warning fired (#183). */
+type TiltSpiralDetails = {
+  recentLosses: number;
+  rapidPlays: number;
+  stakeRatio: number;
+  windowHours: number;
+};
+
+async function getTiltSpiral(userId: number): Promise<TiltSpiralDetails | null> {
   // Step 1: avg stake (lifetime) for meaningful comparison
   const allBets = await db
     .select({ stake: betsTable.stake, status: betsTable.status, settledAt: betsTable.settledAt })
@@ -88,9 +97,9 @@ async function hasTiltSpiral(userId: number): Promise<boolean> {
     .where(and(eq(parlaysTable.userId, userId), isNotNull(parlaysTable.settledAt)));
 
   const settled = [...allBets, ...allParlays];
-  if (settled.length < 5) return false; // not enough history
+  if (settled.length < 5) return null; // not enough history
   const avgStake = settled.reduce((s, r) => s + Number(r.stake), 0) / settled.length;
-  if (avgStake <= 0) return false;
+  if (avgStake <= 0) return null;
 
   // Step 2: recent losses
   const tiltCutoff = new Date(Date.now() - TILT_WINDOW_HOURS * 60 * 60 * 1000);
@@ -98,7 +107,7 @@ async function hasTiltSpiral(userId: number): Promise<boolean> {
     .filter((r) => r.status === "lost" && r.settledAt != null && r.settledAt >= tiltCutoff)
     .map((r) => r.settledAt!.getTime())
     .sort((a, b) => a - b);
-  if (recentLossTimes.length < TILT_MIN_LOSSES) return false;
+  if (recentLossTimes.length < TILT_MIN_LOSSES) return null;
 
   // Step 3: burst of plays since first loss
   const firstLossAt = new Date(recentLossTimes[0]);
@@ -111,10 +120,17 @@ async function hasTiltSpiral(userId: number): Promise<boolean> {
     .from(parlaysTable)
     .where(and(eq(parlaysTable.userId, userId), gte(parlaysTable.createdAt, firstLossAt)));
   const burst = [...burstBets, ...burstParlays];
-  if (burst.length < TILT_MIN_PLAYS) return false;
+  if (burst.length < TILT_MIN_PLAYS) return null;
 
   const burstAvgStake = burst.reduce((s, r) => s + Number(r.stake), 0) / burst.length;
-  return burstAvgStake / avgStake >= TILT_STAKE_RATIO;
+  const stakeRatio = burstAvgStake / avgStake;
+  if (stakeRatio < TILT_STAKE_RATIO) return null;
+  return {
+    recentLosses: recentLossTimes.length,
+    rapidPlays: burst.length,
+    stakeRatio: Math.round(stakeRatio * 10) / 10,
+    windowHours: TILT_WINDOW_HOURS,
+  };
 }
 
 // ── Overdue bet detection ─────────────────────────────────────────────────
@@ -240,6 +256,16 @@ const TILT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const CREW_COOLDOWN_MS = 15 * 60 * 1000;
 
 async function runNotificationCheck() {
+  // #190: scheduled peer-benchmark refresh. getOrRefreshPercentiles is
+  // staleness-guarded (7-day window) and singleflighted, so calling it every
+  // tick is cheap — it only recomputes when the pool snapshot has aged out.
+  // This keeps benchmarks fresh even when nobody loads the page.
+  try {
+    await getOrRefreshPercentiles();
+  } catch (err) {
+    logger.warn({ err }, "Notification worker: scheduled benchmark refresh failed");
+  }
+
   if (!vapidConfigured) return;
 
   const subs = await db
@@ -273,10 +299,13 @@ async function runNotificationCheck() {
       const cooldownPassed =
         !sub.lastTiltNotifiedAt ||
         Date.now() - sub.lastTiltNotifiedAt.getTime() >= TILT_COOLDOWN_MS;
-      if (cooldownPassed && (await hasTiltSpiral(user.id))) {
+      const spiral = cooldownPassed ? await getTiltSpiral(user.id) : null;
+      if (spiral) {
+        // #183: say WHY — cite the losses, the burst, and the stake escalation
+        // so the warning reads as evidence, not a vibe.
         await sendPush(sub, {
           title: "TiltCheck · Heads up",
-          body: "Your recent plays match your tilt pattern. Take a breath before the next one.",
+          body: `${spiral.recentLosses} losses in the last ${spiral.windowHours}h, ${spiral.rapidPlays} quick plays since, stakes ${spiral.stakeRatio}x your usual. That's your tilt pattern — take a breath before the next one.`,
           url: "/stats",
           tag: "tilt",
         });
@@ -314,9 +343,14 @@ async function runNotificationCheck() {
 
 export function startNotificationWorker() {
   ensureVapid();
-  if (!vapidConfigured) return;
-
-  logger.info("Notification worker started (15-min interval)");
+  // Even without VAPID keys the worker still runs: push sends are skipped
+  // inside runNotificationCheck, but the scheduled benchmark refresh (#190)
+  // must keep the peer pool fresh regardless of push configuration.
+  logger.info(
+    vapidConfigured
+      ? "Notification worker started (15-min interval)"
+      : "Notification worker started without VAPID keys (benchmark refresh only)"
+  );
 
   // First check after a short warm-up delay, then every 15 min
   setTimeout(() => {

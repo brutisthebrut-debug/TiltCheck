@@ -47,4 +47,9 @@ export interface LeakProfile {
   tiltSpiral: LeakProfileTiltSpiral;
   /** True while the one-time "trend flipped" celebration is available: the reported leak's trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST /users/me/leak-celebration-seen, after which responses return false and the celebration never repeats. */
   trendFlip: boolean;
+  /**
+     * Where this bettor's ROI sits against the anonymous peer pool — one of top_10, top_25, median, bottom_25, bottom_10. Null when the bettor opted out of benchmarks, the peer pool is too small (under 5 contributors), or the bettor has no computable ROI yet.
+     * @nullable
+     */
+  roiBand: string | null;
 }

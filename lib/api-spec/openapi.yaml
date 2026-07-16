@@ -2010,7 +2010,16 @@ components:
             benchmark percentile pool. When false the user also cannot view
             their own benchmarks (opting out removes them from the sample they
             would be compared against). Defaults true.
-      required: [id, username, displayName, avatarColor, startingBankroll, createdAt, isFounder, oddsFormat, includedInBenchmarks]
+        lessonsResultFilter:
+          type: string
+          description: Saved Lessons-page result filter ("all", "won", "lost", "push") — follows the user across devices
+        lessonsQualityFilter:
+          type: string
+          description: Saved Lessons-page reasoning-quality filter ("all", "sound", "flawed", "ungraded")
+        lessonsReasonFilter:
+          type: string
+          description: Saved Lessons-page miss-reason filter ("all" or a miss-reason key like "bad_read")
+      required: [id, username, displayName, avatarColor, startingBankroll, createdAt, isFounder, oddsFormat, includedInBenchmarks, lessonsResultFilter, lessonsQualityFilter, lessonsReasonFilter]
 
     BillingStatus:
       type: object
@@ -2438,6 +2447,18 @@ components:
         includedInBenchmarks:
           type: boolean
           description: Include my data in anonymous peer benchmarks (opt-out)
+        lessonsResultFilter:
+          type: string
+          enum: [all, won, lost, push]
+          description: Saved Lessons-page result filter — follows the user across devices
+        lessonsQualityFilter:
+          type: string
+          enum: [all, sound, flawed, ungraded]
+          description: Saved Lessons-page reasoning-quality filter
+        lessonsReasonFilter:
+          type: string
+          maxLength: 64
+          description: Saved Lessons-page miss-reason filter ("all" or a miss-reason key)
 
     NeedsSettling:
       type: object
@@ -3019,7 +3040,14 @@ components:
             consumes the celebration — clients that render the card must POST
             /users/me/leak-celebration-seen, after which responses return
             false and the celebration never repeats.
-      required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason, tiltSpiral, trendFlip]
+        roiBand:
+          type: ["string", "null"]
+          description: >-
+            Where this bettor's ROI sits against the anonymous peer pool —
+            one of top_10, top_25, median, bottom_25, bottom_10. Null when
+            the bettor opted out of benchmarks, the peer pool is too small
+            (under 5 contributors), or the bettor has no computable ROI yet.
+      required: [settledCount, recentWindowDays, avgStake, lastLossAt, worstSport, overconfidence, topMissReason, tiltSpiral, trendFlip, roiBand]
 
     EdgeFinderLane:
       type: object

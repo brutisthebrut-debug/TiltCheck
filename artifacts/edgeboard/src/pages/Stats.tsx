@@ -16,7 +16,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { BarChart2, Plus, Lock, Lightbulb, CheckCircle2, XCircle, ArrowRight, Target, TrendingUp, Users, EyeOff, Share2, Download } from "lucide-react"
 import { StatsShareCard, StatsShareCardPortrait } from "@/components/StatsShareCard"
 import type { StatsCardData } from "@/components/StatsShareCard"
-import { exportAndShare } from "@/lib/shareCard"
+import { exportAndShare, exportToClipboard, canCopyImage } from "@/lib/shareCard"
 import {
   Dialog,
   DialogContent,
@@ -279,8 +279,25 @@ export default function Stats() {
   const portraitCardRef = useRef<HTMLDivElement>(null)
   const [isSharing, setIsSharing] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-  // Export format: landscape (1200×630, Twitter/X) or story (1080×1920, IG Stories / TikTok)
-  const [shareFormat, setShareFormat] = useState<"landscape" | "story">("landscape")
+  // Export format: landscape (1200×630, Twitter/X) or story (1080×1920, IG Stories / TikTok).
+  // #196: remembered per device — a Stories person shouldn't re-pick every visit.
+  const [shareFormat, setShareFormatState] = useState<"landscape" | "story">(() => {
+    try {
+      return localStorage.getItem("edgeboard-share-format") === "story" ? "story" : "landscape"
+    } catch {
+      return "landscape"
+    }
+  })
+  function setShareFormat(format: "landscape" | "story") {
+    setShareFormatState(format)
+    try {
+      localStorage.setItem("edgeboard-share-format", format)
+    } catch {
+      // storage unavailable — preference just won't stick
+    }
+  }
+  // #195: clipboard copy state — idle / copying / copied / failed
+  const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "failed">("idle")
 
   // Lessons + peer benchmarks are Pro surfaces — keep queries off for free accounts.
   const { isPro, isProLoading, isProUnknown } = useProStatus()
@@ -442,6 +459,22 @@ export default function Stats() {
     setIsPreviewOpen(true)
   }
 
+  // #195: copy the card image straight to the clipboard from the preview
+  async function handleCopyImage() {
+    const el = shareFormat === "story" ? portraitCardRef.current : cardRef.current
+    if (!el) return
+    setCopyState("copying")
+    try {
+      await exportToClipboard(el)
+      setCopyState("copied")
+      setTimeout(() => setCopyState((s) => (s === "copied" ? "idle" : s)), 2500)
+    } catch (err) {
+      console.warn("Copy image failed", err)
+      setCopyState("failed")
+      setTimeout(() => setCopyState((s) => (s === "failed" ? "idle" : s)), 3500)
+    }
+  }
+
   // Step 2: confirmed from the preview modal — do the actual export
   async function handleConfirmShare() {
     const el = shareFormat === "story" ? portraitCardRef.current : cardRef.current
@@ -485,6 +518,11 @@ export default function Stats() {
           </DialogDescription>
         </DialogHeader>
         <ScaledCardPreview data={cardData} format={shareFormat} />
+        {copyState === "failed" && (
+          <p className="text-xs text-destructive" data-testid="text-copy-failed">
+            Couldn't copy the image — your browser may not allow it. Use Download / Share instead.
+          </p>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
@@ -494,6 +532,17 @@ export default function Stats() {
           >
             Cancel
           </Button>
+          {canCopyImage() && (
+            <Button
+              variant="outline"
+              onClick={handleCopyImage}
+              disabled={isSharing || copyState === "copying"}
+              data-testid="button-share-copy"
+              className="gap-1.5"
+            >
+              {copyState === "copied" ? "Copied ✓" : copyState === "copying" ? "Copying…" : "Copy image"}
+            </Button>
+          )}
           <Button
             onClick={handleConfirmShare}
             disabled={isSharing}

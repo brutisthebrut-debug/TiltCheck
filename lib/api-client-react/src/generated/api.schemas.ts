@@ -43,6 +43,12 @@ export interface User {
   oddsFormat: UserOddsFormat;
   /** Whether this user's data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true. */
   includedInBenchmarks: boolean;
+  /** Saved Lessons-page result filter ("all", "won", "lost", "push") — follows the user across devices */
+  lessonsResultFilter: string;
+  /** Saved Lessons-page reasoning-quality filter ("all", "sound", "flawed", "ungraded") */
+  lessonsQualityFilter: string;
+  /** Saved Lessons-page miss-reason filter ("all" or a miss-reason key like "bad_read") */
+  lessonsReasonFilter: string;
 }
 
 /**
@@ -424,6 +430,32 @@ export const UpdateUserInputOddsFormat = {
 } as const;
 
 /**
+ * Saved Lessons-page result filter — follows the user across devices
+ */
+export type UpdateUserInputLessonsResultFilter = typeof UpdateUserInputLessonsResultFilter[keyof typeof UpdateUserInputLessonsResultFilter];
+
+
+export const UpdateUserInputLessonsResultFilter = {
+  all: 'all',
+  won: 'won',
+  lost: 'lost',
+  push: 'push',
+} as const;
+
+/**
+ * Saved Lessons-page reasoning-quality filter
+ */
+export type UpdateUserInputLessonsQualityFilter = typeof UpdateUserInputLessonsQualityFilter[keyof typeof UpdateUserInputLessonsQualityFilter];
+
+
+export const UpdateUserInputLessonsQualityFilter = {
+  all: 'all',
+  sound: 'sound',
+  flawed: 'flawed',
+  ungraded: 'ungraded',
+} as const;
+
+/**
  * All fields optional; only provided fields are updated
  */
 export interface UpdateUserInput {
@@ -436,6 +468,15 @@ export interface UpdateUserInput {
   oddsFormat?: UpdateUserInputOddsFormat;
   /** Include my data in anonymous peer benchmarks (opt-out) */
   includedInBenchmarks?: boolean;
+  /** Saved Lessons-page result filter — follows the user across devices */
+  lessonsResultFilter?: UpdateUserInputLessonsResultFilter;
+  /** Saved Lessons-page reasoning-quality filter */
+  lessonsQualityFilter?: UpdateUserInputLessonsQualityFilter;
+  /**
+     * Saved Lessons-page miss-reason filter ("all" or a miss-reason key)
+     * @maxLength 64
+     */
+  lessonsReasonFilter?: string;
 }
 
 export type BetBetType = typeof BetBetType[keyof typeof BetBetType];
@@ -1057,6 +1098,11 @@ export interface LeakProfile {
   tiltSpiral: LeakProfileTiltSpiral;
   /** True while the one-time "trend flipped" celebration is available: the reported leak's trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST /users/me/leak-celebration-seen, after which responses return false and the celebration never repeats. */
   trendFlip: boolean;
+  /**
+     * Where this bettor's ROI sits against the anonymous peer pool — one of top_10, top_25, median, bottom_25, bottom_10. Null when the bettor opted out of benchmarks, the peer pool is too small (under 5 contributors), or the bettor has no computable ROI yet.
+     * @nullable
+     */
+  roiBand: string | null;
 }
 
 export interface EdgeFinderLane {

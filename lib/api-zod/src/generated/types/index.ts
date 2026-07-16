@@ -145,6 +145,8 @@ export * from './unsubscribePushInput';
 export * from './updateNotificationPreferences200';
 export * from './updateNotificationPrefsInput';
 export * from './updateUserInput';
+export * from './updateUserInputLessonsQualityFilter';
+export * from './updateUserInputLessonsResultFilter';
 export * from './updateUserInputOddsFormat';
 export * from './user';
 export * from './userOddsFormat';

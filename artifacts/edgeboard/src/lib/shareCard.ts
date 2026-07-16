@@ -6,10 +6,8 @@
  * desktop or when the Share API is unavailable/doesn't support files.
  */
 
-export async function exportAndShare(
-  cardEl: HTMLElement,
-  filename = "tiltcheck-stats.png",
-): Promise<void> {
+/** Snapshot a card element to a PNG blob (shared by share, download, and clipboard paths). */
+async function renderCardBlob(cardEl: HTMLElement): Promise<Blob> {
   // Dynamic import keeps html2canvas out of the main bundle.
   const html2canvas = (await import("html2canvas")).default
 
@@ -24,13 +22,40 @@ export async function exportAndShare(
     logging: false,
   })
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
+  return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((b) => {
       if (b) resolve(b)
       else reject(new Error("canvas.toBlob returned null"))
     }, "image/png")
   })
+}
 
+/** Whether this browser can copy a PNG to the clipboard. */
+export function canCopyImage(): boolean {
+  return (
+    typeof ClipboardItem !== "undefined" &&
+    typeof navigator.clipboard?.write === "function"
+  )
+}
+
+/**
+ * #195: copy the card straight to the clipboard as a PNG.
+ * Throws when the browser refuses (unsupported, permission denied) — the
+ * caller surfaces the failure; silent fallbacks would lie about the copy.
+ */
+export async function exportToClipboard(cardEl: HTMLElement): Promise<void> {
+  if (!canCopyImage()) throw new Error("Clipboard image copy not supported in this browser")
+  // Safari requires the ClipboardItem to be constructed with a promise that
+  // resolves inside the user-gesture window, so pass the pending blob.
+  const item = new ClipboardItem({ "image/png": renderCardBlob(cardEl) })
+  await navigator.clipboard.write([item])
+}
+
+export async function exportAndShare(
+  cardEl: HTMLElement,
+  filename = "tiltcheck-stats.png",
+): Promise<void> {
+  const blob = await renderCardBlob(cardEl)
   const file = new File([blob], filename, { type: "image/png" })
 
   // ── Mobile: Web Share API ────────────────────────────────────────────────

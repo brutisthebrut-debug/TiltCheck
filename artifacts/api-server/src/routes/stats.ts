@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, inArray, gte, sql, lte } from "drizzle-orm";
 import { db, betsTable, parlaysTable, usersTable, transactionsTable, recapNarrativesTable, crewChallengesTable, crewMembersTable } from "@workspace/db";
-import { buildPeerBenchmarks } from "../lib/peerBenchmarks";
+import { buildPeerBenchmarks, getRoiBand } from "../lib/peerBenchmarks";
 import { metricLabel, formatMetricValue, type ChallengeMetric } from "../lib/challengeStandings";
 import {
   GetStatsSummaryQueryParams,
@@ -803,6 +803,20 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
   const trendFlip =
     topLeakImproving && !isDemoRequest(req) && req.currentUser!.leakTrendCelebratedAt == null;
 
+  // #189: where this bettor's ROI sits against the anonymous peer pool.
+  // Gated exactly like the benchmarks endpoint: opted-out users see nothing
+  // (they're not in the sample they'd be compared against) and demo requests
+  // never touch the platform pool. Failure here must never break the profile.
+  let roiBand: string | null = null;
+  if (!isDemoRequest(req) && req.currentUser!.includedInBenchmarks) {
+    try {
+      roiBand = await getRoiBand(self);
+    } catch (err) {
+      req.log?.warn?.({ err }, "leak-profile: roiBand computation failed");
+      roiBand = null;
+    }
+  }
+
   res.json({
     settledCount,
     recentWindowDays: RECENT_WINDOW_DAYS,
@@ -813,6 +827,7 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
     topMissReason,
     tiltSpiral,
     trendFlip,
+    roiBand,
   });
 });
 

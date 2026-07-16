@@ -27,6 +27,12 @@ vi.mock("@/contexts/UserContext", () => ({
   useUser: () => ({ activeUser, allUsers: [], isLoading: false, needsClaim: false, refreshUser: () => {} }),
 }))
 
+// Filter persistence is covered by lessonsFilterSync.test.tsx — here it's a no-op.
+vi.mock("@/hooks/use-lessons-filters", () => ({
+  useSaveLessonsFilters: () => () => {},
+  setLessonsFiltersServerSync: () => {},
+}))
+
 function queryResult(data: unknown) {
   return { data, isLoading: false, isError: false, refetch: vi.fn(), isRefetching: false }
 }

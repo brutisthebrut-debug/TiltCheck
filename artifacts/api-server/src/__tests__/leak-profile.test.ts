@@ -103,6 +103,7 @@ describe("GET /stats/leak-profile", () => {
     expect(res.body).toEqual({
       settledCount: 0,
       recentWindowDays: 30,
+      roiBand: null,
       avgStake: null,
       lastLossAt: null,
       worstSport: null,

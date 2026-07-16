@@ -79,6 +79,8 @@ vi.mock("@workspace/api-client-react", () => ({
 // ── Stub share utilities so html2canvas never runs in tests ───────────────────
 vi.mock("@/lib/shareCard", () => ({
   exportAndShare: vi.fn().mockResolvedValue(undefined),
+  exportToClipboard: vi.fn().mockResolvedValue(undefined),
+  canCopyImage: () => true,
 }))
 
 vi.mock("@/components/StatsShareCard", () => ({

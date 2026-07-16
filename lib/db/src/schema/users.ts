@@ -23,6 +23,11 @@ export const usersTable = pgTable("users", {
   // Preferred odds display format ("american" | "decimal"). Stored on the
   // profile so the choice follows the user across devices.
   oddsFormat: text("odds_format").notNull().default("american"),
+  // Saved Lessons-page filters ("all" by default) — stored on the profile so
+  // the bettor's filter view follows them across devices (#167).
+  lessonsResultFilter: text("lessons_result_filter").notNull().default("all"),
+  lessonsQualityFilter: text("lessons_quality_filter").notNull().default("all"),
+  lessonsReasonFilter: text("lessons_reason_filter").notNull().default("all"),
   // TiltCheck Pro: end of the server-verified subscription horizon. Written
   // only by the billing routes after the payment provider confirms an active
   // membership — never from client state. Acts as a bounded cache (max ~24h)

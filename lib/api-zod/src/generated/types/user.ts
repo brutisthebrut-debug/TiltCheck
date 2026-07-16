@@ -29,4 +29,10 @@ export interface User {
   oddsFormat: UserOddsFormat;
   /** Whether this user's data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true. */
   includedInBenchmarks: boolean;
+  /** Saved Lessons-page result filter ("all", "won", "lost", "push") — follows the user across devices */
+  lessonsResultFilter: string;
+  /** Saved Lessons-page reasoning-quality filter ("all", "sound", "flawed", "ungraded") */
+  lessonsQualityFilter: string;
+  /** Saved Lessons-page miss-reason filter ("all" or a miss-reason key like "bad_read") */
+  lessonsReasonFilter: string;
 }

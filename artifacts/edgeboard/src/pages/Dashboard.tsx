@@ -553,6 +553,21 @@ export default function Dashboard() {
                     First green window since this leak showed up. That's the whole point — keep it boring.
                   </p>
                 )}
+                {/* #189: perspective line — a leak reads differently when you're
+                    still beating the room vs. bleeding at the bottom of it. */}
+                {(leakProfile?.roiBand === "top_10" || leakProfile?.roiBand === "top_25") && (
+                  <p className="text-xs text-muted-foreground mt-2" data-testid="text-leak-roi-band">
+                    Perspective: even with this leak, your ROI is in the{" "}
+                    {leakProfile.roiBand === "top_10" ? "top 10%" : "top quartile"} of the board.
+                    Plug it and you're playing with house money.
+                  </p>
+                )}
+                {(leakProfile?.roiBand === "bottom_25" || leakProfile?.roiBand === "bottom_10") && (
+                  <p className="text-xs text-muted-foreground mt-2" data-testid="text-leak-roi-band">
+                    Your ROI sits in the bottom {leakProfile.roiBand === "bottom_10" ? "10%" : "quartile"} of
+                    the board — this leak is the most fixable reason why.
+                  </p>
+                )}
               </div>
               <div className={`shrink-0 self-end sm:self-auto flex items-center gap-1 text-xs whitespace-nowrap ${leakCelebrating ? "text-chart-1" : "text-chart-2"}`}>
                 {topLeak.cta}

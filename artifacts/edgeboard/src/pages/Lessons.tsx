@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useUser } from "@/contexts/UserContext"
+import { useSaveLessonsFilters } from "@/hooks/use-lessons-filters"
 import { useGetLessons, getGetLessonsQueryKey } from "@workspace/api-client-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -64,9 +65,34 @@ function Chip({ active, onClick, children, testId }: {
 
 export default function Lessons() {
   const { activeUser } = useUser()
-  const [resultFilter, setResultFilter] = useState<string>("all")
-  const [qualityFilter, setQualityFilter] = useState<string>("all")
-  const [reasonFilter, setReasonFilter] = useState<string>("all")
+  const saveFilters = useSaveLessonsFilters()
+  const [resultFilter, setResultFilterState] = useState<string>("all")
+  const [qualityFilter, setQualityFilterState] = useState<string>("all")
+  const [reasonFilter, setReasonFilterState] = useState<string>("all")
+
+  // #167: hydrate once from the profile's saved view (server is the source of
+  // truth across devices), then never overwrite an in-session choice.
+  const hydratedRef = useRef(false)
+  useEffect(() => {
+    if (hydratedRef.current || !activeUser) return
+    hydratedRef.current = true
+    setResultFilterState(activeUser.lessonsResultFilter ?? "all")
+    setQualityFilterState(activeUser.lessonsQualityFilter ?? "all")
+    setReasonFilterState(activeUser.lessonsReasonFilter ?? "all")
+  }, [activeUser])
+
+  const setResultFilter = (v: string) => {
+    setResultFilterState(v)
+    saveFilters({ lessonsResultFilter: v as "all" | "won" | "lost" | "push" })
+  }
+  const setQualityFilter = (v: string) => {
+    setQualityFilterState(v)
+    saveFilters({ lessonsQualityFilter: v as "all" | "sound" | "flawed" | "ungraded" })
+  }
+  const setReasonFilter = (v: string) => {
+    setReasonFilterState(v)
+    saveFilters({ lessonsReasonFilter: v })
+  }
 
   const { data, isLoading, isError, refetch, isRefetching } = useGetLessons(
     { userId: activeUser?.id },

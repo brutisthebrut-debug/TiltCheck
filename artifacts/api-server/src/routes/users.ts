@@ -433,13 +433,16 @@ router.patch("/users/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { startingBankroll, displayName, avatarColor, oddsFormat, includedInBenchmarks } = parsed.data;
+  const { startingBankroll, displayName, avatarColor, oddsFormat, includedInBenchmarks, lessonsResultFilter, lessonsQualityFilter, lessonsReasonFilter } = parsed.data;
   const updateValues: Record<string, unknown> = {};
   if (startingBankroll !== undefined) updateValues.startingBankroll = String(startingBankroll);
   if (displayName !== undefined) updateValues.displayName = displayName;
   if (avatarColor !== undefined) updateValues.avatarColor = avatarColor;
   if (oddsFormat !== undefined) updateValues.oddsFormat = oddsFormat;
   if (includedInBenchmarks !== undefined) updateValues.includedInBenchmarks = includedInBenchmarks;
+  if (lessonsResultFilter !== undefined) updateValues.lessonsResultFilter = lessonsResultFilter;
+  if (lessonsQualityFilter !== undefined) updateValues.lessonsQualityFilter = lessonsQualityFilter;
+  if (lessonsReasonFilter !== undefined) updateValues.lessonsReasonFilter = lessonsReasonFilter;
 
   if (Object.keys(updateValues).length === 0) {
     res.status(400).json({ error: "No fields to update" });
@@ -470,6 +473,9 @@ function formatUser(u: typeof usersTable.$inferSelect): {
   isFounder: boolean;
   oddsFormat: string;
   includedInBenchmarks: boolean;
+  lessonsResultFilter: string;
+  lessonsQualityFilter: string;
+  lessonsReasonFilter: string;
 } {
   return {
     id: u.id,
@@ -482,6 +488,9 @@ function formatUser(u: typeof usersTable.$inferSelect): {
     isFounder: u.isFounder,
     oddsFormat: u.oddsFormat,
     includedInBenchmarks: u.includedInBenchmarks,
+    lessonsResultFilter: u.lessonsResultFilter,
+    lessonsQualityFilter: u.lessonsQualityFilter,
+    lessonsReasonFilter: u.lessonsReasonFilter,
   };
 }
 

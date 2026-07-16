@@ -29,7 +29,10 @@ export const GetCurrentUserResponse = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })
 
 
@@ -54,7 +57,10 @@ export const MarkRecapSeenResponse = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })
 
 
@@ -72,7 +78,10 @@ export const MarkLeakCelebrationSeenResponse = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })
 
 
@@ -89,7 +98,10 @@ export const ListUnclaimedUsersResponseItem = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })
 export const ListUnclaimedUsersResponse = zod.array(ListUnclaimedUsersResponseItem)
 
@@ -115,7 +127,10 @@ export const ClaimProfileResponse = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })
 
 
@@ -133,7 +148,10 @@ export const ListUsersResponseItem = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
@@ -148,6 +166,8 @@ export const UpdateUserParams = zod.object({
 export const updateUserBodyStartingBankrollExclusiveMin = 0;
 
 
+export const updateUserBodyLessonsReasonFilterMax = 64;
+
 
 
 export const UpdateUserBody = zod.object({
@@ -155,7 +175,10 @@ export const UpdateUserBody = zod.object({
   "displayName": zod.string().min(1).optional(),
   "avatarColor": zod.string().optional(),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).optional().describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().optional().describe('Include my data in anonymous peer benchmarks (opt-out)')
+  "includedInBenchmarks": zod.boolean().optional().describe('Include my data in anonymous peer benchmarks (opt-out)'),
+  "lessonsResultFilter": zod.enum(['all', 'won', 'lost', 'push']).optional().describe('Saved Lessons-page result filter — follows the user across devices'),
+  "lessonsQualityFilter": zod.enum(['all', 'sound', 'flawed', 'ungraded']).optional().describe('Saved Lessons-page reasoning-quality filter'),
+  "lessonsReasonFilter": zod.string().max(updateUserBodyLessonsReasonFilterMax).optional().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key)')
 }).describe('All fields optional; only provided fields are updated')
 
 export const UpdateUserResponse = zod.object({
@@ -168,7 +191,10 @@ export const UpdateUserResponse = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })
 
 
@@ -1617,7 +1643,8 @@ export const GetLeakProfileResponse = zod.object({
   "burstAvgStake": zod.number().describe('Average stake across the rapid plays'),
   "stakeRatio": zod.number().describe('burstAvgStake divided by the bettor\'s baseline average stake')
 }).nullable().describe('Present when the bettor looks mid-tilt right now: at least two settled losses inside the short window, followed by a burst of rapid plays at escalated stakes relative to their own baseline. Null when data is thin (needs a real avgStake baseline) or the pattern is absent.'),
-  "trendFlip": zod.boolean().describe('True while the one-time \"trend flipped\" celebration is available: the reported leak\'s trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST \/users\/me\/leak-celebration-seen, after which responses return false and the celebration never repeats.')
+  "trendFlip": zod.boolean().describe('True while the one-time \"trend flipped\" celebration is available: the reported leak\'s trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST \/users\/me\/leak-celebration-seen, after which responses return false and the celebration never repeats.'),
+  "roiBand": zod.string().nullable().describe('Where this bettor\'s ROI sits against the anonymous peer pool — one of top_10, top_25, median, bottom_25, bottom_10. Null when the bettor opted out of benchmarks, the peer pool is too small (under 5 contributors), or the bettor has no computable ROI yet.')
 })
 
 
@@ -1861,7 +1888,10 @@ export const GetWorkspaceResponse = zod.object({
   "recapSeenWeek": zod.string().nullish().describe('Monday (YYYY-MM-DD, UTC) of the last recap week this user opened, or null if never'),
   "isFounder": zod.boolean().describe('Founder of the board — can manage beta invites and see the founder dashboard'),
   "oddsFormat": zod.enum(['american', 'decimal', 'fractional']).describe('Preferred odds display format — follows the user across devices'),
-  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n')
+  "includedInBenchmarks": zod.boolean().describe('Whether this user\'s data is included in the platform-wide peer benchmark percentile pool. When false the user also cannot view their own benchmarks (opting out removes them from the sample they would be compared against). Defaults true.\n'),
+  "lessonsResultFilter": zod.string().describe('Saved Lessons-page result filter (\"all\", \"won\", \"lost\", \"push\") — follows the user across devices'),
+  "lessonsQualityFilter": zod.string().describe('Saved Lessons-page reasoning-quality filter (\"all\", \"sound\", \"flawed\", \"ungraded\")'),
+  "lessonsReasonFilter": zod.string().describe('Saved Lessons-page miss-reason filter (\"all\" or a miss-reason key like \"bad_read\")')
 })),
   "totalBets": zod.number(),
   "createdAt": zod.string()

@@ -5,6 +5,8 @@
  * EdgeBoard - Sports bet tracking API
  * OpenAPI spec version: 0.1.0
  */
+import type { UpdateUserInputLessonsQualityFilter } from './updateUserInputLessonsQualityFilter';
+import type { UpdateUserInputLessonsResultFilter } from './updateUserInputLessonsResultFilter';
 import type { UpdateUserInputOddsFormat } from './updateUserInputOddsFormat';
 
 /**
@@ -20,4 +22,13 @@ export interface UpdateUserInput {
   oddsFormat?: UpdateUserInputOddsFormat;
   /** Include my data in anonymous peer benchmarks (opt-out) */
   includedInBenchmarks?: boolean;
+  /** Saved Lessons-page result filter — follows the user across devices */
+  lessonsResultFilter?: UpdateUserInputLessonsResultFilter;
+  /** Saved Lessons-page reasoning-quality filter */
+  lessonsQualityFilter?: UpdateUserInputLessonsQualityFilter;
+  /**
+     * Saved Lessons-page miss-reason filter ("all" or a miss-reason key)
+     * @maxLength 64
+     */
+  lessonsReasonFilter?: string;
 }
