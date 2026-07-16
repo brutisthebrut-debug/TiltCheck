@@ -41,7 +41,9 @@ function ensureVapid() {
 
 // ── Push helper ───────────────────────────────────────────────────────────
 
-async function sendPush(
+// Exported for tests: the 410/404 cleanup contract below is load-bearing —
+// it's what keeps dead browser endpoints from being retried forever.
+export async function sendPush(
   sub: { endpoint: string; p256dhKey: string; authKey: string },
   payload: { title: string; body: string; url: string; tag: string }
 ) {

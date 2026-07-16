@@ -43,19 +43,22 @@ async function fetchServerPrefs(): Promise<NotificationPrefs | null> {
 async function serverSubscribe(
   sub: PushSubscription,
   prefs: NotificationPrefs
-): Promise<boolean> {
+): Promise<{ ok: boolean; status: number }> {
   const key = sub.getKey("p256dh");
   const auth = sub.getKey("auth");
-  if (!key || !auth) return false;
-  const p256dhKey = btoa(String.fromCharCode(...new Uint8Array(key)));
-  const authKey = btoa(String.fromCharCode(...new Uint8Array(auth)));
+  if (!key || !auth) return { ok: false, status: 0 };
   const res = await fetch(`${API_BASE}/api/notifications/subscribe`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint: sub.endpoint, p256dhKey, authKey, ...prefs }),
+    body: JSON.stringify({
+      endpoint: sub.endpoint,
+      p256dhKey: btoa(String.fromCharCode(...new Uint8Array(key))),
+      authKey: btoa(String.fromCharCode(...new Uint8Array(auth))),
+      ...prefs,
+    }),
   });
-  return res.ok;
+  return { ok: res.ok, status: res.status };
 }
 
 async function serverUnsubscribe(endpoint: string): Promise<void> {
@@ -149,6 +152,21 @@ export function useNotifications(): UseNotificationsReturn {
         // Load server-side truth so the toggles reflect what was actually saved.
         const serverPrefs = await fetchServerPrefs();
         if (serverPrefs) setPrefs(serverPrefs);
+        // Browsers can silently rotate a push endpoint (SW update, browser
+        // upgrade). The server only knows the old endpoint — which will 410
+        // on the next send and be dropped — so re-register the current one on
+        // every load. The subscribe upsert is idempotent for an unchanged
+        // endpoint and preserves saved toggles by sending the server's prefs.
+        const resync = await serverSubscribe(sub, serverPrefs ?? DEFAULT_PREFS);
+        if (!resync.ok && resync.status === 409) {
+          // The endpoint belongs to a different account (shared browser
+          // profile). The server will never deliver to this user through it,
+          // so reflect reality: drop the browser subscription and show the
+          // enable-notifications state instead of a lying "subscribed" toggle.
+          await sub.unsubscribe().catch(() => {});
+          setSubscribed(false);
+          setPrefs(DEFAULT_PREFS);
+        }
       })
       .catch(() => {});
   }, [supported]);
@@ -178,7 +196,7 @@ export function useNotifications(): UseNotificationsReturn {
       const effectivePrefs = serverPrefs ?? prefs;
       if (serverPrefs) setPrefs(serverPrefs);
 
-      const ok = await serverSubscribe(sub, effectivePrefs);
+      const { ok } = await serverSubscribe(sub, effectivePrefs);
       if (ok) setSubscribed(true);
     } finally {
       setLoading(false);

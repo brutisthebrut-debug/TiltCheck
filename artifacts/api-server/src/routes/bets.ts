@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, or, gte, lte, ilike, isNull, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, ilike, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { db, betsTable, usersTable, transactionsTable } from "@workspace/db";
 import {
   ListBetsQueryParams,
@@ -16,7 +16,7 @@ import { requireProfile } from "../middlewares/auth";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import { isValidAmericanOdds, INVALID_ODDS_MESSAGE } from "../lib/odds";
 import { likeContains, clampPageSize } from "../lib/search";
-import { userScopeCondition } from "../lib/scope";
+import { userScopeCondition, getSocialUsers, userInSocialScope } from "../lib/scope";
 import { lockUserLedger } from "../lib/ledger";
 
 const router: IRouter = Router();
@@ -64,11 +64,21 @@ router.get("/bets", async (req, res): Promise<void> => {
   }
   const { userId, status, sport, sportsbook, q, dateFrom, dateTo, oddsMin, oddsMax, day, stakeMin, stakeMax, limit, offset } = query.data;
 
-  // World scoping: the join to users is inner + scoped, so demo sessions only
-  // ever see demo bets and real sessions never see demo bets — even when an
-  // explicit userId filter points across the boundary.
+  // Crew scoping: betting history is visible only inside a shared crew (same
+  // policy as stats, badges, and streaks). The social scope also seals the
+  // demo/real boundary; userScopeCondition stays as defense in depth.
+  const socialUsers = await getSocialUsers(req);
+  if (userId != null && !socialUsers.some((u) => u.id === userId)) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (socialUsers.length === 0) {
+    res.json([]);
+    return;
+  }
   const conditions = [userScopeCondition(req)];
   if (userId != null) conditions.push(eq(betsTable.userId, userId));
+  else conditions.push(inArray(betsTable.userId, socialUsers.map((u) => u.id)));
   if (status != null) conditions.push(eq(betsTable.status, status));
   if (sport != null) conditions.push(eq(betsTable.sport, sport));
   if (sportsbook != null) conditions.push(eq(betsTable.sportsbook, sportsbook));
@@ -156,7 +166,8 @@ router.get("/bets/:id", async (req, res): Promise<void> => {
     .from(betsTable)
     .innerJoin(usersTable, eq(betsTable.userId, usersTable.id))
     .where(and(eq(betsTable.id, params.data.id), userScopeCondition(req)));
-  if (rows.length === 0) {
+  if (rows.length === 0 || !(await userInSocialScope(req, rows[0].bet.userId))) {
+    // Out-of-crew bets read as "not found" — never confirm they exist.
     res.status(404).json({ error: "Bet not found" });
     return;
   }

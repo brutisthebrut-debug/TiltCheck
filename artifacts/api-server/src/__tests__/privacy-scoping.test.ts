@@ -34,7 +34,7 @@ vi.mock("@clerk/express", () => ({
 
 import app from "../app";
 import { httpLogSerializers } from "../lib/logger";
-import { db, pool, usersTable, betsTable, crewsTable, crewMembersTable } from "@workspace/db";
+import { db, pool, usersTable, betsTable, parlaysTable, parlayLegsTable, crewsTable, crewMembersTable } from "@workspace/db";
 
 const createdUserIds: number[] = [];
 let counter = 0;
@@ -67,11 +67,55 @@ async function putInOneCrew(userIds: number[]) {
 
 afterAll(async () => {
   if (createdUserIds.length > 0) {
+    const parlays = await db
+      .select({ id: parlaysTable.id })
+      .from(parlaysTable)
+      .where(inArray(parlaysTable.userId, createdUserIds));
+    if (parlays.length > 0) {
+      await db.delete(parlayLegsTable).where(inArray(parlayLegsTable.parlayId, parlays.map((p) => p.id)));
+      await db.delete(parlaysTable).where(inArray(parlaysTable.userId, createdUserIds));
+    }
     await db.delete(betsTable).where(inArray(betsTable.userId, createdUserIds));
     await db.delete(usersTable).where(inArray(usersTable.id, createdUserIds));
   }
   await pool.end();
 });
+
+async function seedBet(userId: number) {
+  const [bet] = await db
+    .insert(betsTable)
+    .values({
+      userId,
+      sport: "NFL",
+      event: "Chiefs @ Bills",
+      betType: "moneyline",
+      pick: "Chiefs ML",
+      odds: -110,
+      stake: "50",
+      potentialPayout: "95.45",
+      gameDate: "2026-07-10",
+      confidenceScore: 3,
+    })
+    .returning();
+  return bet;
+}
+
+async function seedParlay(userId: number) {
+  const [parlay] = await db
+    .insert(parlaysTable)
+    .values({ userId, name: "Test Parlay", stake: "25", odds: 264, potentialPayout: "91.00", confidenceScore: 3 })
+    .returning();
+  await db.insert(parlayLegsTable).values({
+    parlayId: parlay.id,
+    sport: "NBA",
+    event: "Lakers @ Celtics",
+    betType: "spread",
+    pick: "Lakers +4.5",
+    odds: -110,
+    gameDate: "2026-07-10",
+  });
+  return parlay;
+}
 
 describe("badges are crew-scoped", () => {
   it("cross-crew badge case is reported as not found; same-crew and own work", async () => {
@@ -169,6 +213,90 @@ describe("user list privacy", () => {
     const res = await request(app).get("/api/users");
     expect(res.status).toBe(200);
     expect(res.body.map((u: { id: number }) => u.id)).toEqual([me.id]);
+  });
+});
+
+describe("betting history is crew-scoped", () => {
+  it("bets: list excludes other crews, by-userId 404s cross-crew, single bet 404s cross-crew", async () => {
+    const { row: me, clerkUserId } = await createUser("Viewer");
+    const { row: mate } = await createUser("Crewmate");
+    const { row: stranger } = await createUser("Stranger");
+    await putInOneCrew([me.id, mate.id]);
+    await putInOneCrew([stranger.id]);
+    const myBet = await seedBet(me.id);
+    const mateBet = await seedBet(mate.id);
+    const strangerBet = await seedBet(stranger.id);
+    currentClerkUserId = clerkUserId;
+
+    // Unfiltered list: own + crewmate's bets only, never a stranger's.
+    const list = await request(app).get("/api/bets");
+    expect(list.status).toBe(200);
+    const listIds = list.body.map((b: { id: number }) => b.id);
+    expect(listIds).toContain(myBet.id);
+    expect(listIds).toContain(mateBet.id);
+    expect(listIds).not.toContain(strangerBet.id);
+
+    // Explicit userId filter: same-crew works, cross-crew reads as not found.
+    expect((await request(app).get(`/api/bets?userId=${mate.id}`)).status).toBe(200);
+    expect((await request(app).get(`/api/bets?userId=${stranger.id}`)).status).toBe(404);
+
+    // Single-bet reads follow the same wall.
+    expect((await request(app).get(`/api/bets/${mateBet.id}`)).status).toBe(200);
+    expect((await request(app).get(`/api/bets/${strangerBet.id}`)).status).toBe(404);
+  });
+
+  it("parlays: list excludes other crews, by-userId 404s cross-crew, single parlay 404s cross-crew", async () => {
+    const { row: me, clerkUserId } = await createUser("Viewer");
+    const { row: mate } = await createUser("Crewmate");
+    const { row: stranger } = await createUser("Stranger");
+    await putInOneCrew([me.id, mate.id]);
+    await putInOneCrew([stranger.id]);
+    const mateParlay = await seedParlay(mate.id);
+    const strangerParlay = await seedParlay(stranger.id);
+    currentClerkUserId = clerkUserId;
+
+    const list = await request(app).get("/api/parlays");
+    expect(list.status).toBe(200);
+    const listIds = list.body.map((p: { id: number }) => p.id);
+    expect(listIds).toContain(mateParlay.id);
+    expect(listIds).not.toContain(strangerParlay.id);
+
+    expect((await request(app).get(`/api/parlays?userId=${mate.id}`)).status).toBe(200);
+    expect((await request(app).get(`/api/parlays?userId=${stranger.id}`)).status).toBe(404);
+
+    expect((await request(app).get(`/api/parlays/${mateParlay.id}`)).status).toBe(200);
+    expect((await request(app).get(`/api/parlays/${strangerParlay.id}`)).status).toBe(404);
+  });
+
+  it("recent-activity feed shows the crew's plays, never another crew's", async () => {
+    const { row: me, clerkUserId } = await createUser("Viewer");
+    const { row: mate } = await createUser("Crewmate");
+    const { row: stranger } = await createUser("Stranger");
+    await putInOneCrew([me.id, mate.id]);
+    await putInOneCrew([stranger.id]);
+    await seedBet(mate.id);
+    await seedBet(stranger.id);
+    currentClerkUserId = clerkUserId;
+
+    const res = await request(app).get("/api/stats/recent-activity");
+    expect(res.status).toBe(200);
+    const userIds = res.body.map((a: { userId: number }) => a.userId);
+    expect(userIds).toContain(mate.id);
+    expect(userIds).not.toContain(stranger.id);
+  });
+
+  it("a crewless bettor's list shows only their own plays", async () => {
+    const { row: me, clerkUserId } = await createUser("Loner");
+    const { row: other } = await createUser("Other Real User");
+    const myBet = await seedBet(me.id);
+    const otherBet = await seedBet(other.id);
+    currentClerkUserId = clerkUserId;
+
+    const list = await request(app).get("/api/bets");
+    expect(list.status).toBe(200);
+    const ids = list.body.map((b: { id: number }) => b.id);
+    expect(ids).toContain(myBet.id);
+    expect(ids).not.toContain(otherBet.id);
   });
 });
 

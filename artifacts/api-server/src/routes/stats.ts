@@ -245,11 +245,21 @@ router.get("/stats/recent-activity", async (req, res): Promise<void> => {
   }
   const limit = query.data.limit ?? 20;
 
+  // Crew scoping: the activity feed shows only the requester's crew (same
+  // policy as the bets/parlays lists). userScopeCondition stays as defense
+  // in depth on the demo/real boundary.
+  const socialUsers = await getSocialUsers(req);
+  if (socialUsers.length === 0) {
+    res.json([]);
+    return;
+  }
+  const socialIds = socialUsers.map((u) => u.id);
+
   const bets = await db
     .select({ bet: betsTable, user: usersTable })
     .from(betsTable)
     .innerJoin(usersTable, eq(betsTable.userId, usersTable.id))
-    .where(userScopeCondition(req))
+    .where(and(userScopeCondition(req), inArray(betsTable.userId, socialIds)))
     .orderBy(desc(betsTable.createdAt))
     .limit(limit);
 
@@ -257,7 +267,7 @@ router.get("/stats/recent-activity", async (req, res): Promise<void> => {
     .select({ parlay: parlaysTable, user: usersTable })
     .from(parlaysTable)
     .innerJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
-    .where(userScopeCondition(req))
+    .where(and(userScopeCondition(req), inArray(parlaysTable.userId, socialIds)))
     .orderBy(desc(parlaysTable.createdAt))
     .limit(limit);
 

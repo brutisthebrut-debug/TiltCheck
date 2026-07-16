@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { likeContains, clampPageSize } from "../lib/search";
-import { userScopeCondition } from "../lib/scope";
+import { userScopeCondition, getSocialUsers, userInSocialScope } from "../lib/scope";
 import { lockUserLedger } from "../lib/ledger";
 import { isRealCalendarDate, INVALID_GAME_DATE_MESSAGE } from "../lib/dates";
 import {
@@ -84,10 +84,21 @@ router.get("/parlays", async (req, res): Promise<void> => {
     return;
   }
   const { userId, status, sport, sportsbook, q, dateFrom, dateTo, limit, offset } = query.data;
-  // World scoping: inner join + scope condition keeps demo and real parlays
-  // strictly separated regardless of any explicit userId filter.
+  // Crew scoping: parlay history is visible only inside a shared crew (same
+  // policy as bets, stats, badges, and streaks). The social scope also seals
+  // the demo/real boundary; userScopeCondition stays as defense in depth.
+  const socialUsers = await getSocialUsers(req);
+  if (userId != null && !socialUsers.some((u) => u.id === userId)) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (socialUsers.length === 0) {
+    res.json([]);
+    return;
+  }
   const conditions = [userScopeCondition(req)];
   if (userId != null) conditions.push(eq(parlaysTable.userId, userId));
+  else conditions.push(inArray(parlaysTable.userId, socialUsers.map((u) => u.id)));
   if (status != null) conditions.push(eq(parlaysTable.status, status));
   if (sportsbook != null) conditions.push(eq(parlaysTable.sportsbook, sportsbook));
   if (sport != null) {
@@ -226,7 +237,8 @@ router.get("/parlays/:id", async (req, res): Promise<void> => {
     .from(parlaysTable)
     .innerJoin(usersTable, eq(parlaysTable.userId, usersTable.id))
     .where(and(eq(parlaysTable.id, params.data.id), userScopeCondition(req)));
-  if (rows.length === 0) {
+  if (rows.length === 0 || !(await userInSocialScope(req, rows[0].parlay.userId))) {
+    // Out-of-crew parlays read as "not found" — never confirm they exist.
     res.status(404).json({ error: "Parlay not found" });
     return;
   }
