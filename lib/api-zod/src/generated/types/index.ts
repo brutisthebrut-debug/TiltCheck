@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './activeChallengeStandings';
 export * from './activityItem';
 export * from './activityItemStatus';
 export * from './activityItemType';
@@ -32,12 +33,18 @@ export * from './billingCheckout';
 export * from './billingCheckoutInput';
 export * from './billingStatus';
 export * from './billingStatusSource';
+export * from './challengeStanding';
 export * from './claimProfileInput';
 export * from './compareWorkspaceMembersParams';
 export * from './compareWorkspaceMembersPeriod';
 export * from './confidenceBucket';
+export * from './createChallengeInput';
+export * from './createChallengeInputMetric';
 export * from './createCrewInput';
 export * from './crew';
+export * from './crewChallenge';
+export * from './crewChallengeMetric';
+export * from './crewChallengeWithResult';
 export * from './crewMember';
 export * from './crewMemberRole';
 export * from './crewRole';

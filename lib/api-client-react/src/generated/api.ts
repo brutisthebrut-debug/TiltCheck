@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ActiveChallengeStandings,
   ActivityItem,
   AdminOverview,
   BadgeStatus,
@@ -35,8 +36,11 @@ import type {
   ClaimProfileInput,
   CompareWorkspaceMembersParams,
   ConfidenceBucket,
+  CreateChallengeInput,
   CreateCrewInput,
   Crew,
+  CrewChallenge,
+  CrewChallengeWithResult,
   CrewMember,
   EdgeFinder,
   GetBankrollHistoryParams,
@@ -1599,6 +1603,308 @@ export const useTransferCrewOwnership = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getTransferCrewOwnershipMutationOptions(options));
+    }
+
+export const getCreateCrewChallengeUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/challenges`
+}
+
+/**
+ * Owner only. Creates a challenge that runs from today through the next 7 days. Only one challenge can be active at a time per crew (409 `challenge_active` when one is already running). Free crews can run challenges; Pro unlocks per-challenge historical analytics.
+ * @summary Start a new weekly challenge for the crew (owner only)
+ */
+export const createCrewChallenge = async (id: number,
+    createChallengeInput: CreateChallengeInput, options?: RequestInit): Promise<CrewChallenge> => {
+
+  return customFetch<CrewChallenge>(getCreateCrewChallengeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createChallengeInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCrewChallengeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCrewChallenge>>, TError,{id: number;data: BodyType<CreateChallengeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCrewChallenge>>, TError,{id: number;data: BodyType<CreateChallengeInput>}, TContext> => {
+
+const mutationKey = ['createCrewChallenge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCrewChallenge>>, {id: number;data: BodyType<CreateChallengeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createCrewChallenge(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCrewChallengeMutationResult = NonNullable<Awaited<ReturnType<typeof createCrewChallenge>>>
+    export type CreateCrewChallengeMutationBody = BodyType<CreateChallengeInput>
+    export type CreateCrewChallengeMutationError = ErrorType<void>
+
+    /**
+ * @summary Start a new weekly challenge for the crew (owner only)
+ */
+export const useCreateCrewChallenge = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCrewChallenge>>, TError,{id: number;data: BodyType<CreateChallengeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCrewChallenge>>,
+        TError,
+        {id: number;data: BodyType<CreateChallengeInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCrewChallengeMutationOptions(options));
+    }
+
+export const getListCrewChallengesUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/challenges`
+}
+
+/**
+ * @summary List crew challenges — active first, then last 8 completed
+ */
+export const listCrewChallenges = async (id: number, options?: RequestInit): Promise<CrewChallengeWithResult[]> => {
+
+  return customFetch<CrewChallengeWithResult[]>(getListCrewChallengesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCrewChallengesQueryKey = (id: number,) => {
+    return [
+    `/api/crews/${id}/challenges`
+    ] as const;
+    }
+
+
+export const getListCrewChallengesQueryOptions = <TData = Awaited<ReturnType<typeof listCrewChallenges>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCrewChallenges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCrewChallengesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCrewChallenges>>> = ({ signal }) => listCrewChallenges(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCrewChallenges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCrewChallengesQueryResult = NonNullable<Awaited<ReturnType<typeof listCrewChallenges>>>
+export type ListCrewChallengesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List crew challenges — active first, then last 8 completed
+ */
+
+export function useListCrewChallenges<TData = Awaited<ReturnType<typeof listCrewChallenges>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCrewChallenges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCrewChallengesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetActiveChallengeStandingsUrl = (id: number,) => {
+
+
+
+
+  return `/api/crews/${id}/challenges/active/standings`
+}
+
+/**
+ * Returns real-time metric standings for the active challenge computed from settled plays within the challenge window. If the challenge end date has passed, this endpoint auto-closes it (records the winner) before returning the final result.
+ * @summary Live standings for the crew's active challenge
+ */
+export const getActiveChallengeStandings = async (id: number, options?: RequestInit): Promise<ActiveChallengeStandings> => {
+
+  return customFetch<ActiveChallengeStandings>(getGetActiveChallengeStandingsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetActiveChallengeStandingsQueryKey = (id: number,) => {
+    return [
+    `/api/crews/${id}/challenges/active/standings`
+    ] as const;
+    }
+
+
+export const getGetActiveChallengeStandingsQueryOptions = <TData = Awaited<ReturnType<typeof getActiveChallengeStandings>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveChallengeStandings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetActiveChallengeStandingsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getActiveChallengeStandings>>> = ({ signal }) => getActiveChallengeStandings(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getActiveChallengeStandings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetActiveChallengeStandingsQueryResult = NonNullable<Awaited<ReturnType<typeof getActiveChallengeStandings>>>
+export type GetActiveChallengeStandingsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Live standings for the crew's active challenge
+ */
+
+export function useGetActiveChallengeStandings<TData = Awaited<ReturnType<typeof getActiveChallengeStandings>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveChallengeStandings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetActiveChallengeStandingsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDeleteCrewChallengeUrl = (id: number,
+    challengeId: number,) => {
+
+
+
+
+  return `/api/crews/${id}/challenges/${challengeId}`
+}
+
+/**
+ * Owner only. Cancels the challenge without recording a winner. Historical challenges (already closed) cannot be deleted.
+ * @summary Cancel the active challenge (owner only)
+ */
+export const deleteCrewChallenge = async (id: number,
+    challengeId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCrewChallengeUrl(id,challengeId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteCrewChallengeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCrewChallenge>>, TError,{id: number;challengeId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCrewChallenge>>, TError,{id: number;challengeId: number}, TContext> => {
+
+const mutationKey = ['deleteCrewChallenge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCrewChallenge>>, {id: number;challengeId: number}> = (props) => {
+          const {id,challengeId} = props ?? {};
+
+          return  deleteCrewChallenge(id,challengeId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCrewChallengeMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCrewChallenge>>>
+
+    export type DeleteCrewChallengeMutationError = ErrorType<void>
+
+    /**
+ * @summary Cancel the active challenge (owner only)
+ */
+export const useDeleteCrewChallenge = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCrewChallenge>>, TError,{id: number;challengeId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCrewChallenge>>,
+        TError,
+        {id: number;challengeId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteCrewChallengeMutationOptions(options));
     }
 
 export const getListBetsUrl = (params?: ListBetsParams,) => {

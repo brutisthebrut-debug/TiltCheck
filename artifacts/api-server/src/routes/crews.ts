@@ -1,10 +1,12 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq, count, sql, inArray } from "drizzle-orm";
-import { db, usersTable, crewsTable, crewMembersTable } from "@workspace/db";
-import { CreateCrewBody, JoinCrewBody, TransferCrewOwnershipBody } from "@workspace/api-zod";
+import { and, asc, eq, count, sql, inArray, isNull, desc, lte } from "drizzle-orm";
+import { db, usersTable, crewsTable, crewMembersTable, crewChallengesTable } from "@workspace/db";
+import { CreateCrewBody, JoinCrewBody, TransferCrewOwnershipBody, CreateCrewChallengeBody } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { generateInviteCode, resolveActiveCrewId } from "../lib/crews";
 import { logger } from "../lib/logger";
+import { computeChallengeStandings, maybeCloseChallenge } from "../lib/challengeStandings";
+import { dayOf } from "../lib/recap";
 
 const router: IRouter = Router();
 
@@ -527,6 +529,336 @@ router.delete("/crews/:id", requireProfile, async (req, res): Promise<void> => {
     logger.error({ err, userId: me.id, crewId }, "crews: delete failed");
     res.status(500).json({ error: "Could not delete the crew — try again" });
   }
+});
+
+// ── Crew challenges ────────────────────────────────────────────────────────
+
+const CHALLENGE_METRICS = ["roi", "win_rate", "calibration", "postmortem_rate"] as const;
+const DEFAULT_LABELS: Record<string, string> = {
+  roi: "Best ROI",
+  win_rate: "Hot Streak",
+  calibration: "Sharpest Read",
+  postmortem_rate: "Discipline Run",
+};
+
+/** Membership guard: returns the member row or null. */
+async function getCrewMembership(crewId: number, userId: number) {
+  const [m] = await db
+    .select({ role: crewMembersTable.role })
+    .from(crewMembersTable)
+    .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, userId)))
+    .limit(1);
+  return m ?? null;
+}
+
+/** All user IDs currently in a crew. */
+async function getCrewMemberIds(crewId: number): Promise<number[]> {
+  const rows = await db
+    .select({ userId: crewMembersTable.userId })
+    .from(crewMembersTable)
+    .where(eq(crewMembersTable.crewId, crewId));
+  return rows.map((r) => r.userId);
+}
+
+function formatChallenge(
+  c: typeof crewChallengesTable.$inferSelect,
+  winnerName: string | null,
+  today: string,
+) {
+  return {
+    id: c.id,
+    crewId: c.crewId,
+    metric: c.metric,
+    label: c.label,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    createdBy: c.createdBy,
+    winnerId: c.winnerId,
+    winnerValue: c.winnerValue,
+    closedAt: c.closedAt?.toISOString() ?? null,
+    createdAt: c.createdAt.toISOString(),
+    winnerName,
+    isActive: c.closedAt == null && c.endDate >= today,
+  };
+}
+
+// POST /crews/:id/challenges — owner creates a 7-day challenge
+router.post("/crews/:id/challenges", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  if (isNaN(crewId)) { res.status(400).json({ error: "Invalid crew id" }); return; }
+
+  const parsed = CreateCrewChallengeBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const { metric, label } = parsed.data;
+  if (!CHALLENGE_METRICS.includes(metric as typeof CHALLENGE_METRICS[number])) {
+    res.status(400).json({ error: "Invalid metric" }); return;
+  }
+
+  const me = req.currentUser!;
+  const today = dayOf(new Date());
+
+  // ── Authorization first — no mutations until the caller is verified ────────
+  const earlyMembership = await getCrewMembership(crewId, me.id);
+  if (!earlyMembership) { res.status(404).json({ error: "You're not in this crew" }); return; }
+  if (earlyMembership.role !== "owner") {
+    res.status(403).json({ error: "owner_only", message: "Only the crew owner can start a challenge." });
+    return;
+  }
+
+  const endDate = (() => {
+    const d = new Date(`${today}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() + 6); // 7-day window (today is day 1)
+    return dayOf(d);
+  })();
+
+  // ── Pre-transaction: finalize expired challenges with winner metadata ───────
+  // Must happen outside the transaction because maybeCloseChallenge issues its
+  // own DB queries (standings computation) that can't share a tx handle.
+  // Runs only after authorization is confirmed — no mutations before auth.
+  {
+    const expired = await db
+      .select()
+      .from(crewChallengesTable)
+      .where(
+        and(
+          eq(crewChallengesTable.crewId, crewId),
+          isNull(crewChallengesTable.closedAt),
+          sql`${crewChallengesTable.endDate} < ${today}`,
+        ),
+      );
+    if (expired.length > 0) {
+      const memberIds = await getCrewMemberIds(crewId);
+      for (const c of expired) {
+        await maybeCloseChallenge(c, memberIds);
+      }
+    }
+  }
+
+  type CreateOutcome =
+    | { kind: "not_member" }
+    | { kind: "not_owner" }
+    | { kind: "challenge_active" }
+    | { kind: "created"; challenge: typeof crewChallengesTable.$inferSelect };
+
+  let outcome: CreateOutcome;
+  try {
+    outcome = await db.transaction(async (tx): Promise<CreateOutcome> => {
+      // Lock the crew row — serializes all owner-gated mutations for this crew
+      // so that two concurrent POST /challenges requests can't both slip past
+      // the active-challenge guard.
+      const crew = await lockCrew(tx, crewId);
+      if (!crew) return { kind: "not_member" };
+
+      // Re-verify membership and role inside the lock (ownership may have
+      // transferred between the early check and the transaction).
+      const [mine] = await tx
+        .select({ role: crewMembersTable.role })
+        .from(crewMembersTable)
+        .where(and(eq(crewMembersTable.crewId, crewId), eq(crewMembersTable.userId, me.id)))
+        .limit(1);
+      if (!mine) return { kind: "not_member" };
+      if (mine.role !== "owner") return { kind: "not_owner" };
+
+      // Now check for a genuinely active challenge (endDate >= today, not closed).
+      // Expired rows were finalized before the transaction started.
+      const [open] = await tx
+        .select({ id: crewChallengesTable.id })
+        .from(crewChallengesTable)
+        .where(
+          and(
+            eq(crewChallengesTable.crewId, crewId),
+            isNull(crewChallengesTable.closedAt),
+            sql`${crewChallengesTable.endDate} >= ${today}`,
+          ),
+        )
+        .limit(1);
+      if (open) return { kind: "challenge_active" };
+
+      const [challenge] = await tx
+        .insert(crewChallengesTable)
+        .values({
+          crewId,
+          metric,
+          label: label.trim() || DEFAULT_LABELS[metric] || metric,
+          startDate: today,
+          endDate,
+          createdBy: me.id,
+        })
+        .returning();
+
+      return { kind: "created", challenge };
+    });
+  } catch (err: unknown) {
+    // The partial unique index (crew_challenges_one_active_per_crew) is the
+    // final DB-level guard. If two concurrent transactions both pass the
+    // application check and one wins the race, the loser gets a 23505
+    // unique-violation — map it to 409 instead of 500.
+    const pgCode = (err as { code?: string })?.code;
+    if (pgCode === "23505") {
+      res.status(409).json({ error: "challenge_active", message: "A challenge is already running. Cancel it or wait for it to close." });
+      return;
+    }
+    throw err;
+  }
+
+  if (outcome.kind === "not_member") { res.status(404).json({ error: "You're not in this crew" }); return; }
+  if (outcome.kind === "not_owner") {
+    res.status(403).json({ error: "owner_only", message: "Only the crew owner can start a challenge." });
+    return;
+  }
+  if (outcome.kind === "challenge_active") {
+    res.status(409).json({ error: "challenge_active", message: "A challenge is already running. Cancel it or wait for it to close." });
+    return;
+  }
+
+  res.status(201).json(formatChallenge(outcome.challenge, null, today));
+});
+
+// GET /crews/:id/challenges — active challenge first, then up to 8 completed
+router.get("/crews/:id/challenges", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  if (isNaN(crewId)) { res.status(400).json({ error: "Invalid crew id" }); return; }
+
+  const me = req.currentUser!;
+  const membership = await getCrewMembership(crewId, me.id);
+  if (!membership) { res.status(404).json({ error: "You're not in this crew" }); return; }
+
+  const today = dayOf(new Date());
+  const memberIds = await getCrewMemberIds(crewId);
+
+  // Load last 9 challenges (8 completed + possibly 1 active)
+  const challenges = await db
+    .select()
+    .from(crewChallengesTable)
+    .where(eq(crewChallengesTable.crewId, crewId))
+    .orderBy(desc(crewChallengesTable.createdAt))
+    .limit(9);
+
+  // Auto-close any that have passed their end date
+  for (const c of challenges) {
+    if (c.closedAt == null && c.endDate < today) {
+      await maybeCloseChallenge(c, memberIds);
+      // Refresh from DB — patch the local object
+      const [fresh] = await db.select().from(crewChallengesTable).where(eq(crewChallengesTable.id, c.id));
+      if (fresh) Object.assign(c, fresh);
+    }
+  }
+
+  // Resolve winner names
+  const winnerIds = challenges.map((c) => c.winnerId).filter((id): id is number => id != null);
+  const winners =
+    winnerIds.length > 0
+      ? await db.select({ id: usersTable.id, displayName: usersTable.displayName }).from(usersTable).where(inArray(usersTable.id, winnerIds))
+      : [];
+  const winnerNameById = new Map(winners.map((w) => [w.id, w.displayName]));
+
+  // Sort: active first, then newest
+  challenges.sort((a, b) => {
+    const aActive = a.closedAt == null && a.endDate >= today;
+    const bActive = b.closedAt == null && b.endDate >= today;
+    if (aActive !== bActive) return aActive ? -1 : 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  const closed = challenges.filter((c) => c.closedAt != null);
+  const active = challenges.filter((c) => c.closedAt == null && c.endDate >= today);
+  const result = [...active, ...closed.slice(0, 8)];
+
+  res.json(result.map((c) => formatChallenge(c, c.winnerId ? (winnerNameById.get(c.winnerId) ?? null) : null, today)));
+});
+
+// GET /crews/:id/challenges/active/standings — live standings + auto-close
+router.get("/crews/:id/challenges/active/standings", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  if (isNaN(crewId)) { res.status(400).json({ error: "Invalid crew id" }); return; }
+
+  const me = req.currentUser!;
+  const membership = await getCrewMembership(crewId, me.id);
+  if (!membership) { res.status(404).json({ error: "You're not in this crew" }); return; }
+
+  const today = dayOf(new Date());
+
+  // Find active challenge
+  const challengeRows = await db
+    .select()
+    .from(crewChallengesTable)
+    .where(and(eq(crewChallengesTable.crewId, crewId), isNull(crewChallengesTable.closedAt)))
+    .orderBy(desc(crewChallengesTable.createdAt))
+    .limit(1);
+
+  const challenge = challengeRows[0];
+  if (!challenge) { res.status(404).json({ error: "No active challenge for this crew" }); return; }
+
+  const memberIds = await getCrewMemberIds(crewId);
+
+  // Auto-close if endDate has passed
+  await maybeCloseChallenge(challenge, memberIds);
+
+  // Reload (may have just been closed)
+  const [fresh] = await db.select().from(crewChallengesTable).where(eq(crewChallengesTable.id, challenge.id));
+  const current = fresh ?? challenge;
+
+  const standings = await computeChallengeStandings(current, memberIds);
+
+  // Resolve winner name if closed
+  let winnerName: string | null = null;
+  if (current.winnerId) {
+    const [w] = await db.select({ displayName: usersTable.displayName }).from(usersTable).where(eq(usersTable.id, current.winnerId));
+    winnerName = w?.displayName ?? null;
+  }
+
+  // Days remaining: -1 if closed, 0 if last day, N otherwise
+  const endEpoch = new Date(`${current.endDate}T00:00:00.000Z`).getTime();
+  const nowEpoch = Date.now();
+  const msLeft = endEpoch - nowEpoch;
+  const daysRemaining = current.closedAt != null ? -1 : Math.max(-1, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+
+  res.json({
+    challenge: formatChallenge(current, winnerName, today),
+    standings,
+    daysRemaining,
+  });
+});
+
+// DELETE /crews/:id/challenges/:challengeId — owner cancels active challenge
+router.delete("/crews/:id/challenges/:challengeId", requireProfile, async (req, res): Promise<void> => {
+  const crewId = parseInt(String(req.params.id), 10);
+  const challengeId = parseInt(String(req.params.challengeId), 10);
+  if (isNaN(crewId) || isNaN(challengeId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const me = req.currentUser!;
+  const membership = await getCrewMembership(crewId, me.id);
+  if (!membership) { res.status(404).json({ error: "You're not in this crew" }); return; }
+  if (membership.role !== "owner") {
+    res.status(403).json({ error: "owner_only", message: "Only the crew owner can cancel a challenge." });
+    return;
+  }
+
+  const [challenge] = await db
+    .select()
+    .from(crewChallengesTable)
+    .where(and(eq(crewChallengesTable.id, challengeId), eq(crewChallengesTable.crewId, crewId)))
+    .limit(1);
+
+  if (!challenge) { res.status(404).json({ error: "Challenge not found" }); return; }
+  if (challenge.closedAt != null) {
+    res.status(409).json({ error: "challenge_closed", message: "This challenge already closed — it can't be cancelled." });
+    return;
+  }
+
+  const today = dayOf(new Date());
+  if (challenge.endDate < today) {
+    // The challenge window passed without being explicitly cancelled — auto-
+    // finalize it so winner data is preserved, then report it as already closed.
+    const memberIds = await getCrewMemberIds(crewId);
+    await maybeCloseChallenge(challenge, memberIds);
+    res.status(409).json({ error: "challenge_closed", message: "The challenge window already ended — the results have been saved." });
+    return;
+  }
+
+  await db.delete(crewChallengesTable).where(eq(crewChallengesTable.id, challengeId));
+  res.status(204).end();
 });
 
 export default router;

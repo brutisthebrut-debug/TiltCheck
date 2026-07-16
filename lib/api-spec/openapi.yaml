@@ -506,6 +506,119 @@ paths:
         "404":
           description: Not a member of this crew, or the target isn't a member
 
+  # ── Crew Challenges ────────────────────────────────────────────────────────
+  /crews/{id}/challenges:
+    post:
+      operationId: createCrewChallenge
+      tags: [crews]
+      summary: Start a new weekly challenge for the crew (owner only)
+      description: >
+        Owner only. Creates a challenge that runs from today through the next
+        7 days. Only one challenge can be active at a time per crew (409
+        `challenge_active` when one is already running). Free crews can run
+        challenges; Pro unlocks per-challenge historical analytics.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChallengeInput"
+      responses:
+        "201":
+          description: Created challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrewChallenge"
+        "403":
+          description: Only the crew owner can create a challenge (`error` is `owner_only`)
+        "404":
+          description: Not a member of this crew
+        "409":
+          description: A challenge is already active (`error` is `challenge_active`)
+    get:
+      operationId: listCrewChallenges
+      tags: [crews]
+      summary: List crew challenges — active first, then last 8 completed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Challenges ordered active-first, then most recent
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CrewChallengeWithResult"
+        "404":
+          description: Not a member of this crew
+
+  /crews/{id}/challenges/active/standings:
+    get:
+      operationId: getActiveChallengeStandings
+      tags: [crews]
+      summary: Live standings for the crew's active challenge
+      description: >
+        Returns real-time metric standings for the active challenge computed
+        from settled plays within the challenge window. If the challenge end
+        date has passed, this endpoint auto-closes it (records the winner)
+        before returning the final result.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Current standings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveChallengeStandings"
+        "404":
+          description: Not a member of this crew, or no active challenge
+
+  /crews/{id}/challenges/{challengeId}:
+    delete:
+      operationId: deleteCrewChallenge
+      tags: [crews]
+      summary: Cancel the active challenge (owner only)
+      description: >
+        Owner only. Cancels the challenge without recording a winner.
+        Historical challenges (already closed) cannot be deleted.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: challengeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Challenge cancelled
+        "403":
+          description: Only the crew owner can cancel a challenge (`error` is `owner_only`)
+        "404":
+          description: Not a member of this crew, or challenge not found
+        "409":
+          description: Challenge is already closed (`error` is `challenge_closed`)
+
   # ── Bets ──────────────────────────────────────────────────────────────────
   /bets:
     get:
@@ -2021,6 +2134,96 @@ components:
           type: integer
           description: The member who takes over as owner
       required: [userId]
+
+    CreateChallengeInput:
+      type: object
+      required: [metric, label]
+      properties:
+        metric:
+          type: string
+          enum: [roi, win_rate, calibration, postmortem_rate]
+          description: The metric this challenge measures
+        label:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: Human-readable name shown in banners (e.g. "Sharp Week")
+
+    CrewChallenge:
+      type: object
+      required: [id, crewId, metric, label, startDate, endDate, createdBy, createdAt]
+      properties:
+        id:
+          type: integer
+        crewId:
+          type: integer
+        metric:
+          type: string
+          enum: [roi, win_rate, calibration, postmortem_rate]
+        label:
+          type: string
+        startDate:
+          type: string
+          description: Inclusive challenge start date (YYYY-MM-DD, UTC)
+        endDate:
+          type: string
+          description: Inclusive challenge end date (YYYY-MM-DD, UTC)
+        createdBy:
+          type: integer
+        winnerId:
+          type: ["integer", "null"]
+        winnerValue:
+          type: ["number", "null"]
+        closedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CrewChallengeWithResult:
+      description: A challenge with winner display name resolved (for history lists)
+      allOf:
+        - $ref: "#/components/schemas/CrewChallenge"
+        - type: object
+          properties:
+            winnerName:
+              type: ["string", "null"]
+              description: Display name of the winner (resolved from winnerId)
+            isActive:
+              type: boolean
+              description: True when the challenge is still open
+
+    ChallengeStanding:
+      type: object
+      required: [userId, userName, avatarColor, value, rank, settledCount]
+      properties:
+        userId:
+          type: integer
+        userName:
+          type: string
+        avatarColor:
+          type: string
+        value:
+          type: ["number", "null"]
+          description: The metric value for this member (null when no settled plays)
+        rank:
+          type: integer
+        settledCount:
+          type: integer
+          description: Settled plays in the challenge window (used for tie-breaking)
+
+    ActiveChallengeStandings:
+      type: object
+      required: [challenge, standings, daysRemaining]
+      properties:
+        challenge:
+          $ref: "#/components/schemas/CrewChallengeWithResult"
+        standings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChallengeStanding"
+        daysRemaining:
+          type: integer
+          description: Days left in the challenge window (0 = last day, -1 = closed)
 
     Invite:
       type: object

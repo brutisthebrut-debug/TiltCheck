@@ -51,6 +51,18 @@ export type RecapFacts = {
   /** Sports by settled play count, descending. */
   sportMix: { sport: string; plays: number; profit: number }[];
   parlays: { settled: number; won: number; profit: number } | null;
+  /**
+   * If a crew challenge closed during this week, summarise it so the AI can
+   * call out the winner. The model must only reference this if it is non-null.
+   */
+  closedChallenge: {
+    label: string;
+    metric: string;
+    winnerName: string;
+    formattedValue: string;
+    /** True when the narrator IS the winner — lets the AI adjust tone. */
+    isNarrator: boolean;
+  } | null;
 };
 
 /**
@@ -174,6 +186,8 @@ export function assembleRecapFacts(input: {
             profit: round2(settledParlays.reduce((a, s) => a + s.profit, 0)),
           }
         : null,
+    // Populated by the narrative route when a crew challenge closed this week.
+    closedChallenge: null,
   };
   return { hasData: true, facts };
 }
@@ -192,7 +206,9 @@ Hard rules:
 - No moralizing about gambling. They track because they want the mirror, not a lecture.
 - 2–3 short paragraphs, then a final single-sentence paragraph starting with "Watch next week:" naming ONE concrete behavior to observe (a habit to watch, not a bet to place).
 - Plain text only. No headings, no bullet points, no emoji, no markdown.
-- Keep it under 180 words.`;
+- Keep it under 180 words.
+- If the facts JSON includes a "closedChallenge" field (non-null), append one sentence after the "Watch next week:" line naming the winner, the challenge label, and their formatted value. Example: "This week's Best ROI challenge: Jake +14.3%." If closedChallenge.isNarrator is true the bettor IS the winner — adjust tone accordingly.
+- If closedChallenge is null or absent, do not mention a challenge at all.`;
 
 /**
  * Generate the narrative for one bettor-week. Throws on provider failure —

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, inArray, gte, sql } from "drizzle-orm";
-import { db, betsTable, parlaysTable, usersTable, transactionsTable, recapNarrativesTable } from "@workspace/db";
+import { eq, desc, and, inArray, gte, sql, lte } from "drizzle-orm";
+import { db, betsTable, parlaysTable, usersTable, transactionsTable, recapNarrativesTable, crewChallengesTable, crewMembersTable } from "@workspace/db";
+import { metricLabel, formatMetricValue, type ChallengeMetric } from "../lib/challengeStandings";
 import {
   GetStatsSummaryQueryParams,
   GetStatsBySportQueryParams,
@@ -1082,6 +1083,58 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
       res.json({ weekStart, narrative: null, limitReached: true });
       return;
     }
+  }
+
+  // ── Challenge winner injection ────────────────────────────────────────────
+  // If a challenge for the bettor's active crew closed during this recap week,
+  // inject the winner into facts so the AI can call it out. Best-effort —
+  // a failure here never blocks narrative generation.
+  try {
+    const [activeUser] = await db
+      .select({ activeCrewId: usersTable.activeCrewId })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    const activeCrewId = activeUser?.activeCrewId;
+    if (activeCrewId != null) {
+      const weekStartDate = new Date(`${weekStart}T00:00:00.000Z`);
+      const weekEndDate = new Date(weekStartDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+      // Find a challenge that closed during this week
+      const [closedChallenge] = await db
+        .select()
+        .from(crewChallengesTable)
+        .where(
+          and(
+            eq(crewChallengesTable.crewId, activeCrewId),
+            sql`${crewChallengesTable.closedAt} >= ${weekStartDate}`,
+            lte(crewChallengesTable.closedAt, weekEndDate),
+          ),
+        )
+        .orderBy(desc(crewChallengesTable.closedAt))
+        .limit(1);
+
+      if (closedChallenge?.winnerId != null && closedChallenge.winnerValue != null) {
+        const [winner] = await db
+          .select({ displayName: usersTable.displayName })
+          .from(usersTable)
+          .where(eq(usersTable.id, closedChallenge.winnerId))
+          .limit(1);
+        if (winner) {
+          factsResult.facts.closedChallenge = {
+            label: closedChallenge.label,
+            metric: closedChallenge.metric,
+            winnerName: winner.displayName,
+            formattedValue: formatMetricValue(
+              closedChallenge.metric as ChallengeMetric,
+              closedChallenge.winnerValue,
+            ),
+            isNarrator: closedChallenge.winnerId === userId,
+          };
+        }
+      }
+    }
+  } catch (challengeErr) {
+    logger.warn({ err: challengeErr, userId, weekStart }, "Challenge winner lookup failed — continuing without it");
   }
 
   try {

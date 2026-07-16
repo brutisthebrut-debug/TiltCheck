@@ -175,6 +175,93 @@ export interface TransferCrewOwnershipInput {
   userId: number;
 }
 
+/**
+ * The metric this challenge measures
+ */
+export type CreateChallengeInputMetric = typeof CreateChallengeInputMetric[keyof typeof CreateChallengeInputMetric];
+
+
+export const CreateChallengeInputMetric = {
+  roi: 'roi',
+  win_rate: 'win_rate',
+  calibration: 'calibration',
+  postmortem_rate: 'postmortem_rate',
+} as const;
+
+export interface CreateChallengeInput {
+  /** The metric this challenge measures */
+  metric: CreateChallengeInputMetric;
+  /**
+     * Human-readable name shown in banners (e.g. "Sharp Week")
+     * @minLength 1
+     * @maxLength 40
+     */
+  label: string;
+}
+
+export type CrewChallengeMetric = typeof CrewChallengeMetric[keyof typeof CrewChallengeMetric];
+
+
+export const CrewChallengeMetric = {
+  roi: 'roi',
+  win_rate: 'win_rate',
+  calibration: 'calibration',
+  postmortem_rate: 'postmortem_rate',
+} as const;
+
+export interface CrewChallenge {
+  id: number;
+  crewId: number;
+  metric: CrewChallengeMetric;
+  label: string;
+  /** Inclusive challenge start date (YYYY-MM-DD, UTC) */
+  startDate: string;
+  /** Inclusive challenge end date (YYYY-MM-DD, UTC) */
+  endDate: string;
+  createdBy: number;
+  /** @nullable */
+  winnerId?: number | null;
+  /** @nullable */
+  winnerValue?: number | null;
+  /** @nullable */
+  closedAt?: string | null;
+  createdAt: string;
+}
+
+/**
+ * A challenge with winner display name resolved (for history lists)
+ */
+export type CrewChallengeWithResult = CrewChallenge & ({
+  /**
+     * Display name of the winner (resolved from winnerId)
+     * @nullable
+     */
+  winnerName?: string | null;
+  /** True when the challenge is still open */
+  isActive?: boolean;
+});
+
+export interface ChallengeStanding {
+  userId: number;
+  userName: string;
+  avatarColor: string;
+  /**
+     * The metric value for this member (null when no settled plays)
+     * @nullable
+     */
+  value: number | null;
+  rank: number;
+  /** Settled plays in the challenge window (used for tie-breaking) */
+  settledCount: number;
+}
+
+export interface ActiveChallengeStandings {
+  challenge: CrewChallengeWithResult;
+  standings: ChallengeStanding[];
+  /** Days left in the challenge window (0 = last day, -1 = closed) */
+  daysRemaining: number;
+}
+
 export interface Invite {
   id: number;
   email: string;

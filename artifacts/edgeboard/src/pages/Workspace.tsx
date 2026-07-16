@@ -24,6 +24,7 @@ import { CrewSwitcher } from "@/components/CrewSwitcher"
 import { Button } from "@/components/ui/button"
 import { Copy } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { CrewChallengeSection } from "@/components/CrewChallengeSection"
 
 type Period = "week" | "month" | "all"
 
@@ -546,6 +547,14 @@ export default function Workspace() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Crew challenges — weekly competitions on a single metric */}
+      {activeCrew && (
+        <CrewChallengeSection
+          crewId={activeCrew.id}
+          isOwner={activeCrew.role === "owner"}
+        />
       )}
 
       {/* Every badge in the book — earned and still-locked, with the criteria */}

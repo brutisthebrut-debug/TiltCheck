@@ -359,6 +359,113 @@ export const TransferCrewOwnershipResponse = zod.object({
 
 
 /**
+ * Owner only. Creates a challenge that runs from today through the next 7 days. Only one challenge can be active at a time per crew (409 `challenge_active` when one is already running). Free crews can run challenges; Pro unlocks per-challenge historical analytics.
+ * @summary Start a new weekly challenge for the crew (owner only)
+ */
+export const CreateCrewChallengeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const createCrewChallengeBodyLabelMax = 40;
+
+
+
+export const CreateCrewChallengeBody = zod.object({
+  "metric": zod.enum(['roi', 'win_rate', 'calibration', 'postmortem_rate']).describe('The metric this challenge measures'),
+  "label": zod.string().min(1).max(createCrewChallengeBodyLabelMax).describe('Human-readable name shown in banners (e.g. \"Sharp Week\")')
+})
+
+export const CreateCrewChallengeResponse = zod.object({
+  "id": zod.number(),
+  "crewId": zod.number(),
+  "metric": zod.enum(['roi', 'win_rate', 'calibration', 'postmortem_rate']),
+  "label": zod.string(),
+  "startDate": zod.string().describe('Inclusive challenge start date (YYYY-MM-DD, UTC)'),
+  "endDate": zod.string().describe('Inclusive challenge end date (YYYY-MM-DD, UTC)'),
+  "createdBy": zod.number(),
+  "winnerId": zod.number().nullish(),
+  "winnerValue": zod.number().nullish(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List crew challenges — active first, then last 8 completed
+ */
+export const ListCrewChallengesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListCrewChallengesResponseItem = zod.object({
+  "id": zod.number(),
+  "crewId": zod.number(),
+  "metric": zod.enum(['roi', 'win_rate', 'calibration', 'postmortem_rate']),
+  "label": zod.string(),
+  "startDate": zod.string().describe('Inclusive challenge start date (YYYY-MM-DD, UTC)'),
+  "endDate": zod.string().describe('Inclusive challenge end date (YYYY-MM-DD, UTC)'),
+  "createdBy": zod.number(),
+  "winnerId": zod.number().nullish(),
+  "winnerValue": zod.number().nullish(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "winnerName": zod.string().nullish().describe('Display name of the winner (resolved from winnerId)'),
+  "isActive": zod.boolean().optional().describe('True when the challenge is still open')
+})).describe('A challenge with winner display name resolved (for history lists)')
+export const ListCrewChallengesResponse = zod.array(ListCrewChallengesResponseItem)
+
+
+/**
+ * Returns real-time metric standings for the active challenge computed from settled plays within the challenge window. If the challenge end date has passed, this endpoint auto-closes it (records the winner) before returning the final result.
+ * @summary Live standings for the crew's active challenge
+ */
+export const GetActiveChallengeStandingsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetActiveChallengeStandingsResponse = zod.object({
+  "challenge": zod.object({
+  "id": zod.number(),
+  "crewId": zod.number(),
+  "metric": zod.enum(['roi', 'win_rate', 'calibration', 'postmortem_rate']),
+  "label": zod.string(),
+  "startDate": zod.string().describe('Inclusive challenge start date (YYYY-MM-DD, UTC)'),
+  "endDate": zod.string().describe('Inclusive challenge end date (YYYY-MM-DD, UTC)'),
+  "createdBy": zod.number(),
+  "winnerId": zod.number().nullish(),
+  "winnerValue": zod.number().nullish(),
+  "closedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "winnerName": zod.string().nullish().describe('Display name of the winner (resolved from winnerId)'),
+  "isActive": zod.boolean().optional().describe('True when the challenge is still open')
+})).describe('A challenge with winner display name resolved (for history lists)'),
+  "standings": zod.array(zod.object({
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "avatarColor": zod.string(),
+  "value": zod.number().nullable().describe('The metric value for this member (null when no settled plays)'),
+  "rank": zod.number(),
+  "settledCount": zod.number().describe('Settled plays in the challenge window (used for tie-breaking)')
+})),
+  "daysRemaining": zod.number().describe('Days left in the challenge window (0 = last day, -1 = closed)')
+})
+
+
+/**
+ * Owner only. Cancels the challenge without recording a winner. Historical challenges (already closed) cannot be deleted.
+ * @summary Cancel the active challenge (owner only)
+ */
+export const DeleteCrewChallengeParams = zod.object({
+  "id": zod.coerce.number(),
+  "challengeId": zod.coerce.number()
+})
+
+export const DeleteCrewChallengeResponse = zod.void()
+
+
+/**
  * @summary List straight bets
  */
 export const listBetsQueryLimitDefault = 50;
