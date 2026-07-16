@@ -15,3 +15,4 @@
 - [Crew scoping](crew-scoping.md) — social surfaces & by-userId lookups must use crew-aware scope helpers; world-only checks leak across crews; multi-user tests need a shared crew.
 - [Pro billing pattern](pro-billing-pattern.md) — Pro access only via server-verified Whop chain + 24h proUntil cache; checkout serialized by advisory lock; never upsell on status-fetch error.
 - [Rate limiting behind the Replit proxy](rate-limiting.md) — key per user else req.ip with trust proxy=1 (never first XFF hop); dormant under NODE_ENV=test; Clerk live keys auto-swap at publish.
+- [V3 done-definition](v3-roadmap.md) — owner rule: no V4 work until V3 is verifiably done; source of truth is .local/tasks/v3-roadmap-log.md (Wave A = ship blockers incl. cross-crew bets read privacy).
