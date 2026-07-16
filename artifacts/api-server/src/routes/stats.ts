@@ -1295,17 +1295,29 @@ router.post(
 
     try {
       const { openai } = await import("@workspace/integrations-openai-ai-server");
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
-        max_completion_tokens: 200,
-        messages: [
-          { role: "system", content: PRE_BET_SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `Here is this bettor's history for the bet they're about to place. Give them the coaching note.\n\n${JSON.stringify(facts, null, 2)}`,
-          },
-        ],
-      });
+      // A slow provider must not hang the request — the form is waiting on
+      // this. Race the call against a hard deadline; a timeout falls through
+      // to the same 503 the client already knows how to shrug off.
+      const rawTimeout = Number(process.env.PRE_BET_AI_TIMEOUT_MS);
+      const timeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0 ? Math.floor(rawTimeout) : 8000;
+      let deadline: NodeJS.Timeout | undefined;
+      const completion = await Promise.race([
+        openai.chat.completions.create({
+          model: "gpt-4.1-mini",
+          max_completion_tokens: 200,
+          messages: [
+            { role: "system", content: PRE_BET_SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: `Here is this bettor's history for the bet they're about to place. Give them the coaching note.\n\n${JSON.stringify(facts, null, 2)}`,
+            },
+          ],
+        }),
+        new Promise<never>((_, reject) => {
+          deadline = setTimeout(() => reject(new Error(`AI provider timed out after ${timeoutMs}ms`)), timeoutMs);
+          deadline.unref?.();
+        }),
+      ]).finally(() => clearTimeout(deadline));
       const note = completion.choices[0]?.message?.content?.trim();
       if (!note) throw new Error("Empty response from AI");
       res.json({ note });

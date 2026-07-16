@@ -1,5 +1,5 @@
 import { Link, useLocation, useParams } from "wouter"
-import { useGetParlay, useSettleParlay, useUnsettleParlay, useUpdateParlayLeg, useRecomputeParlayOdds, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
+import { useGetParlay, useSettleParlay, useUnsettleParlay, useUpdateParlayLeg, useRecomputeParlayOdds, useDeleteParlay, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -17,7 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw, Lightbulb } from "lucide-react"
+import { ArrowLeft, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw, Lightbulb, Trash2 } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import type { LegResult } from "@workspace/api-client-react"
@@ -49,6 +49,26 @@ export default function ParlayDetail() {
   const settleParlay = useSettleParlay()
   const unsettleParlay = useUnsettleParlay()
   const updateParlayLeg = useUpdateParlayLeg()
+  const deleteParlay = useDeleteParlay()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  const handleDelete = () => {
+    deleteParlay.mutate({ id: parlayId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListParlaysQueryKey() })
+        queryClient.invalidateQueries({ queryKey: getGetNeedsSettlingQueryKey() })
+        if (activeUser) {
+          queryClient.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey({ userId: activeUser.id }) })
+          queryClient.invalidateQueries({ queryKey: getGetBankrollQueryKey({ userId: activeUser.id }) })
+          queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey() })
+          queryClient.invalidateQueries({ queryKey: getGetUserBadgesQueryKey(activeUser.id) })
+          queryClient.invalidateQueries({ queryKey: getGetStreaksQueryKey({ userId: activeUser.id }) })
+        }
+        setDeleteOpen(false)
+        setLocation('/parlays')
+      },
+    })
+  }
 
   const handleReopen = () => {
     unsettleParlay.mutate({ id: parlayId }, {
@@ -242,6 +262,14 @@ export default function ParlayDetail() {
   const hasDeadZoneIssue = deadZoneLegs.length > 0 || hasDeadZoneCombined
   const isOwner = activeUser?.id === parlay.userId
 
+  // Delete-impact math: a settled parlay already moved the bankroll by
+  // (actualPayout - stake). Deleting appends a correction entry of the
+  // opposite sign — this is the number the confirm dialog must show.
+  const settledNetImpact = isSettled && parlay.actualPayout !== null && parlay.actualPayout !== undefined
+    ? parlay.actualPayout - parlay.stake
+    : 0
+  const deleteMovesMoney = isSettled && Math.abs(settledNetImpact) >= 0.005
+
   const statusLabel: Record<SettleStatus, string> = { won: 'Won ✓', lost: 'Lost ✗', push: 'Push', void: 'Void' }
 
   // Derive the only grade the leg results allow, so the overall result can't
@@ -352,14 +380,14 @@ export default function ParlayDetail() {
                               type="button"
                               onClick={() => openFixDialog(leg.id)}
                               title="These odds aren't a real American price — click to re-enter them."
-                              className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-500 transition-colors hover:bg-amber-500/25 hover:border-amber-500/70"
+                              className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-500 transition-colors hover:bg-amber-500/25 hover:border-amber-500/70"
                             >
                               <AlertTriangle className="h-3 w-3" /> Re-enter odds
                             </button>
                           ) : (
                             <Badge
                               variant="outline"
-                              className="text-[10px] border-amber-500/40 bg-amber-500/10 text-amber-500 gap-1"
+                              className="text-xs border-amber-500/40 bg-amber-500/10 text-amber-500 gap-1"
                               title="These odds aren't a real American price — they need to be re-entered."
                             >
                               <AlertTriangle className="h-3 w-3" /> Re-enter odds
@@ -594,8 +622,89 @@ export default function ParlayDetail() {
               </CardContent>
             </Card>
           )}
+
+          {/* Delete — owner only. Settled parlays moved money, so the confirm
+              dialog spells out exactly what the reversal does to the balance. */}
+          {isOwner && (
+            <Card className="border-destructive/20 bg-card">
+              <CardContent className="pt-6 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  {isSettled
+                    ? 'Deleting a settled parlay also reverses its bankroll impact with a correction entry.'
+                    : 'This parlay is still pending — no money has moved, so deleting it leaves your bankroll untouched.'}
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
+                  onClick={() => setDeleteOpen(true)}
+                  data-testid="button-delete-parlay"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete this parlay
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* Delete confirmation — the warning contract. Before anything is
+          removed, the bettor sees exactly what happens to the balance. */}
+      <Dialog open={deleteOpen} onOpenChange={(open) => { if (!open) setDeleteOpen(false) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this parlay?</DialogTitle>
+            <DialogDescription>
+              {parlay.name} · {parlay.legs.length} legs · {formatCurrency(parlay.stake)} stake
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1 text-sm" data-testid="text-delete-impact">
+            {!isSettled ? (
+              <p className="text-muted-foreground">
+                This parlay hasn't settled, so it never touched your bankroll. Deleting removes it
+                and all its legs from the record — your balance doesn't change.
+              </p>
+            ) : deleteMovesMoney ? (
+              <>
+                <p className="text-muted-foreground">
+                  This parlay already settled and moved your bankroll by{' '}
+                  <span className={`font-mono font-semibold ${settledNetImpact > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {settledNetImpact > 0 ? '+' : '−'}{formatCurrency(Math.abs(settledNetImpact))}
+                  </span>.
+                </p>
+                <p className="text-muted-foreground">
+                  Deleting it adds a correction entry, so your balance will change by{' '}
+                  <span className={`font-mono font-semibold ${settledNetImpact > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    {settledNetImpact > 0 ? '−' : '+'}{formatCurrency(Math.abs(settledNetImpact))}
+                  </span>. The ledger keeps both entries — nothing is silently rewritten.
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                This parlay settled as a wash — your stake came back, so deleting it won't change
+                your balance. It only disappears from the record.
+              </p>
+            )}
+            <p className="text-muted-foreground">This can't be undone.</p>
+          </div>
+          {deleteParlay.isError && (
+            <p className="text-sm text-chart-2" role="alert" data-testid="text-delete-error">
+              {getApiErrorMessage(deleteParlay.error, "Couldn't delete this parlay. Nothing was removed — try again.")}
+            </p>
+          )}
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} className="sm:w-auto w-full">Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteParlay.isPending}
+              className="sm:w-auto w-full"
+              data-testid="button-confirm-delete-parlay"
+            >
+              {deleteParlay.isPending ? 'Deleting...' : 'Delete parlay'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Leg odds re-entry (dead-zone repair) modal */}
       <Dialog open={fixLegId !== null} onOpenChange={(open) => { if (!open) setFixLegId(null) }}>

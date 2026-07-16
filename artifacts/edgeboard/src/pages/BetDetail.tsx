@@ -1,5 +1,5 @@
 import { Link, useLocation, useParams } from "wouter"
-import { useGetBet, useSettleBet, useUnsettleBet, useUpdateBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
+import { useGetBet, useSettleBet, useUnsettleBet, useUpdateBet, useDeleteBet, getListBetsQueryKey, getGetBetQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
 import { useState } from "react"
@@ -17,7 +17,7 @@ import { useOddsFormat } from "@/hooks/use-odds-format"
 import { isDeadZoneOdds } from "@/lib/odds"
 import { getApiErrorMessage } from "@/lib/api-error"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw, Lightbulb } from "lucide-react"
+import { ArrowLeft, Calendar, DollarSign, Brain, Check, X, Minus, Ban, Lock, AlertTriangle, RotateCcw, Lightbulb, Trash2 } from "lucide-react"
 import { SettleMoment, type SettleMomentData } from "@/components/SettleMoment"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 
@@ -48,6 +48,8 @@ export default function BetDetail() {
   const settleBet = useSettleBet()
   const unsettleBet = useUnsettleBet()
   const updateBet = useUpdateBet()
+  const deleteBet = useDeleteBet()
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const invalidateBetQueries = () => {
     queryClient.invalidateQueries({ queryKey: getGetBetQueryKey(betId) })
@@ -65,6 +67,16 @@ export default function BetDetail() {
   const handleReopen = () => {
     unsettleBet.mutate({ id: betId }, {
       onSuccess: invalidateBetQueries,
+    })
+  }
+
+  const handleDelete = () => {
+    deleteBet.mutate({ id: betId }, {
+      onSuccess: () => {
+        invalidateBetQueries()
+        setDeleteOpen(false)
+        setLocation('/bets')
+      },
     })
   }
 
@@ -185,6 +197,14 @@ export default function BetDetail() {
   const isSettled = !isPending
   const hasDeadZoneOdds = isDeadZoneOdds(bet.odds)
   const isOwner = activeUser?.id === bet.userId
+
+  // Delete-impact math: a settled bet already moved the bankroll by
+  // (actualPayout - stake). Deleting appends a correction entry of the
+  // opposite sign — this is the number the confirm dialog must show.
+  const settledNetImpact = isSettled && bet.actualPayout !== null && bet.actualPayout !== undefined
+    ? bet.actualPayout - bet.stake
+    : 0
+  const deleteMovesMoney = isSettled && Math.abs(settledNetImpact) >= 0.005
 
   const statusLabel: Record<SettleStatus, string> = { won: 'Won ✓', lost: 'Lost ✗', push: 'Push', void: 'Void' }
   const statusColor: Record<SettleStatus, string> = {
@@ -417,7 +437,88 @@ export default function BetDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Delete — owner only. Settled bets moved money, so the confirm
+            dialog spells out exactly what the reversal does to the balance. */}
+        {isOwner && (
+          <Card className="border-destructive/20 bg-card h-fit md:col-span-3">
+            <CardContent className="pt-6 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <p className="text-xs text-muted-foreground">
+                {isSettled
+                  ? 'Deleting a settled bet also reverses its bankroll impact with a correction entry.'
+                  : 'This bet is still pending — no money has moved, so deleting it leaves your bankroll untouched.'}
+              </p>
+              <Button
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 shrink-0"
+                onClick={() => setDeleteOpen(true)}
+                data-testid="button-delete-bet"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete this bet
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Delete confirmation — the warning contract. Before anything is
+          removed, the bettor sees exactly what happens to the balance. */}
+      <Dialog open={deleteOpen} onOpenChange={(open) => { if (!open) setDeleteOpen(false) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this bet?</DialogTitle>
+            <DialogDescription>
+              {bet.pick} · {formatCurrency(bet.stake)} stake
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1 text-sm" data-testid="text-delete-impact">
+            {!isSettled ? (
+              <p className="text-muted-foreground">
+                This bet hasn't settled, so it never touched your bankroll. Deleting removes it
+                from the record — your balance doesn't change.
+              </p>
+            ) : deleteMovesMoney ? (
+              <>
+                <p className="text-muted-foreground">
+                  This bet already settled and moved your bankroll by{' '}
+                  <span className={`font-mono font-semibold ${settledNetImpact > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {settledNetImpact > 0 ? '+' : '−'}{formatCurrency(Math.abs(settledNetImpact))}
+                  </span>.
+                </p>
+                <p className="text-muted-foreground">
+                  Deleting it adds a correction entry, so your balance will change by{' '}
+                  <span className={`font-mono font-semibold ${settledNetImpact > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    {settledNetImpact > 0 ? '−' : '+'}{formatCurrency(Math.abs(settledNetImpact))}
+                  </span>. The ledger keeps both entries — nothing is silently rewritten.
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                This bet settled as a wash — your stake came back, so deleting it won't change
+                your balance. It only disappears from the record.
+              </p>
+            )}
+            <p className="text-muted-foreground">This can't be undone.</p>
+          </div>
+          {deleteBet.isError && (
+            <p className="text-sm text-chart-2" role="alert" data-testid="text-delete-error">
+              {getApiErrorMessage(deleteBet.error, "Couldn't delete this bet. Nothing was removed — try again.")}
+            </p>
+          )}
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} className="sm:w-auto w-full">Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteBet.isPending}
+              className="sm:w-auto w-full"
+              data-testid="button-confirm-delete-bet"
+            >
+              {deleteBet.isPending ? 'Deleting...' : 'Delete bet'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Odds re-entry modal (dead-zone repair) */}
       <Dialog open={fixOpen} onOpenChange={(open) => { if (!open) setFixOpen(false) }}>

@@ -6,7 +6,8 @@
  * below the pick field with an Arc indicator and a dismiss button.
  *
  * - Loading: button shows a spinner, cannot be re-clicked
- * - Error: button resets silently (never blocks the form)
+ * - Error: button resets and a one-line "Arc is unavailable" note appears
+ *   (never blocks the form — the bet doesn't need Arc's permission)
  * - Note: persists until dismissed or the form resets
  * - Free tier: renders an UpgradeCard teaser in compact mode
  */
@@ -53,15 +54,18 @@ export function ArcCoachNote({ enabled, sport, odds, betType, stake, pick }: Arc
   const { isPro } = useProStatus()
   const [note, setNote] = useState<string | null>(null)
   const [dismissed, setDismissed] = useState(false)
+  const [unavailable, setUnavailable] = useState(false)
 
   const check = usePreBetCheck({
     mutation: {
       onSuccess: (data) => {
         setNote(data.note)
         setDismissed(false)
+        setUnavailable(false)
       },
       onError: () => {
-        // Silent failure — button simply resets
+        // Never blocks the form — the button resets and we say why.
+        setUnavailable(true)
       },
     },
   })
@@ -90,6 +94,7 @@ export function ArcCoachNote({ enabled, sport, odds, betType, stake, pick }: Arc
           onClick={() => {
             setNote(null)
             setDismissed(false)
+            setUnavailable(false)
             check.mutate({
               data: {
                 sport,
@@ -115,6 +120,14 @@ export function ArcCoachNote({ enabled, sport, odds, betType, stake, pick }: Arc
             </>
           )}
         </Button>
+      )}
+
+      {/* Provider down or slow — say so instead of silently resetting.
+          Informational only; the bet form stays fully usable. */}
+      {unavailable && (!note || dismissed) && (
+        <p className="text-xs text-muted-foreground" role="status" data-testid="text-arc-coach-unavailable">
+          Arc is taking a breather — your bet doesn't need permission. Try again in a moment.
+        </p>
       )}
 
       {/* The coaching note */}

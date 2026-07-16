@@ -282,11 +282,11 @@ export default function Bets() {
                       </TableCell>
                       <TableCell className="font-mono">
                         {isDeadZoneOdds(bet.odds) ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-amber-500">{formatOdds(bet.odds)}</span>
                             <Badge
                               variant="outline"
-                              className="border-amber-500/40 bg-amber-500/10 text-amber-500 font-sans text-[10px] gap-1 whitespace-nowrap"
+                              className="border-amber-500/40 bg-amber-500/10 text-amber-500 font-sans text-xs gap-1 whitespace-nowrap"
                               title="These odds aren't a real American price. Open the bet to re-enter them."
                             >
                               <AlertTriangle className="h-3 w-3" /> Re-enter odds
