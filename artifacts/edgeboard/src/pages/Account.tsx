@@ -20,11 +20,135 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useDeleteCurrentUser } from "@workspace/api-client-react"
 import { getApiErrorMessage } from "@/lib/api-error"
-import { Sparkles, ExternalLink, Crown, Check, ShieldCheck, Trash2 } from "lucide-react"
+import { Sparkles, ExternalLink, Crown, Check, ShieldCheck, Trash2, Bell, BellOff, BellRing } from "lucide-react"
+import { useNotifications } from "@/hooks/useNotifications"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
 const DELETE_PHRASE = "DELETE"
+
+/** Push notification preferences section on the Account page. */
+function NotificationsSection() {
+  const { supported, permission, subscribed, prefs, loading, requestAndSubscribe, unsubscribe, updatePref } =
+    useNotifications()
+
+  if (!supported) {
+    return (
+      <Card data-testid="card-notifications">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="h-4 w-4 text-muted-foreground" />
+            Notifications
+          </CardTitle>
+          <CardDescription>
+            Push notifications aren't supported in this browser. Try Chrome or Firefox on
+            desktop, or your phone's browser.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
+
+  return (
+    <Card data-testid="card-notifications">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="text-base flex items-center gap-2">
+              {subscribed ? (
+                <BellRing className="h-4 w-4 text-primary" />
+              ) : (
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              )}
+              Notifications
+            </CardTitle>
+            <CardDescription>
+              {permission === "denied"
+                ? "Notifications are blocked in your browser — open browser settings to allow them for this site."
+                : subscribed
+                  ? "TiltCheck will nudge you before bad patterns get worse."
+                  : "Get nudged before bad patterns get worse. Enable once, works across sessions."}
+            </CardDescription>
+          </div>
+          {permission !== "denied" && (
+            <Button
+              variant={subscribed ? "outline" : "default"}
+              size="sm"
+              onClick={subscribed ? unsubscribe : requestAndSubscribe}
+              disabled={loading}
+              data-testid="button-notifications-toggle"
+            >
+              {loading ? "…" : subscribed ? (
+                <>
+                  <BellOff className="h-3.5 w-3.5 mr-1.5" />
+                  Turn off
+                </>
+              ) : (
+                <>
+                  <Bell className="h-3.5 w-3.5 mr-1.5" />
+                  Enable
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      {subscribed && (
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            What you hear about
+          </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="notify-overdue" className="flex flex-col gap-0.5 cursor-pointer">
+                <span className="text-sm font-medium">Overdue bets</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  Remind me when a play has been pending over 48 hours
+                </span>
+              </Label>
+              <Switch
+                id="notify-overdue"
+                checked={prefs.notifyOverdue}
+                onCheckedChange={(v) => updatePref("notifyOverdue", v)}
+                data-testid="switch-notify-overdue"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="notify-tilt" className="flex flex-col gap-0.5 cursor-pointer">
+                <span className="text-sm font-medium">Tilt alert</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  Warn me when my session matches my tilt pattern
+                </span>
+              </Label>
+              <Switch
+                id="notify-tilt"
+                checked={prefs.notifyTilt}
+                onCheckedChange={(v) => updatePref("notifyTilt", v)}
+                data-testid="switch-notify-tilt"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="notify-crew" className="flex flex-col gap-0.5 cursor-pointer">
+                <span className="text-sm font-medium">Crew activity</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  Notify me when a crew member cashes a notable win
+                </span>
+              </Label>
+              <Switch
+                id="notify-crew"
+                checked={prefs.notifyCrewActivity}
+                onCheckedChange={(v) => updatePref("notifyCrewActivity", v)}
+                data-testid="switch-notify-crew"
+              />
+            </div>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  )
+}
 
 /** Typed-confirmation account deletion. Irreversible, so the button stays
  * dead until the user types the phrase; on success the session is ended. */
@@ -270,6 +394,8 @@ export default function Account() {
           <ResponsibleGamblingNote />
         </CardContent>
       </Card>
+
+      <NotificationsSection />
 
       <DeleteAccountSection />
     </div>

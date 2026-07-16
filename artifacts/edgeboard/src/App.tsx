@@ -35,6 +35,21 @@ import { ResponsibleGamblingNote, TrustLinks } from './components/TrustFooter';
 
 const queryClient = new QueryClient();
 
+// Register the push notification service worker once at module load.
+// Runs only when supported; failures are non-fatal (push works progressively).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    // In Vite dev the public dir is served at root; in production the app is
+    // mounted under BASE_URL (e.g. /edgeboard/) and the SW lives there too.
+    const swPath = import.meta.env.DEV
+      ? "/sw.js"
+      : `${import.meta.env.BASE_URL}sw.js`;
+    navigator.serviceWorker.register(swPath, { scope: import.meta.env.BASE_URL }).catch(() => {
+      // SW registration failures are silent — push is a progressive enhancement.
+    });
+  });
+}
+
 // REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
 // same build serves multiple Clerk custom domains.
 const clerkPubKey = publishableKeyFromHost(

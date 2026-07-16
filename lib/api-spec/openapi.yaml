@@ -26,6 +26,8 @@ tags:
     description: TiltCheck Pro subscription operations
   - name: crews
     description: Crew membership and switching operations
+  - name: notifications
+    description: Push notification subscription and preference operations
 
 paths:
   /healthz:
@@ -1613,6 +1615,116 @@ paths:
         "503":
           description: Payment provider unreachable
 
+  # ── Notifications ─────────────────────────────────────────────────────────
+  /notifications/vapid-public-key:
+    get:
+      operationId: getVapidPublicKey
+      tags: [notifications]
+      summary: Return the VAPID public key for creating a push subscription
+      responses:
+        "200":
+          description: VAPID public key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VapidPublicKey"
+        "401":
+          description: Not signed in
+        "503":
+          description: Push notifications not configured on this server
+
+  /notifications/subscribe:
+    post:
+      operationId: subscribePush
+      tags: [notifications]
+      summary: Store (or refresh) a push subscription for the signed-in bettor
+      description: >
+        Upserts a push subscription. Sending the same endpoint again updates the
+        keys and preference toggles — useful when the browser silently rotates
+        a subscription. Preferences default to overdue=true, tilt=true,
+        crew=false on first subscribe; existing toggles are preserved unless
+        explicitly passed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscribePushInput"
+      responses:
+        "200":
+          description: Active notification preferences for this subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+        "400":
+          description: Invalid subscription data
+        "401":
+          description: Not signed in
+
+  /notifications/unsubscribe:
+    delete:
+      operationId: unsubscribePush
+      tags: [notifications]
+      summary: Remove a push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnsubscribePushInput"
+      responses:
+        "204":
+          description: Subscription removed
+        "400":
+          description: Invalid request
+        "401":
+          description: Not signed in
+
+  /notifications/preferences:
+    get:
+      operationId: getNotificationPreferences
+      tags: [notifications]
+      summary: Return the current notification preferences for the signed-in bettor
+      description: >
+        Returns the preferences from the bettor's most recent push subscription,
+        or the defaults (overdue=true, tilt=true, crew=false) when the bettor
+        has no active subscription. Used to hydrate the Account page on mount.
+      responses:
+        "200":
+          description: Current notification preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+        "401":
+          description: Not signed in
+    patch:
+      operationId: updateNotificationPreferences
+      tags: [notifications]
+      summary: Update notification type toggles for all of the user's subscriptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationPrefsInput"
+      responses:
+        "200":
+          description: Preferences updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+        "400":
+          description: No preferences to update
+        "401":
+          description: Not signed in
+
   /admin/overview:
     get:
       operationId: getAdminOverview
@@ -1738,6 +1850,64 @@ components:
           enum: [subscription, founder, demo, none]
           description: Why the account is (or isn't) Pro
       required: [isPro, proUntil, source]
+
+    VapidPublicKey:
+      type: object
+      properties:
+        publicKey:
+          type: string
+      required: [publicKey]
+
+    SubscribePushInput:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          description: Browser-issued push endpoint URL
+        p256dhKey:
+          type: string
+          description: P-256 DH public key (base64url)
+        authKey:
+          type: string
+          description: HMAC authentication secret (base64url)
+        notifyOverdue:
+          type: boolean
+          description: Receive reminders for pending plays older than 48 h
+        notifyTilt:
+          type: boolean
+          description: Receive alerts when the tilt spiral fires
+        notifyCrewActivity:
+          type: boolean
+          description: Receive notifications for notable crew wins
+      required: [endpoint, p256dhKey, authKey]
+
+    UnsubscribePushInput:
+      type: object
+      properties:
+        endpoint:
+          type: string
+      required: [endpoint]
+
+    UpdateNotificationPrefsInput:
+      type: object
+      properties:
+        notifyOverdue:
+          type: boolean
+        notifyTilt:
+          type: boolean
+        notifyCrewActivity:
+          type: boolean
+
+    NotificationPreferences:
+      type: object
+      properties:
+        notifyOverdue:
+          type: boolean
+        notifyTilt:
+          type: boolean
+        notifyCrewActivity:
+          type: boolean
+      required: [notifyOverdue, notifyTilt, notifyCrewActivity]
 
     BillingCheckoutInput:
       type: object

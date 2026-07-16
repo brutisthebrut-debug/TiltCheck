@@ -12,6 +12,7 @@ import workspaceRouter from "./workspace";
 import adminRouter from "./admin";
 import billingRouter from "./billing";
 import crewsRouter from "./crews";
+import notificationsRouter from "./notifications";
 import { requireAuth } from "../middlewares/auth";
 import { demoReadOnly, demoSession } from "../middlewares/demo";
 import { authLimiter, narrativeLimiter, generalLimiter } from "../middlewares/rate-limit";
@@ -68,5 +69,6 @@ router.use(adminRouter);
 // reports Pro via its own bypass in requirePro, never through checkout.
 router.use(billingRouter);
 router.use(crewsRouter);
+router.use(notificationsRouter);
 
 export default router;

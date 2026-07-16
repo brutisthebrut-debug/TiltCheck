@@ -1802,6 +1802,69 @@ export const CreateBillingCheckoutResponse = zod.object({
 
 
 /**
+ * @summary Return the VAPID public key for creating a push subscription
+ */
+export const GetVapidPublicKeyResponse = zod.object({
+  "publicKey": zod.string()
+})
+
+
+/**
+ * Upserts a push subscription. Sending the same endpoint again updates the keys and preference toggles — useful when the browser silently rotates a subscription. Preferences default to overdue=true, tilt=true, crew=false on first subscribe; existing toggles are preserved unless explicitly passed.
+ * @summary Store (or refresh) a push subscription for the signed-in bettor
+ */
+export const SubscribePushBody = zod.object({
+  "endpoint": zod.string().describe('Browser-issued push endpoint URL'),
+  "p256dhKey": zod.string().describe('P-256 DH public key (base64url)'),
+  "authKey": zod.string().describe('HMAC authentication secret (base64url)'),
+  "notifyOverdue": zod.boolean().optional().describe('Receive reminders for pending plays older than 48 h'),
+  "notifyTilt": zod.boolean().optional().describe('Receive alerts when the tilt spiral fires'),
+  "notifyCrewActivity": zod.boolean().optional().describe('Receive notifications for notable crew wins')
+})
+
+export const SubscribePushResponse = zod.object({
+  "notifyOverdue": zod.boolean(),
+  "notifyTilt": zod.boolean(),
+  "notifyCrewActivity": zod.boolean()
+})
+
+
+/**
+ * @summary Remove a push subscription
+ */
+export const UnsubscribePushBody = zod.object({
+  "endpoint": zod.string()
+})
+
+export const UnsubscribePushResponse = zod.void()
+
+
+/**
+ * Returns the preferences from the bettor's most recent push subscription, or the defaults (overdue=true, tilt=true, crew=false) when the bettor has no active subscription. Used to hydrate the Account page on mount.
+ * @summary Return the current notification preferences for the signed-in bettor
+ */
+export const GetNotificationPreferencesResponse = zod.object({
+  "notifyOverdue": zod.boolean(),
+  "notifyTilt": zod.boolean(),
+  "notifyCrewActivity": zod.boolean()
+})
+
+
+/**
+ * @summary Update notification type toggles for all of the user's subscriptions
+ */
+export const UpdateNotificationPreferencesBody = zod.object({
+  "notifyOverdue": zod.boolean().optional(),
+  "notifyTilt": zod.boolean().optional(),
+  "notifyCrewActivity": zod.boolean().optional()
+})
+
+export const UpdateNotificationPreferencesResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Founder dashboard overview — seats, invites, and crew activity
  */
 export const GetAdminOverviewResponse = zod.object({

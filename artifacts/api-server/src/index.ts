@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureDemoSeeded } from "./lib/demo-seed";
 import { ensureCrewsBootstrapped } from "./lib/crews";
+import { startNotificationWorker } from "./lib/notificationWorker";
 
 const rawPort = process.env["PORT"];
 
@@ -43,5 +44,8 @@ app.listen(port, (err) => {
       ensureCrewsBootstrapped().catch((err) => {
         logger.error({ err }, "Crews bootstrap failed");
       });
+      // Start push notification worker after the world is seeded.
+      // Skips silently if VAPID keys are not configured.
+      startNotificationWorker();
     });
 });

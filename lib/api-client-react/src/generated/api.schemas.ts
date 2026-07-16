@@ -67,6 +67,41 @@ export interface BillingStatus {
   source: BillingStatusSource;
 }
 
+export interface VapidPublicKey {
+  publicKey: string;
+}
+
+export interface SubscribePushInput {
+  /** Browser-issued push endpoint URL */
+  endpoint: string;
+  /** P-256 DH public key (base64url) */
+  p256dhKey: string;
+  /** HMAC authentication secret (base64url) */
+  authKey: string;
+  /** Receive reminders for pending plays older than 48 h */
+  notifyOverdue?: boolean;
+  /** Receive alerts when the tilt spiral fires */
+  notifyTilt?: boolean;
+  /** Receive notifications for notable crew wins */
+  notifyCrewActivity?: boolean;
+}
+
+export interface UnsubscribePushInput {
+  endpoint: string;
+}
+
+export interface UpdateNotificationPrefsInput {
+  notifyOverdue?: boolean;
+  notifyTilt?: boolean;
+  notifyCrewActivity?: boolean;
+}
+
+export interface NotificationPreferences {
+  notifyOverdue: boolean;
+  notifyTilt: boolean;
+  notifyCrewActivity: boolean;
+}
+
 export interface BillingCheckoutInput {
   /** Absolute http(s) URL the hosted checkout redirects back to after payment */
   returnUrl: string;
@@ -1716,4 +1751,8 @@ export const GetWorkspaceLeaderboardPeriod = {
   month: 'month',
   all: 'all',
 } as const;
+
+export type UpdateNotificationPreferences200 = {
+  ok: boolean;
+};
 
