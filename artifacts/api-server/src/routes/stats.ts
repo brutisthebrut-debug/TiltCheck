@@ -12,6 +12,7 @@ import {
   GetEdgeFinderQueryParams,
   GetWeeklyRecapQueryParams,
   GetRecapNarrativeQueryParams,
+  PreBetCheckBody,
 } from "@workspace/api-zod";
 import { isValidAmericanOdds } from "../lib/odds";
 import { isRealCalendarDate } from "../lib/dates";
@@ -20,6 +21,7 @@ import { assembleRecapFacts, generateRecapNarrative, NARRATIVE_MODEL } from "../
 import { logger } from "../lib/logger";
 import { requireProfile } from "../middlewares/auth";
 import { requirePro } from "../middlewares/billing";
+import { preBetCheckLimiter } from "../middlewares/rate-limit";
 import { userScopeCondition, userInSocialScope, getSocialUsers } from "../lib/scope";
 import { isDemoRequest } from "../middlewares/demo";
 
@@ -1135,6 +1137,120 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
     res.json({ weekStart, narrative: null });
   }
 });
+
+// ── Pre-bet Arc coaching check ──────────────────────────────────────────────
+
+const PRE_BET_SYSTEM_PROMPT = `You are EdgeBoard's pre-bet coach. EdgeBoard is a private bet tracker a friend group uses to study their own decision-making — it never gives picks.
+
+Voice (non-negotiable): blunt like a trainer reviewing game tape, big-sibling energy, dry humor welcome. Never mean, never preachy, no clichés. Address the bettor as "you".
+
+Hard rules:
+- You may ONLY reference the numbers in the provided JSON. Never invent or extrapolate.
+- Reflection only: talk about their historical tendencies in this sport/bet-type/odds range. NEVER suggest what to bet, which team to pick, or predict outcomes.
+- If history is thin (<5 settled plays), say so directly — don't pad with generic advice.
+- 2–3 sentences maximum. End with a short punchy sentence (can end with "Your call." or similar).
+- Plain text only. No headings, no bullets, no emoji, no markdown.`;
+
+/** Demo coaching notes keyed by sport — deterministic, no AI call. */
+function demoPrebetNote(sport: string, odds: number): string {
+  const isFavorite = odds < 0;
+  const notes: Record<string, string> = {
+    NFL: isFavorite
+      ? "In the demo, this bettor is 4–9 on NFL favorites laying more than a field goal — a 31% clip that's cost 18 units. The sample's big enough to be a pattern, not noise. Your call."
+      : "In the demo, they're 6–3 on NFL dogs in this range — but all three losses came in primetime road spots. Worth knowing.",
+    NBA: "In the demo, NBA totals have been a -12 unit bleed over 23 plays. The over is hitting at 39% — that's the house's number, not a bettor's. Your call.",
+    MLB: "In the demo, MLB is the worst sport by ROI: -31 units on 41 bets. The sample is too big to be bad luck. It means something.",
+    NCAAF: "In the demo, NCAAF spreads are 8–17 — a 32% clip. Most of the losses came laying points on road teams. Something to watch.",
+    NCAAB: "In the demo, NCAAB has been a wash: 11–11 against the spread, roughly break-even after juice. No edge identified here.",
+    default: "In the demo, this angle doesn't have enough history to say anything meaningful — fewer than 5 settled plays in this sport and bet type. The data isn't there yet.",
+  };
+  return notes[sport] ?? notes.default;
+}
+
+/** POST /stats/pre-bet-check — Arc coaching note for an in-progress bet. */
+router.post(
+  "/stats/pre-bet-check",
+  requireProfile,
+  requirePro,
+  preBetCheckLimiter,
+  async (req, res): Promise<void> => {
+    const parsed = PreBetCheckBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    const { sport, betType, odds, stake, pick } = parsed.data;
+    const userId = req.currentUser!.id;
+
+    // Demo: return a deterministic seeded note, no AI call.
+    if (isDemoRequest(req)) {
+      res.json({ note: demoPrebetNote(sport, odds) });
+      return;
+    }
+
+    // Pull settled straight bets for this bettor in the relevant sport and
+    // bet type — this is the history Arc reads.
+    const where = [
+      eq(betsTable.userId, userId),
+      inArray(betsTable.status, ["won", "lost", "push"]),
+      eq(betsTable.sport, sport),
+      ...(betType ? [eq(betsTable.betType, betType as "moneyline" | "spread" | "total" | "prop" | "futures")] : []),
+    ];
+    const history = (await db.select().from(betsTable).where(and(...where)).orderBy(desc(betsTable.settledAt)).limit(60)).filter(hasValidOdds);
+
+    // Compute a compact fact summary — the AI only ever sees aggregates, never raw rows.
+    const decided = history.filter((b) => b.status === "won" || b.status === "lost");
+    const wins = decided.filter((b) => b.status === "won").length;
+    const winRate = decided.length > 0 ? Math.round((wins / decided.length) * 1000) / 10 : null;
+    const totalProfit = history.reduce((s, b) => s + (Number(b.actualPayout ?? 0) - Number(b.stake)), 0);
+    const avgOdds = history.length > 0 ? Math.round(history.reduce((s, b) => s + b.odds, 0) / history.length) : null;
+
+    // Similar-price bucket: ±50 from the proposed odds
+    const similar = history.filter((b) => Math.abs(b.odds - odds) <= 50);
+    const similarDecided = similar.filter((b) => b.status === "won" || b.status === "lost");
+    const similarWins = similarDecided.filter((b) => b.status === "won").length;
+
+    const facts = {
+      sport,
+      betType: betType ?? "all",
+      proposedOdds: odds,
+      proposedStake: stake ?? null,
+      pick: pick ?? null,
+      settledPlays: history.length,
+      record: { wins, losses: decided.length - wins, pushes: history.length - decided.length },
+      winRate,
+      netProfit: Math.round(totalProfit * 100) / 100,
+      avgOdds,
+      similarOddsRange: {
+        plays: similar.length,
+        wins: similarWins,
+        losses: similarDecided.length - similarWins,
+        winRate: similarDecided.length > 0 ? Math.round((similarWins / similarDecided.length) * 1000) / 10 : null,
+      },
+    };
+
+    try {
+      const { openai } = await import("@workspace/integrations-openai-ai-server");
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4.1-mini",
+        max_completion_tokens: 200,
+        messages: [
+          { role: "system", content: PRE_BET_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Here is this bettor's history for the bet they're about to place. Give them the coaching note.\n\n${JSON.stringify(facts, null, 2)}`,
+          },
+        ],
+      });
+      const note = completion.choices[0]?.message?.content?.trim();
+      if (!note) throw new Error("Empty response from AI");
+      res.json({ note });
+    } catch (err) {
+      logger.warn({ err, userId, sport }, "Pre-bet coaching note unavailable");
+      res.status(503).json({ error: "coaching_unavailable", message: "Arc is taking a breather — try again in a moment." });
+    }
+  }
+);
 
 // In-flight narrative generations, keyed `${userId}:${weekStart}`.
 const narrativeFlights = new Map<string, Promise<string>>();

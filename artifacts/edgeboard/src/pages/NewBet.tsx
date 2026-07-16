@@ -25,6 +25,7 @@ import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, ChevronDown, AlertTriangle, Lightbulb } from "lucide-react"
 import { MistakeWarning } from "@/components/MistakeWarning"
+import { ArcCoachNote } from "@/components/ArcCoachNote"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 import { dayOf } from "@workspace/weeks"
 
@@ -89,6 +90,8 @@ export default function NewBet() {
   const watchSportsbook = form.watch("sportsbook")
   const watchSport = form.watch("sport")
   const watchConfidence = form.watch("confidenceScore")
+  const watchPick = form.watch("pick")
+  const watchBetType = form.watch("betType")
 
   // The bettor's own history, turned into one pointed heads-up before they
   // repeat their most common mistake. Never blocks the bet. Pro-only: free
@@ -307,6 +310,17 @@ export default function NewBet() {
                   )}
                 />
               </div>
+
+              {/* Arc pre-bet coaching — appears once sport + pick + odds are filled.
+                  Pro-only; free accounts see a compact upgrade teaser instead. */}
+              <ArcCoachNote
+                enabled={!!watchSport && !!watchPick && isValidAmericanOdds(watchOdds)}
+                sport={watchSport}
+                odds={watchOdds}
+                betType={watchBetType}
+                stake={watchStake}
+                pick={watchPick}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField

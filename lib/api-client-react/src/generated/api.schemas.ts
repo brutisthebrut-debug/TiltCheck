@@ -755,6 +755,30 @@ export interface BankrollHistory {
   points: BankrollHistoryPoint[];
 }
 
+export interface PreBetCheckInput {
+  /** Sport for this bet (e.g. NFL, NBA) */
+  sport: string;
+  /** Bet type (moneyline, spread, total, prop, futures) */
+  betType?: string;
+  /** American odds for this bet */
+  odds: number;
+  /**
+     * Proposed stake in dollars (optional context)
+     * @nullable
+     */
+  stake?: number | null;
+  /**
+     * Pick text for additional context (optional)
+     * @nullable
+     */
+  pick?: string | null;
+}
+
+export interface PreBetCheckResult {
+  /** 2–3 sentence coaching note from Arc */
+  note: string;
+}
+
 /**
  * The sport losing the most money, when it has cost at least $50 over 5+ bets
  * @nullable

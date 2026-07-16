@@ -1481,6 +1481,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/StreaksSummary"
 
+  /stats/pre-bet-check:
+    post:
+      operationId: preBetCheck
+      tags: [stats]
+      summary: Get Arc's pre-bet coaching note for an in-progress bet (Pro)
+      description: >
+        Pro-only. Reads the bettor's settled history in the specified sport and
+        bet type, then generates a 2–3 sentence coaching note via AI. Ephemeral —
+        not persisted. Rate-limited to 10 checks per hour per bettor.
+        Demo sessions return a deterministic simulated response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreBetCheckInput"
+      responses:
+        "200":
+          description: Coaching note from Arc
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreBetCheckResult"
+        "401":
+          description: Not signed in
+        "402":
+          description: Pro feature — upgrade required (`error` is `pro_required`)
+        "429":
+          description: Rate limit reached (10 per hour)
+
   # ── Workspace ─────────────────────────────────────────────────────────────
   /workspace:
     get:
@@ -2548,6 +2578,34 @@ components:
           items:
             $ref: "#/components/schemas/BankrollHistoryPoint"
       required: [startingBalance, points]
+
+    PreBetCheckInput:
+      type: object
+      required: [sport, odds]
+      properties:
+        sport:
+          type: string
+          description: Sport for this bet (e.g. NFL, NBA)
+        betType:
+          type: string
+          description: Bet type (moneyline, spread, total, prop, futures)
+        odds:
+          type: integer
+          description: American odds for this bet
+        stake:
+          type: ["number", "null"]
+          description: Proposed stake in dollars (optional context)
+        pick:
+          type: ["string", "null"]
+          description: Pick text for additional context (optional)
+
+    PreBetCheckResult:
+      type: object
+      required: [note]
+      properties:
+        note:
+          type: string
+          description: 2–3 sentence coaching note from Arc
 
     LeakProfile:
       type: object

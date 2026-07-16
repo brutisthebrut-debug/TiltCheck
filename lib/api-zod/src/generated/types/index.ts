@@ -105,6 +105,8 @@ export * from './parlaySettlementReasoningQuality';
 export * from './parlaySettlementStatus';
 export * from './parlayStatus';
 export * from './parlayUpdate';
+export * from './preBetCheckInput';
+export * from './preBetCheckResult';
 export * from './reasoningQualityStats';
 export * from './recapLeak';
 export * from './recapLeakKind';

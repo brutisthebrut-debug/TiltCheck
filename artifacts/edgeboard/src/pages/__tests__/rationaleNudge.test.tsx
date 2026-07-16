@@ -37,6 +37,11 @@ vi.mock("@workspace/api-client-react", () => ({
   // Pulled in transitively via useOddsFormat
   useUpdateUser: () => ({ mutate: vi.fn(), isPending: false }),
   getGetCurrentUserQueryKey: () => ["current-user"],
+  // ArcCoachNote pre-bet coaching — isPro is false in these tests so the
+  // button is replaced by an UpgradeCard teaser; mutate is never called.
+  usePreBetCheck: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  // UpgradeCard checkout (rendered in upgrade teaser path)
+  useCreateBillingCheckout: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
 
 vi.mock("@/contexts/UserContext", () => ({

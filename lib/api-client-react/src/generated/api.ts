@@ -73,6 +73,8 @@ import type {
   ParlayLegUpdate,
   ParlaySettlement,
   ParlayUpdate,
+  PreBetCheckInput,
+  PreBetCheckResult,
   RecapNarrative,
   SportStats,
   StatsSummary,
@@ -4356,6 +4358,78 @@ export function useGetStreaks<TData = Awaited<ReturnType<typeof getStreaks>>, TE
 
 
 
+
+export const getPreBetCheckUrl = () => {
+
+
+
+
+  return `/api/stats/pre-bet-check`
+}
+
+/**
+ * Pro-only. Reads the bettor's settled history in the specified sport and bet type, then generates a 2–3 sentence coaching note via AI. Ephemeral — not persisted. Rate-limited to 10 checks per hour per bettor. Demo sessions return a deterministic simulated response.
+ * @summary Get Arc's pre-bet coaching note for an in-progress bet (Pro)
+ */
+export const preBetCheck = async (preBetCheckInput: PreBetCheckInput, options?: RequestInit): Promise<PreBetCheckResult> => {
+
+  return customFetch<PreBetCheckResult>(getPreBetCheckUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(preBetCheckInput)
+  }
+);}
+
+
+
+
+
+export const getPreBetCheckMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preBetCheck>>, TError,{data: BodyType<PreBetCheckInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof preBetCheck>>, TError,{data: BodyType<PreBetCheckInput>}, TContext> => {
+
+const mutationKey = ['preBetCheck'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof preBetCheck>>, {data: BodyType<PreBetCheckInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  preBetCheck(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreBetCheckMutationResult = NonNullable<Awaited<ReturnType<typeof preBetCheck>>>
+    export type PreBetCheckMutationBody = BodyType<PreBetCheckInput>
+    export type PreBetCheckMutationError = ErrorType<void>
+
+    /**
+ * @summary Get Arc's pre-bet coaching note for an in-progress bet (Pro)
+ */
+export const usePreBetCheck = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof preBetCheck>>, TError,{data: BodyType<PreBetCheckInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof preBetCheck>>,
+        TError,
+        {data: BodyType<PreBetCheckInput>},
+        TContext
+      > => {
+      return useMutation(getPreBetCheckMutationOptions(options));
+    }
 
 export const getGetWorkspaceUrl = () => {
 

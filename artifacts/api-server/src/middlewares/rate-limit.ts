@@ -77,5 +77,8 @@ export const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 20 });
 /** AI recap narrative: 10 requests / 5 min per client. */
 export const narrativeLimiter = makeLimiter({ windowMs: 5 * 60 * 1000, limit: 10 });
 
+/** Pre-bet Arc coaching check: 10 requests / 60 min per client. */
+export const preBetCheckLimiter = makeLimiter({ windowMs: 60 * 60 * 1000, limit: 10 });
+
 /** Everything else under /api: 300 requests / min per client. */
 export const generalLimiter = makeLimiter({ windowMs: 60 * 1000, limit: 300 });

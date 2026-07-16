@@ -1687,6 +1687,23 @@ export const GetStreaksResponse = zod.object({
 
 
 /**
+ * Pro-only. Reads the bettor's settled history in the specified sport and bet type, then generates a 2–3 sentence coaching note via AI. Ephemeral — not persisted. Rate-limited to 10 checks per hour per bettor. Demo sessions return a deterministic simulated response.
+ * @summary Get Arc's pre-bet coaching note for an in-progress bet (Pro)
+ */
+export const PreBetCheckBody = zod.object({
+  "sport": zod.string().describe('Sport for this bet (e.g. NFL, NBA)'),
+  "betType": zod.string().optional().describe('Bet type (moneyline, spread, total, prop, futures)'),
+  "odds": zod.number().describe('American odds for this bet'),
+  "stake": zod.number().nullish().describe('Proposed stake in dollars (optional context)'),
+  "pick": zod.string().nullish().describe('Pick text for additional context (optional)')
+})
+
+export const PreBetCheckResponse = zod.object({
+  "note": zod.string().describe('2–3 sentence coaching note from Arc')
+})
+
+
+/**
  * @summary Get workspace info and members
  */
 export const GetWorkspaceResponse = zod.object({

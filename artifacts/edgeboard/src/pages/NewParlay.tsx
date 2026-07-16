@@ -31,6 +31,7 @@ import { OddsFormatToggle } from "@/components/OddsFormatToggle"
 import { useOddsFormat } from "@/hooks/use-odds-format"
 import { ArrowLeft, Plus, Trash2, ChevronDown, AlertTriangle, Lightbulb } from "lucide-react"
 import { MistakeWarning } from "@/components/MistakeWarning"
+import { ArcCoachNote } from "@/components/ArcCoachNote"
 import { SPORTSBOOKS, getLastSportsbook, getFavoriteSports, getStakePresets, rememberBetSlipDefaults } from "@/lib/preferences"
 import { dayOf } from "@workspace/weeks"
 
@@ -519,6 +520,25 @@ export default function NewParlay() {
               <Plus className="h-4 w-4 mr-2" /> Add Leg {fields.length + 1}
             </Button>
           </div>
+
+          {/* Arc pre-bet coaching — appears once the slip has a name and at least
+              two priced legs. Uses the first leg's sport as the history anchor. */}
+          {(() => {
+            const firstName = form.watch("name")
+            const firstLegSport = watchLegs[0]?.sport ?? ""
+            const firstLegOdds = watchLegs[0]?.odds ?? -110
+            const firstLegBetType = watchLegs[0]?.betType ?? "moneyline"
+            return (
+              <ArcCoachNote
+                enabled={!!firstName && allLegsPriced && !!firstLegSport}
+                sport={firstLegSport}
+                odds={firstLegOdds}
+                betType={firstLegBetType}
+                stake={watchStake}
+                pick={firstName}
+              />
+            )
+          })()}
 
           <div className="sticky bottom-0 left-0 right-0 z-10 pt-4 bg-background" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <Card className="border-primary bg-card shadow-lg">
