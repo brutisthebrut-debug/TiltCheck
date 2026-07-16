@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
 import { formatCurrency } from "@/lib/format"
-import { Link } from "wouter"
+import { Link, useSearch } from "wouter"
 import {
   BookOpen,
   Plus,
@@ -66,20 +66,24 @@ function Chip({ active, onClick, children, testId }: {
 export default function Lessons() {
   const { activeUser } = useUser()
   const saveFilters = useSaveLessonsFilters()
+  const search = useSearch()
   const [resultFilter, setResultFilterState] = useState<string>("all")
   const [qualityFilter, setQualityFilterState] = useState<string>("all")
   const [reasonFilter, setReasonFilterState] = useState<string>("all")
 
   // #167: hydrate once from the profile's saved view (server is the source of
   // truth across devices), then never overwrite an in-session choice.
+  // URL param ?reason= takes priority — used by the "See my lessons" deep-link
+  // from the Dashboard mistake-warning card so the right filter is pre-applied.
   const hydratedRef = useRef(false)
   useEffect(() => {
     if (hydratedRef.current || !activeUser) return
     hydratedRef.current = true
     setResultFilterState(activeUser.lessonsResultFilter ?? "all")
     setQualityFilterState(activeUser.lessonsQualityFilter ?? "all")
-    setReasonFilterState(activeUser.lessonsReasonFilter ?? "all")
-  }, [activeUser])
+    const urlReason = new URLSearchParams(search).get("reason")
+    setReasonFilterState(urlReason ?? activeUser.lessonsReasonFilter ?? "all")
+  }, [activeUser, search])
 
   const setResultFilter = (v: string) => {
     setResultFilterState(v)

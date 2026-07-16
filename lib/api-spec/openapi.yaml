@@ -3001,11 +3001,14 @@ components:
               type: number
             recentCount:
               type: integer
-              description: Losses graded with this reason inside the recent window
+              description: Losses graded with this reason inside the 14-day mistake window
             recentNetLoss:
               type: number
-              description: Dollars lost to this reason inside the recent window
-          required: [reason, count, netLoss, recentCount, recentNetLoss]
+              description: Dollars lost to this reason inside the 14-day mistake window
+            mistakeWindowDays:
+              type: integer
+              description: Length in days of the rolling window used for recentCount and recentNetLoss (always 14)
+          required: [reason, count, netLoss, recentCount, recentNetLoss, mistakeWindowDays]
         tiltSpiral:
           type: ["object", "null"]
           description: >-
@@ -3030,7 +3033,19 @@ components:
             stakeRatio:
               type: number
               description: burstAvgStake divided by the bettor's baseline average stake
-          required: [windowHours, recentLosses, rapidPlays, burstAvgStake, stakeRatio]
+            tiltCostDollars:
+              type: ["number", "null"]
+              description: >-
+                Total stake lost across all detected tilt sessions in the last 90 days
+                (null when fewer than two tilt sessions are detected). Shown on the tilt
+                card to make the recurring cost concrete — "your last N tilt nights cost you $X".
+            tiltEventCount:
+              type: integer
+              description: >-
+                Number of distinct tilt sessions detected in the last 90 days (each session
+                is a 12-hour window with 2+ settled losses). Includes the current active spiral
+                when one is present.
+          required: [windowHours, recentLosses, rapidPlays, burstAvgStake, stakeRatio, tiltCostDollars, tiltEventCount]
         trendFlip:
           type: boolean
           description: >-

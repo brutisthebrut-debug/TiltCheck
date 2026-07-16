@@ -21,4 +21,11 @@ export type LeakProfileTiltSpiral = {
   burstAvgStake: number;
   /** burstAvgStake divided by the bettor's baseline average stake */
   stakeRatio: number;
+  /**
+     * Total stake lost across all detected tilt sessions in the last 90 days (null when fewer than two tilt sessions are detected). Shown on the tilt card to make the recurring cost concrete — "your last N tilt nights cost you $X".
+     * @nullable
+     */
+  tiltCostDollars: number | null;
+  /** Number of distinct tilt sessions detected in the last 90 days (each session is a 12-hour window with 2+ settled losses). Includes the current active spiral when one is present. */
+  tiltEventCount: number;
 } | null;

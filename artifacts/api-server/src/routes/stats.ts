@@ -641,6 +641,14 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
   const isRecent = (r: { settledAt: Date | null }) =>
     r.settledAt != null && r.settledAt.getTime() >= recentCutoff;
 
+  // Tighter 14-day window used for the mistake warning so the signal reflects
+  // current behaviour, not ancient history. The trend reporting still uses the
+  // 30-day window for the other leak signals.
+  const MISTAKE_WINDOW_DAYS = 14;
+  const mistakeCutoff = Date.now() - MISTAKE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const isMistakeRecent = (r: { settledAt: Date | null }) =>
+    r.settledAt != null && r.settledAt.getTime() >= mistakeCutoff;
+
   // Average stake across settled straight bets — the baseline for spotting
   // an oversized "get it back" stake. Needs a real sample to mean anything.
   const avgStake =
@@ -716,10 +724,12 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
   const topReasonEntry = Object.entries(reasonAgg).sort(
     (a, b) => b[1].count - a[1].count || b[1].netLoss - a[1].netLoss
   )[0];
-  let topMissReason: { reason: string; count: number; netLoss: number; recentCount: number; recentNetLoss: number } | null = null;
+  let topMissReason: { reason: string; count: number; netLoss: number; recentCount: number; recentNetLoss: number; mistakeWindowDays: number } | null = null;
   if (topReasonEntry && topReasonEntry[1].count >= 3) {
+    // Use the 14-day mistake window for recentCount so the warning reflects
+    // current behaviour instead of a 30-day average that smooths out old history.
     const recentRows = [...bets, ...parlays].filter(
-      (r) => r.status === "lost" && r.missReason === topReasonEntry[0] && isRecent(r)
+      (r) => r.status === "lost" && r.missReason === topReasonEntry[0] && isMistakeRecent(r)
     );
     const recentNetLoss = recentRows.reduce((s, r) => s + Number(r.stake), 0);
     topMissReason = {
@@ -728,8 +738,18 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
       netLoss: Math.round(topReasonEntry[1].netLoss * 100) / 100,
       recentCount: recentRows.length,
       recentNetLoss: Math.round(recentNetLoss * 100) / 100,
+      mistakeWindowDays: MISTAKE_WINDOW_DAYS,
     };
   }
+
+  // Historical tilt cost — how much has the bettor lost across all detected
+  // tilt sessions in the last 90 days? A "tilt session" is any 12-hour window
+  // with two or more settled losses (same threshold as the live spiral check).
+  // We use a greedy forward scan so overlapping windows are only counted once.
+  // The result makes the current warning more concrete ("your last N nights
+  // cost you $X") rather than just flagging that the pattern is happening.
+  const TILT_HISTORY_DAYS = 90;
+  const tiltHistoryCutoff = new Date(Date.now() - TILT_HISTORY_DAYS * 24 * 60 * 60 * 1000);
 
   // Tilt spiral — is the bettor mid-spiral *right now*? Fires only when all
   // three hold inside a short window: (1) two or more settled losses landed,
@@ -742,12 +762,15 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
   const TILT_MIN_LOSSES = 2;
   const TILT_MIN_PLAYS = 3;
   const TILT_STAKE_RATIO = 1.5;
+  const TILT_WINDOW_MS = TILT_WINDOW_HOURS * 60 * 60 * 1000;
   let tiltSpiral: {
     windowHours: number;
     recentLosses: number;
     rapidPlays: number;
     burstAvgStake: number;
     stakeRatio: number;
+    tiltCostDollars: number | null;
+    tiltEventCount: number;
   } | null = null;
   if (avgStake != null && avgStake > 0) {
     const tiltCutoff = new Date(Date.now() - TILT_WINDOW_HOURS * 60 * 60 * 1000);
@@ -771,12 +794,51 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
         const burstAvgStake = burst.reduce((s, r) => s + Number(r.stake), 0) / burst.length;
         const stakeRatio = burstAvgStake / avgStake;
         if (stakeRatio >= TILT_STAKE_RATIO) {
+          // Historical tilt cost: scan all settled losses in the last 90 days
+          // using a greedy forward pass so overlapping 12h windows only count
+          // once. Each cluster of TILT_MIN_LOSSES+ losses within the window is
+          // one "tilt night"; we sum the stakes lost across all such nights.
+          const historicLosses = [...bets, ...parlays]
+            .filter((r) => r.status === "lost" && r.settledAt != null && r.settledAt >= tiltHistoryCutoff)
+            .sort((a, b) => a.settledAt!.getTime() - b.settledAt!.getTime());
+
+          let tiltCostDollars: number | null = null;
+          let tiltEventCount = 0;
+          let histIdx = 0;
+          while (histIdx < historicLosses.length) {
+            const clusterStart = historicLosses[histIdx].settledAt!.getTime();
+            const inCluster: (typeof historicLosses)[0][] = [];
+            let j = histIdx;
+            while (j < historicLosses.length && historicLosses[j].settledAt!.getTime() - clusterStart <= TILT_WINDOW_MS) {
+              inCluster.push(historicLosses[j]);
+              j++;
+            }
+            if (inCluster.length >= TILT_MIN_LOSSES) {
+              tiltEventCount++;
+              tiltCostDollars = (tiltCostDollars ?? 0) + inCluster.reduce((s, r) => s + Number(r.stake), 0);
+              histIdx = j; // skip past this cluster so events don't overlap
+            } else {
+              histIdx++;
+            }
+          }
+          if (tiltCostDollars !== null) {
+            tiltCostDollars = Math.round(tiltCostDollars * 100) / 100;
+          }
+          // Per the API contract: tiltCostDollars is null unless two or more
+          // distinct tilt sessions were detected — one night of data isn't
+          // enough to quote a reliable historical cost.
+          if (tiltEventCount < 2) {
+            tiltCostDollars = null;
+          }
+
           tiltSpiral = {
             windowHours: TILT_WINDOW_HOURS,
             recentLosses: recentLossTimes.length,
             rapidPlays: burst.length,
             burstAvgStake: Math.round(burstAvgStake * 100) / 100,
             stakeRatio: Math.round(stakeRatio * 10) / 10,
+            tiltCostDollars,
+            tiltEventCount,
           };
         }
       }

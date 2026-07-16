@@ -1633,15 +1633,18 @@ export const GetLeakProfileResponse = zod.object({
   "reason": zod.string(),
   "count": zod.number(),
   "netLoss": zod.number(),
-  "recentCount": zod.number().describe('Losses graded with this reason inside the recent window'),
-  "recentNetLoss": zod.number().describe('Dollars lost to this reason inside the recent window')
+  "recentCount": zod.number().describe('Losses graded with this reason inside the 14-day mistake window'),
+  "recentNetLoss": zod.number().describe('Dollars lost to this reason inside the 14-day mistake window'),
+  "mistakeWindowDays": zod.number().describe('Length in days of the rolling window used for recentCount and recentNetLoss (always 14)')
 }).nullable().describe('Most common self-graded miss reason across settled losses (excluding normal variance)'),
   "tiltSpiral": zod.object({
   "windowHours": zod.number().describe('Length of the \"right now\" window the signal looks at'),
   "recentLosses": zod.number().describe('Settled losses (bets + parlays) inside the window'),
   "rapidPlays": zod.number().describe('Plays logged since the first of those losses landed'),
   "burstAvgStake": zod.number().describe('Average stake across the rapid plays'),
-  "stakeRatio": zod.number().describe('burstAvgStake divided by the bettor\'s baseline average stake')
+  "stakeRatio": zod.number().describe('burstAvgStake divided by the bettor\'s baseline average stake'),
+  "tiltCostDollars": zod.number().nullable().describe('Total stake lost across all detected tilt sessions in the last 90 days (null when fewer than two tilt sessions are detected). Shown on the tilt card to make the recurring cost concrete — \"your last N tilt nights cost you $X\".'),
+  "tiltEventCount": zod.number().describe('Number of distinct tilt sessions detected in the last 90 days (each session is a 12-hour window with 2+ settled losses). Includes the current active spiral when one is present.')
 }).nullable().describe('Present when the bettor looks mid-tilt right now: at least two settled losses inside the short window, followed by a burst of rapid plays at escalated stakes relative to their own baseline. Null when data is thin (needs a real avgStake baseline) or the pattern is absent.'),
   "trendFlip": zod.boolean().describe('True while the one-time \"trend flipped\" celebration is available: the reported leak\'s trend reads non-negative and the user has not yet seen the celebratory card. Reading this endpoint never consumes the celebration — clients that render the card must POST \/users\/me\/leak-celebration-seen, after which responses return false and the celebration never repeats.'),
   "roiBand": zod.string().nullable().describe('Where this bettor\'s ROI sits against the anonymous peer pool — one of top_10, top_25, median, bottom_25, bottom_10. Null when the bettor opted out of benchmarks, the peer pool is too small (under 5 contributors), or the bettor has no computable ROI yet.')

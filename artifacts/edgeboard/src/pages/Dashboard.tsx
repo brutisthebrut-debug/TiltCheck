@@ -142,23 +142,27 @@ export default function Dashboard() {
       };
     }
     if (leakProfile.topMissReason) {
-      const { reason, count, netLoss, recentCount, recentNetLoss } = leakProfile.topMissReason;
+      const { reason, count, netLoss, recentCount, recentNetLoss, mistakeWindowDays } = leakProfile.topMissReason;
       const label = MISS_REASON_LABELS[reason] ?? reason;
+      const mw = mistakeWindowDays ?? 14;
+      const mwLabel = mw === 14 ? "2 weeks" : `${mw} days`;
       const trend =
         recentCount === 0
-          ? { improving: true, text: `Zero "${label.toLowerCase()}" losses in the last ${windowDays} days — slowing down.` }
+          ? { improving: true, text: `Zero "${label.toLowerCase()}" losses in the last ${mwLabel} — slowing down.` }
           : {
               improving: false,
-              text: `${recentCount} more (${formatCurrency(-recentNetLoss)}) in the last ${windowDays} days — still bleeding.`,
+              text: `${recentCount} more (${formatCurrency(-recentNetLoss)}) in the last ${mwLabel} — still bleeding.`,
             };
       return {
         key: "miss-reason",
         label: `"${label}" — again`,
         figure: formatCurrency(-netLoss),
-        line: `You've graded ${count} losses "${label.toLowerCase()}". Once is a bad night. ${count} times is a pattern.`,
+        line: recentCount > 0
+          ? `${recentCount} "${label.toLowerCase()}" loss${recentCount === 1 ? "" : "es"} in the last ${mwLabel}. ${count} all-time — that's a pattern, not a fluke.`
+          : `You've graded ${count} losses "${label.toLowerCase()}" — your most repeated mistake. None in the last ${mwLabel} though.`,
         trend,
-        href: "/stats",
-        cta: "See the full pattern",
+        href: `/lessons?reason=${encodeURIComponent(reason)}`,
+        cta: "See my lessons",
       };
     }
     if (leakProfile.overconfidence) {
@@ -479,6 +483,11 @@ export default function Dashboard() {
               {leakProfile.tiltSpiral.rapidPlays} quick plays since — staked{" "}
               {leakProfile.tiltSpiral.stakeRatio}x your usual ({formatCurrency(leakProfile.tiltSpiral.burstAvgStake)} a pop).
             </p>
+            {leakProfile.tiltSpiral.tiltEventCount > 1 && leakProfile.tiltSpiral.tiltCostDollars != null && (
+              <p className="text-xs text-chart-2/80 font-mono">
+                Your last {leakProfile.tiltSpiral.tiltEventCount} tilt nights cost you {formatCurrency(leakProfile.tiltSpiral.tiltCostDollars)} in losses.
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               That's the tilt playbook, and the book wrote it. Close the app, take the walk — the board will still be here tomorrow.
             </p>

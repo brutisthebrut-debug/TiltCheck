@@ -1038,10 +1038,12 @@ export type LeakProfileTopMissReason = {
   reason: string;
   count: number;
   netLoss: number;
-  /** Losses graded with this reason inside the recent window */
+  /** Losses graded with this reason inside the 14-day mistake window */
   recentCount: number;
-  /** Dollars lost to this reason inside the recent window */
+  /** Dollars lost to this reason inside the 14-day mistake window */
   recentNetLoss: number;
+  /** Length in days of the rolling window used for recentCount and recentNetLoss (always 14) */
+  mistakeWindowDays: number;
 } | null;
 
 /**
@@ -1059,6 +1061,13 @@ export type LeakProfileTiltSpiral = {
   burstAvgStake: number;
   /** burstAvgStake divided by the bettor's baseline average stake */
   stakeRatio: number;
+  /**
+     * Total stake lost across all detected tilt sessions in the last 90 days (null when fewer than two tilt sessions are detected). Shown on the tilt card to make the recurring cost concrete — "your last N tilt nights cost you $X".
+     * @nullable
+     */
+  tiltCostDollars: number | null;
+  /** Number of distinct tilt sessions detected in the last 90 days (each session is a 12-hour window with 2+ settled losses). Includes the current active spiral when one is present. */
+  tiltEventCount: number;
 } | null;
 
 export interface LeakProfile {

@@ -14,8 +14,10 @@ export type LeakProfileTopMissReason = {
   reason: string;
   count: number;
   netLoss: number;
-  /** Losses graded with this reason inside the recent window */
+  /** Losses graded with this reason inside the 14-day mistake window */
   recentCount: number;
-  /** Dollars lost to this reason inside the recent window */
+  /** Dollars lost to this reason inside the 14-day mistake window */
   recentNetLoss: number;
+  /** Length in days of the rolling window used for recentCount and recentNetLoss (always 14) */
+  mistakeWindowDays: number;
 } | null;

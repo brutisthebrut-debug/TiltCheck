@@ -78,7 +78,7 @@ const statsWithData = {
 } as unknown as StatsSummary
 
 const worstSport = { sport: "NBA", netLoss: -230.5, bets: 12, recentNet: -80.25, recentBets: 4 }
-const topMissReason = { reason: "emotional", count: 4, netLoss: 180, recentCount: 2, recentNetLoss: 90 }
+const topMissReason = { reason: "emotional", count: 4, netLoss: 180, recentCount: 2, recentNetLoss: 90, mistakeWindowDays: 14 }
 const overconfidence = { winRate: 38.5, sample: 13, recentWinRate: 33.3, recentSample: 6 }
 
 function makeProfile(overrides: Partial<LeakProfile> = {}): LeakProfile {
@@ -154,7 +154,7 @@ describe("Your Leak card priority", () => {
     const card = screen.getByTestId("card-your-leak")
     // The raw reason code is translated to its human label.
     expect(card.textContent).toContain('"Emotional bet" — again')
-    expect(card.textContent).toContain("4 losses")
+    expect(card.textContent).toContain("2 \"emotional bet\" losses in the last 2 weeks")
     // Miss-reason netLoss arrives positive; the card shows it as money lost
     // (whole-dollar amounts render without decimals).
     expect(screen.getByTestId("text-leak-figure").textContent).toBe("-$180")
@@ -237,7 +237,7 @@ describe("Your Leak card trend", () => {
     setLeakProfile(makeProfile({ topMissReason }))
     renderDashboard()
 
-    expect(trendEl().textContent).toBe("2 more (-$90) in the last 30 days — still bleeding.")
+    expect(trendEl().textContent).toBe("2 more (-$90) in the last 2 weeks — still bleeding.")
     expect(trendEl().className).toContain("text-chart-2")
   })
 
@@ -245,7 +245,7 @@ describe("Your Leak card trend", () => {
     setLeakProfile(makeProfile({ topMissReason: { ...topMissReason, recentCount: 0, recentNetLoss: 0 } }))
     renderDashboard()
 
-    expect(trendEl().textContent).toBe('Zero "emotional bet" losses in the last 30 days — slowing down.')
+    expect(trendEl().textContent).toBe('Zero "emotional bet" losses in the last 2 weeks — slowing down.')
     expect(trendEl().className).toContain("text-chart-1")
   })
 
@@ -293,12 +293,12 @@ describe("Your Leak card deep links", () => {
     expect(link.getAttribute("href")).toBe("/bets?mine=1&sport=College%20Football")
   })
 
-  it("miss-reason leak links to the stats page", () => {
+  it("miss-reason leak links to the lessons page filtered by reason", () => {
     setLeakProfile(makeProfile({ topMissReason }))
     renderDashboard()
 
     const link = screen.getByTestId("link-your-leak-miss-reason")
-    expect(link.getAttribute("href")).toBe("/stats")
+    expect(link.getAttribute("href")).toBe("/lessons?reason=emotional")
   })
 
   it("overconfidence leak links to the stats page", () => {

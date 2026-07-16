@@ -293,7 +293,7 @@ describe("GET /stats/leak-profile", () => {
     await seedBet(user.id, { status: "lost", missReason: "na" });
 
     const res = await request(app).get("/api/stats/leak-profile");
-    expect(res.body.topMissReason).toEqual({ reason: "emotional", count: 3, netLoss: 120, recentCount: 3, recentNetLoss: 120 });
+    expect(res.body.topMissReason).toEqual({ reason: "emotional", count: 3, netLoss: 120, recentCount: 3, recentNetLoss: 120, mistakeWindowDays: 14 });
 
     // Below the 3-loss threshold → null
     const { user: fresh, clerkUserId: freshClerk } = await createLinkedUser();

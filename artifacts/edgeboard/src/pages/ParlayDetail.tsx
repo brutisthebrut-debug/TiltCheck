@@ -2,7 +2,7 @@ import { Link, useLocation, useParams } from "wouter"
 import { useGetParlay, useSettleParlay, useUnsettleParlay, useUpdateParlayLeg, useRecomputeParlayOdds, useDeleteParlay, getListParlaysQueryKey, getGetParlayQueryKey, getGetStatsSummaryQueryKey, getGetBankrollQueryKey, getGetRecentActivityQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useUser } from "@/contexts/UserContext"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -144,6 +144,11 @@ export default function ParlayDetail() {
 
   // Modal state
   const [pendingStatus, setPendingStatus] = useState<SettleStatus | null>(null)
+  // Tracks whether we've already auto-opened the grade modal for the current
+  // "all legs marked" state. Prevents a close→reopen loop: once the user
+  // dismisses the modal the ref stays true until leg outcomes change back to
+  // incomplete, at which point it resets so the next completion re-opens it.
+  const autoOpenedRef = useRef(false)
   const [reasoningQuality, setReasoningQuality] = useState<'sound' | 'flawed' | ''>('')
   const [whatHappened, setWhatHappened] = useState('')
   const [missReason, setMissReason] = useState('')
@@ -292,6 +297,47 @@ export default function ParlayDetail() {
       : null
   const gradeDisabled = (status: SettleStatus) => derivedStatus !== null && status !== derivedStatus
 
+  // Step 7: When all legs have been marked and the result is unambiguous,
+  // auto-open the grade modal so the bettor only has to confirm, not hunt for
+  // the right button. The modal can still be cancelled; this just removes one
+  // tap from the happy path.
+  // Reset the auto-open guard whenever legs go back to being incomplete so the
+  // next time the bettor marks all legs the modal will open again.
+  useEffect(() => {
+    if (!allLegsMarked) {
+      autoOpenedRef.current = false
+    }
+  }, [allLegsMarked])
+
+  // Auto-open the grade modal exactly once per "all-legs-marked" transition.
+  // The guard prevents a dismiss→reopen loop: closing the modal sets
+  // pendingStatus to null, but autoOpenedRef stays true so the effect skips.
+  useEffect(() => {
+    if (derivedStatus !== null && allLegsMarked && pendingStatus === null && !autoOpenedRef.current) {
+      autoOpenedRef.current = true
+      setPendingStatus(derivedStatus)
+    }
+  }, [derivedStatus, allLegsMarked, pendingStatus])
+
+  // Step 6: For settled parlays with push/void legs, compute the reduced ticket
+  // so the UI can show "Reduced to N legs" — same math the server used.
+  const settledReducedTicket = (() => {
+    if (!parlay || !isSettled) return null
+    const nonActiveLegs = parlay.legs.filter(
+      (leg) => leg.status === 'push' || leg.status === 'void'
+    )
+    if (nonActiveLegs.length === 0) return null
+    const activeLegs = parlay.legs.filter(
+      (leg) => leg.status !== 'push' && leg.status !== 'void'
+    )
+    const activeOdds = activeLegs.map((l) => l.odds).filter((o) => !isDeadZoneOdds(o))
+    return {
+      removed: nonActiveLegs.length,
+      remaining: activeLegs.length,
+      reducedOdds: activeOdds.length > 0 ? combineAmerican(activeOdds) : null,
+    }
+  })()
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
@@ -366,9 +412,36 @@ export default function ParlayDetail() {
               </Badge>
             </CardHeader>
             <CardContent className="p-0">
+              {/* Reduced ticket notice — settled parlays where any leg pushed
+                  or voided settle like a shorter parlay. This tells the bettor
+                  at a glance that the book applied that reduction. */}
+              {settledReducedTicket && (
+                <div
+                  className="flex items-center gap-2 px-4 py-2.5 bg-muted/40 border-b text-xs text-muted-foreground"
+                  data-testid="banner-reduced-ticket"
+                >
+                  <Minus className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <span>
+                    <span className="font-medium text-foreground">
+                      Reduced to {settledReducedTicket.remaining} leg{settledReducedTicket.remaining === 1 ? "" : "s"}
+                    </span>
+                    {" "}— {settledReducedTicket.removed} leg{settledReducedTicket.removed === 1 ? "" : "s"} pushed/voided off the ticket.
+                    {settledReducedTicket.reducedOdds !== null && (
+                      <> Settled at <span className="font-mono font-medium text-foreground">{formatOddsAs(settledReducedTicket.reducedOdds, oddsFormat)}</span>.</>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="divide-y">
                 {parlay.legs.map((leg, index) => (
-                  <div key={leg.id} className={`p-4 ${leg.status === 'won' ? 'bg-green-500/5' : leg.status === 'lost' ? 'bg-red-500/5' : ''}`}>
+                  <div
+                    key={leg.id}
+                    className={`p-4 ${
+                      leg.status === 'won' ? 'bg-green-500/5' :
+                      leg.status === 'lost' ? 'bg-red-500/5' :
+                      (leg.status === 'push' || leg.status === 'void') && isSettled ? 'opacity-50' : ''
+                    }`}
+                  >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Leg {index + 1}</span>
@@ -411,6 +484,7 @@ export default function ParlayDetail() {
                           {(['won', 'lost', 'push', 'void'] as const).map(s => (
                             <button
                               key={s}
+                              data-testid={`button-leg-${leg.id}-${s}`}
                               onClick={() => handleLegResult(leg.id, s)}
                               className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                                 legResults[leg.id] === s
