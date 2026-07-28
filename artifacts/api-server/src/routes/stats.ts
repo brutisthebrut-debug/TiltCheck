@@ -1173,6 +1173,118 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
     }
   }
 
+  // ── Richer bettor context (Task #201) ────────────────────────────────────
+  // Enrich the facts with all-time leak profile, ROI band, calibration, and
+  // Edge Finder sport lanes. Every computation is best-effort — any failure
+  // leaves the corresponding fact null rather than blocking the narrative.
+  try {
+    const settledBets = allBets.filter(hasValidOdds).filter((b) => b.status === "won" || b.status === "lost" || b.status === "push");
+    const settledAll = [...allBets, ...allParlays].filter((r) => r.status === "won" || r.status === "lost" || r.status === "push");
+
+    // ── Worst sport ─────────────────────────────────────────────────────────
+    const bySport: Record<string, { net: number; count: number }> = {};
+    for (const b of settledBets) {
+      const net = Number(b.actualPayout ?? 0) - Number(b.stake);
+      const entry = (bySport[b.sport] ??= { net: 0, count: 0 });
+      entry.net += net;
+      entry.count += 1;
+    }
+    const worstEntry = Object.entries(bySport)
+      .filter(([, v]) => v.count >= 5 && v.net <= -50)
+      .sort((a, b) => a[1].net - b[1].net)[0];
+
+    // ── Top miss reason ──────────────────────────────────────────────────────
+    const NARRATIVE_MISTAKE_WINDOW_DAYS = 14;
+    const narrativeMistakeCutoff = Date.now() - NARRATIVE_MISTAKE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const reasonAgg: Record<string, { count: number; netLoss: number }> = {};
+    for (const r of settledAll) {
+      if (r.status !== "lost") continue;
+      if (!r.missReason || r.missReason === "na" || r.missReason === "normal_variance") continue;
+      const entry = (reasonAgg[r.missReason] ??= { count: 0, netLoss: 0 });
+      entry.count += 1;
+      entry.netLoss += Number(r.stake);
+    }
+    const topReasonEntry = Object.entries(reasonAgg).sort((a, b) => b[1].count - a[1].count || b[1].netLoss - a[1].netLoss)[0];
+    const leakMissReason =
+      topReasonEntry && topReasonEntry[1].count >= 3
+        ? {
+            reason: topReasonEntry[0],
+            count: topReasonEntry[1].count,
+            recentCount: settledAll.filter(
+              (r) => r.status === "lost" && r.missReason === topReasonEntry[0] && r.settledAt != null && r.settledAt.getTime() >= narrativeMistakeCutoff,
+            ).length,
+          }
+        : null;
+
+    // ── Overconfidence ────────────────────────────────────────────────────────
+    const highConf = settledAll.filter((r) => (r.confidenceScore ?? 0) >= 7 && (r.status === "won" || r.status === "lost"));
+    const highConfWins = highConf.filter((r) => r.status === "won").length;
+    const leakOverconf =
+      highConf.length >= 5 && highConfWins / highConf.length < 0.45
+        ? { winRate: Math.round((highConfWins / highConf.length) * 1000) / 10, sample: highConf.length }
+        : null;
+
+    factsResult.facts.leakContext =
+      worstEntry || leakMissReason || leakOverconf
+        ? {
+            worstSport: worstEntry
+              ? { sport: worstEntry[0], netLoss: Math.round(worstEntry[1].net * 100) / 100, bets: worstEntry[1].count }
+              : null,
+            topMissReason: leakMissReason,
+            overconfidence: leakOverconf,
+          }
+        : null;
+
+    // ── Calibration context ──────────────────────────────────────────────────
+    // All-time high-confidence (7+) plays, any status settled.
+    const calibHigh = settledAll.filter((r) => (r.confidenceScore ?? 0) >= 7 && (r.status === "won" || r.status === "lost"));
+    factsResult.facts.calibrationContext =
+      calibHigh.length >= 10
+        ? {
+            highConfWinRate: Math.round((calibHigh.filter((r) => r.status === "won").length / calibHigh.length) * 1000) / 10,
+            highConfSample: calibHigh.length,
+          }
+        : null;
+
+    // ── Edge Finder sport summary (≥10 settled bets per sport) ──────────────
+    const NARRATIVE_EDGE_MIN = 10;
+    const sportLanes = new Map<string, { wagered: number; payout: number; bets: number }>();
+    for (const b of settledBets) {
+      let lane = sportLanes.get(b.sport);
+      if (!lane) { lane = { wagered: 0, payout: 0, bets: 0 }; sportLanes.set(b.sport, lane); }
+      lane.bets += 1;
+      lane.wagered += Number(b.stake);
+      lane.payout += b.actualPayout != null ? Number(b.actualPayout) : 0;
+    }
+    const sportSummary = [...sportLanes.entries()]
+      .map(([sport, l]) => ({
+        sport,
+        bets: l.bets,
+        roi: l.wagered > 0 ? Math.round(((l.payout - l.wagered) / l.wagered) * 10000) / 100 : 0,
+        netProfit: Math.round((l.payout - l.wagered) * 100) / 100,
+      }))
+      .filter((s) => s.bets >= NARRATIVE_EDGE_MIN)
+      .sort((a, b) => b.roi - a.roi);
+    factsResult.facts.edgeFinderSummary =
+      sportSummary.length >= 2
+        ? { top: sportSummary.slice(0, 2), bottom: [...sportSummary].reverse().slice(0, 2) }
+        : null;
+
+    // ── ROI percentile band ──────────────────────────────────────────────────
+    // Only for the bettor viewing their own narrative, opted in, not demo.
+    factsResult.facts.roiPercentileBand = null;
+    if (!isDemoRequest(req) && userId === req.currentUser!.id && req.currentUser!.includedInBenchmarks) {
+      try {
+        factsResult.facts.roiPercentileBand = await getRoiBand(userId);
+      } catch (bandErr) {
+        logger.warn({ err: bandErr, userId }, "Narrative: roiBand lookup failed — continuing without it");
+      }
+    }
+  } catch (enrichErr) {
+    logger.warn({ err: enrichErr, userId, weekStart }, "Narrative: bettor context enrichment failed — continuing with base facts");
+    // Leave the new fields as undefined — the model prompt treats missing/null as "skip"
+  }
+
   // ── Challenge winner injection ────────────────────────────────────────────
   // If a challenge for the bettor's active crew closed during this recap week,
   // inject the winner into facts so the AI can call it out. Best-effort —
@@ -1290,7 +1402,12 @@ Hard rules:
 - Reflection only: talk about their historical tendencies in this sport/bet-type/odds range. NEVER suggest what to bet, which team to pick, or predict outcomes.
 - If history is thin (<5 settled plays), say so directly — don't pad with generic advice.
 - 2–3 sentences maximum. End with a short punchy sentence (can end with "Your call." or similar).
-- Plain text only. No headings, no bullets, no emoji, no markdown.`;
+- Plain text only. No headings, no bullets, no emoji, no markdown.
+
+Richer context rules (only when the corresponding fact is non-null):
+- favDogPerformance: if the proposed odds put this in the "favorite" or "underdog" bucket, cite their win rate and ROI in that bucket to anchor how this price has historically worked for them.
+- sportRoi: cite their all-time ROI in this sport when it is a clear positive or a clear negative edge (outside the –5% to +5% break-even zone). Use the dollar figure or percentage — whichever is more damning or impressive.
+- topMissReasonInSport: if there is a repeated mistake pattern in this sport, name it. Do not moralize — just state the pattern and how often it has appeared.`;
 
 /** Demo coaching notes keyed by sport — deterministic, no AI call. */
 function demoPrebetNote(sport: string, odds: number): string {
@@ -1370,6 +1487,53 @@ router.post(
       },
     };
 
+    // ── Richer coaching context (Task #201) ────────────────────────────────
+    // Fav/dog performance, sport ROI, and top repeated mistake — computed
+    // from the already-loaded history. All null when sample is too thin.
+    // The AI prompt instructs the model to only cite these when non-null.
+    const isFavorite = odds <= -100;
+    const bucketBets = history.filter((b) => (isFavorite ? b.odds <= -100 : b.odds >= 100));
+    const bucketDecided = bucketBets.filter((b) => b.status === "won" || b.status === "lost");
+    const bucketWins = bucketDecided.filter((b) => b.status === "won").length;
+    const bucketWagered = bucketBets.reduce((s, b) => s + Number(b.stake), 0);
+    const bucketPayout = bucketBets.reduce((s, b) => s + Number(b.actualPayout ?? 0), 0);
+
+    const favDogPerformance =
+      bucketBets.length >= 3
+        ? {
+            bucket: isFavorite ? "favorite" : "underdog",
+            plays: bucketBets.length,
+            wins: bucketWins,
+            losses: bucketDecided.length - bucketWins,
+            winRate:
+              bucketDecided.length > 0
+                ? Math.round((bucketWins / bucketDecided.length) * 1000) / 10
+                : null,
+            roi:
+              bucketWagered > 0
+                ? Math.round(((bucketPayout - bucketWagered) / bucketWagered) * 10000) / 100
+                : null,
+          }
+        : null;
+
+    const missReasonAgg: Record<string, number> = {};
+    for (const b of history) {
+      if (b.status !== "lost" || !b.missReason || b.missReason === "na" || b.missReason === "normal_variance") continue;
+      missReasonAgg[b.missReason] = (missReasonAgg[b.missReason] ?? 0) + 1;
+    }
+    const topMissEntry = Object.entries(missReasonAgg).sort((a, b) => b[1] - a[1])[0];
+    const topMissReasonInSport =
+      topMissEntry && topMissEntry[1] >= 2 ? { reason: topMissEntry[0], count: topMissEntry[1] } : null;
+
+    const sportWagered = history.reduce((s, b) => s + Number(b.stake), 0);
+    const sportPayout = history.reduce((s, b) => s + Number(b.actualPayout ?? 0), 0);
+    const sportRoi =
+      sportWagered > 0 && history.length >= 5
+        ? Math.round(((sportPayout - sportWagered) / sportWagered) * 10000) / 100
+        : null;
+
+    const enrichedFacts = { ...facts, favDogPerformance, topMissReasonInSport, sportRoi };
+
     try {
       const { openai } = await import("@workspace/integrations-openai-ai-server");
       // A slow provider must not hang the request — the form is waiting on
@@ -1386,7 +1550,7 @@ router.post(
             { role: "system", content: PRE_BET_SYSTEM_PROMPT },
             {
               role: "user",
-              content: `Here is this bettor's history for the bet they're about to place. Give them the coaching note.\n\n${JSON.stringify(facts, null, 2)}`,
+              content: `Here is this bettor's history for the bet they're about to place. Give them the coaching note.\n\n${JSON.stringify(enrichedFacts, null, 2)}`,
             },
           ],
         }),

@@ -63,6 +63,40 @@ export type RecapFacts = {
     /** True when the narrator IS the winner — lets the AI adjust tone. */
     isNarrator: boolean;
   } | null;
+  /**
+   * Active all-time leak signals from the bettor's full history. Null when the
+   * sample is too thin for any signal to fire. The AI must only cite a leak
+   * when the corresponding field is non-null — fabricating a pattern is a hard
+   * rule violation.
+   */
+  leakContext: {
+    /** Worst sport by net dollars, ≥5 bets, at least –$50 in the hole. */
+    worstSport: { sport: string; netLoss: number; bets: number } | null;
+    /** Most repeated self-graded mistake, ≥3 occurrences. */
+    topMissReason: { reason: string; count: number; recentCount: number } | null;
+    /** High-confidence plays (7+) win rate when it is genuinely bad (<45%). */
+    overconfidence: { winRate: number; sample: number } | null;
+  } | null;
+  /**
+   * Where this bettor's all-time ROI sits vs. the anonymous peer pool.
+   * Values: "top_10", "top_25", "median", "bottom_25", "bottom_10".
+   * Null when the pool is too small or the bettor has opted out.
+   */
+  roiPercentileBand: string | null;
+  /**
+   * Calibration: how their high-confidence (7+) plays actually land, all-time.
+   * Null when sample < 10 — too thin to say anything meaningful.
+   */
+  calibrationContext: { highConfWinRate: number; highConfSample: number } | null;
+  /**
+   * Top and bottom sports by all-time ROI, minimum 10 settled bets each.
+   * Null when the bettor doesn't have enough volume in at least 2 sports.
+   * The AI should cite these when commenting on where the bettor wins/bleeds.
+   */
+  edgeFinderSummary: {
+    top: { sport: string; roi: number; bets: number; netProfit: number }[];
+    bottom: { sport: string; roi: number; bets: number; netProfit: number }[];
+  } | null;
 };
 
 /**
@@ -188,6 +222,11 @@ export function assembleRecapFacts(input: {
         : null,
     // Populated by the narrative route when a crew challenge closed this week.
     closedChallenge: null,
+    // Populated by the narrative route from the bettor's all-time profile.
+    leakContext: null,
+    roiPercentileBand: null,
+    calibrationContext: null,
+    edgeFinderSummary: null,
   };
   return { hasData: true, facts };
 }
@@ -206,9 +245,17 @@ Hard rules:
 - No moralizing about gambling. They track because they want the mirror, not a lecture.
 - 2–3 short paragraphs, then a final single-sentence paragraph starting with "Watch next week:" naming ONE concrete behavior to observe (a habit to watch, not a bet to place).
 - Plain text only. No headings, no bullet points, no emoji, no markdown.
-- Keep it under 180 words.
+- Keep it under 200 words.
 - If the facts JSON includes a "closedChallenge" field (non-null), append one sentence after the "Watch next week:" line naming the winner, the challenge label, and their formatted value. Example: "This week's Best ROI challenge: Jake +14.3%." If closedChallenge.isNarrator is true the bettor IS the winner — adjust tone accordingly.
-- If closedChallenge is null or absent, do not mention a challenge at all.`;
+- If closedChallenge is null or absent, do not mention a challenge at all.
+
+Richer context rules (only when the corresponding fact is non-null):
+- leakContext.worstSport: name the sport and the dollar amount it has cost all-time. Do not suggest avoiding it.
+- leakContext.topMissReason: name the repeated mistake pattern (e.g. "emotional bets") and how often it appears; note whether it has been happening lately (recentCount > 0).
+- leakContext.overconfidence: call out the calibration gap — high confidence, low hit rate.
+- calibrationContext: weave in the high-confidence hit rate as a signal of whether their conviction is calibrated.
+- roiPercentileBand: only mention it when it is "top_10" or "top_25" (positive reinforcement) or "bottom_10" (honest tough love). Skip "median" and "bottom_25" — they add no signal worth citing in 200 words.
+- edgeFinderSummary: if present, reference the top and/or bottom sport lanes to give the week a concrete historical frame. Cite their ROI and bet count so the numbers land.`;
 
 /**
  * Generate the narrative for one bettor-week. Throws on provider failure —
