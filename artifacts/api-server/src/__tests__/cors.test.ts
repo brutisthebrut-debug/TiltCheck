@@ -7,18 +7,18 @@ vi.mock("@clerk/express", () => ({
   clerkClient: { users: { getUser: vi.fn() } },
 }));
 
-process.env.APP_ORIGIN = "https://tiltcheck.example";
-
 import app from "../app";
+
+const configuredOrigin = process.env.APP_ORIGIN ?? "http://localhost:5173";
 
 describe("browser origin boundaries", () => {
   it("returns credentialed CORS headers to the configured app", async () => {
     const res = await request(app)
       .get("/api/healthz")
-      .set("Origin", "https://tiltcheck.example");
+      .set("Origin", configuredOrigin);
 
     expect(res.status).toBe(200);
-    expect(res.headers["access-control-allow-origin"]).toBe("https://tiltcheck.example");
+    expect(res.headers["access-control-allow-origin"]).toBe(configuredOrigin);
     expect(res.headers["access-control-allow-credentials"]).toBe("true");
   });
 
