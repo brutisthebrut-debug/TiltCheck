@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
-import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Layout } from './components/Layout';
 import { Toaster } from './components/ui/toaster';
@@ -50,15 +49,9 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
-// same build serves multiple Clerk custom domains.
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
-
-// REQUIRED — empty in dev (Clerk hits dev FAPI directly), auto-set in prod.
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+// Clerk's publishable key is intentionally safe to embed in the browser build.
+// The secret key remains server-only.
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -270,7 +263,6 @@ function ClerkProviderWithRoutes() {
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}

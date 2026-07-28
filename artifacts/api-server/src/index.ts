@@ -4,13 +4,7 @@ import { ensureDemoSeeded } from "./lib/demo-seed";
 import { ensureCrewsBootstrapped } from "./lib/crews";
 import { startNotificationWorker } from "./lib/notificationWorker";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
+const rawPort = process.env["PORT"] ?? "3000";
 
 const port = Number(rawPort);
 
@@ -18,12 +12,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-
+const server = app.listen(port, () => {
   logger.info({ port }, "Server listening");
 
   // Self-seed the public demo board when its world is empty (first prod boot,
@@ -48,4 +37,9 @@ app.listen(port, (err) => {
       // Skips silently if VAPID keys are not configured.
       startNotificationWorker();
     });
+});
+
+server.on("error", (err) => {
+  logger.error({ err }, "Error listening on port");
+  process.exit(1);
 });

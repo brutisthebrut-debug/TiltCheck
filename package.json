@@ -1,17 +1,20 @@
 {
-  "name": "workspace",
+  "name": "tiltcheck",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "dev": "pnpm --parallel --filter @workspace/api-server --filter @workspace/edgeboard run dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "start": "pnpm --filter @workspace/api-server start",
+    "test": "pnpm -r --if-present run test",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "db:push": "pnpm --filter @workspace/db push",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
-  "dependencies": {
-    "@replit/connectors-sdk": "^0.4.1"
-  },
   "devDependencies": {
     "prettier": "^3.9.5",
     "typescript": "~5.9.3"

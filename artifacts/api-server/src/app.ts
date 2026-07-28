@@ -2,22 +2,22 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
-import {
-  CLERK_PROXY_PATH,
-  clerkProxyMiddleware,
-  getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware";
+import path from "node:path";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { logger, httpLogSerializers } from "./lib/logger";
 
 const app: Express = express();
 
-// The server always sits one hop behind the Replit proxy in both dev preview
-// and deployments. Trusting exactly that hop makes req.ip the real client
-// address (the entry the proxy appended), while a spoofed X-Forwarded-For
-// value sent by the client itself is ignored — rate limiting keys off req.ip.
-app.set("trust proxy", 1);
+// Railway, Render, Fly, and most managed Node hosts place the service one hop
+// behind their edge proxy. The value stays explicit so rate limiting never
+// trusts an arbitrary X-Forwarded-For chain.
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? "1");
+app.set(
+  "trust proxy",
+  Number.isInteger(trustProxyHops) && trustProxyHops >= 0 ? trustProxyHops : 1,
+);
 
 app.use(
   pinoHttp({
@@ -26,25 +26,64 @@ app.use(
   }),
 );
 
-// Clerk Frontend API proxy — must be mounted before body parsers (streams raw bytes)
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+const configuredOrigins = [
+  process.env.APP_ORIGIN,
+  ...(process.env.CORS_ALLOWED_ORIGINS ?? "").split(","),
+]
+  .map((origin) => origin?.trim().replace(/\/$/, ""))
+  .filter((origin): origin is string => Boolean(origin));
 
-app.use(cors({ credentials: true, origin: true }));
+if (process.env.NODE_ENV !== "production") {
+  configuredOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
+}
+
+const allowedOrigins = new Set(configuredOrigins);
+
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      // Non-browser and same-origin traffic does not require CORS headers.
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, allowedOrigins.has(origin.replace(/\/$/, "")));
+    },
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Resolve the publishable key from the incoming request host so the same
-// server can serve multiple Clerk custom domains. Falls back to
-// CLERK_PUBLISHABLE_KEY when the host doesn't map to a custom domain.
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
-);
+// Clerk reads CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY directly from the
+// environment. This works on any host and avoids a platform-owned auth proxy.
+app.use(clerkMiddleware());
 
 app.use("/api", router);
+
+// The production service ships the Vite app and API together on one origin.
+// In development Vite serves the frontend and proxies /api to this process.
+if (process.env.NODE_ENV === "production") {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  const frontendDist = path.resolve(
+    moduleDir,
+    "../../edgeboard/dist/public",
+  );
+
+  if (existsSync(frontendDist)) {
+    app.use(express.static(frontendDist, { index: false }));
+    app.use((req, res, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api/")) {
+        next();
+        return;
+      }
+
+      res.sendFile(path.join(frontendDist, "index.html"));
+    });
+  } else {
+    logger.warn({ frontendDist }, "Frontend build was not found");
+  }
+}
 
 export default app;

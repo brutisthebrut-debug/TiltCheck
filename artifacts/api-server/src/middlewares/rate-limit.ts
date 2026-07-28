@@ -17,7 +17,7 @@ import { getAuth } from "@clerk/express";
  * Keying: signed-in traffic is throttled per Clerk account, anonymous
  * traffic (demo board, unauthenticated probes) per client IP. req.ip is the
  * trustworthy source here: app.ts sets `trust proxy` to exactly the one
- * Replit proxy hop, so req.ip is the address the proxy appended, and a
+ * trusted platform proxy hop, so req.ip is the address the proxy appended, and a
  * client-forged X-Forwarded-For prefix can neither rotate keys nor inflate
  * the in-memory key space.
  *
