@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: EdgeBoard - Sports bet tracking API
+  description: TiltCheck - betting decision intelligence API
 servers:
   - url: /api
     description: Base API path
@@ -19,11 +19,11 @@ tags:
   - name: stats
     description: Analytics and statistics
   - name: workspace
-    description: Shared workspace operations
+    description: Private Crew operations
   - name: users
     description: User operations
   - name: billing
-    description: TiltCheck Pro subscription operations
+    description: Paid multi-Crew membership operations
   - name: crews
     description: Crew membership and switching operations
   - name: notifications
@@ -38,6 +38,26 @@ paths:
       responses:
         "200":
           description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /readyz:
+    get:
+      operationId: readinessCheck
+      tags: [health]
+      summary: Deployment readiness check
+      description: Confirms the API can reach PostgreSQL before a deployment receives traffic.
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: Database unavailable
           content:
             application/json:
               schema:
@@ -273,8 +293,8 @@ paths:
       description: >
         Creates a crew owned by the signed-in user and switches them to it.
         The first crew is free; creating another while already in one is part
-        of the Pro layer (402 `pro_required` for free accounts — founder and
-        live subscriptions pass).
+        of paid multi-Crew access (402 `pro_required` for free accounts —
+        founder and live subscriptions pass).
       requestBody:
         required: true
         content:
@@ -289,7 +309,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Crew"
         "402":
-          description: Free accounts live in one crew — running more is Pro (`error` is `pro_required`)
+          description: Free accounts live in one Crew — additional Crew access is paid (`error` is `pro_required`)
         "403":
           description: No bettor profile linked yet
 
@@ -300,8 +320,8 @@ paths:
       summary: Join a crew with an invite code
       description: >
         Joins the crew behind the invite code and switches to it. Joining your
-        first crew is free; joining another while already in one is part of
-        the Pro layer (402 `pro_required` for free accounts).
+        first Crew is free; joining another while already in one requires paid
+        multi-Crew access (402 `pro_required` for free accounts).
       requestBody:
         required: true
         content:
@@ -316,7 +336,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Crew"
         "402":
-          description: Free accounts live in one crew — running more is Pro (`error` is `pro_required`)
+          description: Free accounts live in one Crew — additional Crew access is paid (`error` is `pro_required`)
         "404":
           description: No crew matches that invite code
         "409":
@@ -515,8 +535,8 @@ paths:
       description: >
         Owner only. Creates a challenge that runs from today through the next
         7 days. Only one challenge can be active at a time per crew (409
-        `challenge_active` when one is already running). Free crews can run
-        challenges; Pro unlocks per-challenge historical analytics.
+        `challenge_active` when one is already running). Every Crew can run
+        challenges and review the results.
       parameters:
         - name: id
           in: path
@@ -1343,7 +1363,7 @@ paths:
     get:
       operationId: getRecentActivity
       tags: [stats]
-      summary: Recent bets and parlays activity feed across the workspace
+      summary: Recent bets and parlays activity feed across the active Crew
       parameters:
         - name: limit
           in: query
@@ -1551,7 +1571,7 @@ paths:
       tags: [stats]
       summary: AI-narrated review of a bettor's week
       description: >
-        Returns a short written review of the bettor's week in EdgeBoard's
+        Returns a short written review of the bettor's week in TiltCheck's
         voice, generated from the same computed recap facts the recap page
         shows (never from raw bets) and cached per user per week. When the
         week had no activity or generation is unavailable, `narrative` is
@@ -1598,12 +1618,12 @@ paths:
     post:
       operationId: preBetCheck
       tags: [stats]
-      summary: Get Arc's pre-bet coaching note for an in-progress bet (Pro)
+      summary: Get Arc's pre-bet coaching note for an in-progress bet
       description: >
-        Pro-only. Reads the bettor's settled history in the specified sport and
-        bet type, then generates a 2–3 sentence coaching note via AI. Ephemeral —
-        not persisted. Rate-limited to 10 checks per hour per bettor.
-        Demo sessions return a deterministic simulated response.
+        Reads the bettor's settled history in the specified sport and bet type,
+        then generates a 2–3 sentence coaching note via AI. Ephemeral — not
+        persisted. Rate-limited to 10 checks per hour per bettor. Demo sessions
+        return a deterministic simulated response.
       requestBody:
         required: true
         content:
@@ -1619,8 +1639,6 @@ paths:
                 $ref: "#/components/schemas/PreBetCheckResult"
         "401":
           description: Not signed in
-        "402":
-          description: Pro feature — upgrade required (`error` is `pro_required`)
         "429":
           description: Rate limit reached (10 per hour)
 
@@ -1628,15 +1646,15 @@ paths:
     get:
       operationId: getStatsPeerBenchmarks
       tags: [stats]
-      summary: Get the bettor's metrics ranked against anonymized platform-wide percentiles (Pro)
+      summary: Get the bettor's metrics ranked against anonymized platform-wide percentiles
       description: >
-        Pro-only. Returns the signed-in bettor's key metrics (ROI, win rate,
-        calibration, post-mortem rate, tilt frequency) compared against
-        pre-computed platform-wide percentile breakpoints. Percentiles are
-        computed weekly across all opted-in, non-demo users with ≥10 settled
-        plays. The bettor's percentile band is computed server-side — raw
-        per-user data is never exposed. Returns `opted_out: true` when the
-        user has disabled benchmarking on their account.
+        Returns the signed-in bettor's key metrics (ROI, win rate, calibration,
+        post-mortem rate, tilt frequency) compared against pre-computed
+        platform-wide percentile breakpoints. Percentiles are computed weekly
+        across all opted-in, non-demo users with ≥10 settled plays. The
+        bettor's percentile band is computed server-side — raw per-user data
+        is never exposed. Returns `opted_out: true` when the user has disabled
+        benchmarking on their account.
       responses:
         "200":
           description: Peer benchmark comparison
@@ -1646,18 +1664,15 @@ paths:
                 $ref: "#/components/schemas/PeerBenchmarks"
         "401":
           description: Not signed in
-        "402":
-          description: Pro feature — upgrade required (`error` is `pro_required`)
-
-  # ── Workspace ─────────────────────────────────────────────────────────────
+  # ── Crew ──────────────────────────────────────────────────────────────────
   /workspace:
     get:
       operationId: getWorkspace
       tags: [workspace]
-      summary: Get workspace info and members
+      summary: Get active Crew info and members
       responses:
         "200":
-          description: Workspace with members
+          description: Crew with members
           content:
             application/json:
               schema:
@@ -1667,9 +1682,9 @@ paths:
     get:
       operationId: compareWorkspaceMembers
       tags: [workspace]
-      summary: Compare bets and stats between workspace members
+      summary: Compare bets and stats between Crew members
       description: >
-        Head-to-head comparison rows for every workspace member. Money math
+        Head-to-head comparison rows for every Crew member. Money math
         includes settled straight bets AND parlays (won/lost/push), excludes
         dead-zone-odds rows, and honors the same settledAt window as the
         leaderboard: week = last 7 days, month = last 30 days, all = everything.
@@ -1696,7 +1711,7 @@ paths:
       tags: [workspace]
       summary: Rank crew members by settled results over a time window
       description: >
-        Ranks every workspace member by net profit (ties broken by ROI, then
+        Ranks every Crew member by net profit (ties broken by ROI, then
         wins) using settled straight bets and parlays only — pending plays are
         reported as an "in play" count and never move the ranking. Rows saved
         with dead-zone odds are excluded the same way the stats endpoints
@@ -1728,13 +1743,13 @@ paths:
     get:
       operationId: getBillingStatus
       tags: [billing]
-      summary: TiltCheck Pro status for the signed-in bettor
+      summary: Paid multi-Crew status for the signed-in bettor
       description: >
         Server-verified subscription status. When the cached horizon has
         expired, the server re-checks the payment provider and stores the new
-        horizon — Pro access is never granted from client state, redirects, or
-        checkout IDs. Founders are always Pro; the demo board reports Pro so
-        the public demo shows the full product.
+        horizon — paid access is never granted from client state, redirects,
+        or checkout IDs. Founders bypass the paid Crew limit; the demo board
+        has no checkout flow.
       responses:
         "200":
           description: Verified subscription status
@@ -1753,7 +1768,7 @@ paths:
     post:
       operationId: createBillingCheckout
       tags: [billing]
-      summary: Create a hosted checkout session for TiltCheck Pro
+      summary: Create a hosted checkout session for additional Crew access
       description: >
         Creates a Whop hosted-checkout session bound to this bettor and returns
         the URL to redirect to. The checkout configuration id is stored on the
@@ -1779,7 +1794,7 @@ paths:
         "403":
           description: Signed in but no bettor profile linked yet
         "409":
-          description: Already subscribed (founders included — Pro comes with the crown)
+          description: Already subscribed (founders already bypass the Crew limit)
         "503":
           description: Payment provider unreachable
 
@@ -1972,6 +1987,7 @@ components:
       properties:
         status:
           type: string
+          enum: [ok, unavailable]
       required: [status]
 
     User:
@@ -2026,13 +2042,14 @@ components:
       properties:
         isPro:
           type: boolean
+          description: Whether this account may join or create more than one Crew
         proUntil:
           type: ["string", "null"]
-          description: End of the server-verified subscription horizon (ISO timestamp); null when Pro comes from founder/demo status or the account isn't Pro
+          description: End of the server-verified multi-Crew subscription horizon (ISO timestamp); null for a founder/demo bypass or an unpaid account
         source:
           type: string
           enum: [subscription, founder, demo, none]
-          description: Why the account is (or isn't) Pro
+          description: Why the account does (or does not) have multi-Crew access
       required: [isPro, proUntil, source]
 
     VapidPublicKey:
@@ -2122,7 +2139,7 @@ components:
           description: The signed-in user's role in this crew
         inviteCode:
           type: string
-          description: Shareable join code — sharing it is free, joining may need Pro
+          description: Shareable join code — sharing is free; a second Crew requires paid access
         memberCount:
           type: integer
         isActive:
@@ -2388,10 +2405,25 @@ components:
           description: Plays logged since Monday (UTC)
         totalWagered:
           type: number
+        reviewedPlays:
+          type: number
+          description: Settled plays with a recorded process-quality review
+        crewMemberships:
+          type: number
+          description: Number of Crews this member belongs to
+        firstPlayAt:
+          type: ["string", "null"]
+          description: When this member logged their first play
+        firstReviewAt:
+          type: ["string", "null"]
+          description: When this member first settled a play with a process review
+        returnedWithin7Days:
+          type: boolean
+          description: Whether a second play was logged within seven days of the first
         lastPlayAt:
           type: ["string", "null"]
           description: When this member last logged a play, or null if never
-      required: [userId, displayName, avatarColor, email, linked, isFounder, playsLogged, playsThisWeek, totalWagered, lastPlayAt]
+      required: [userId, displayName, avatarColor, email, linked, isFounder, playsLogged, playsThisWeek, totalWagered, reviewedPlays, crewMemberships, firstPlayAt, firstReviewAt, returnedWithin7Days, lastPlayAt]
 
     AdminOverview:
       type: object
@@ -2412,11 +2444,17 @@ components:
           type: number
         totalWagered:
           type: number
+        betaQualifiedMembers:
+          type: number
+          description: Non-founder testers with a first play, process review, seven-day return, and Crew membership
+        betaTesterTarget:
+          type: number
+          description: Evidence target for the private beta
         members:
           type: array
           items:
             $ref: "#/components/schemas/AdminMember"
-      required: [betaLocked, linkedSeats, invitesOutstanding, playsThisWeek, wageredThisWeek, totalPlays, totalWagered, members]
+      required: [betaLocked, linkedSeats, invitesOutstanding, playsThisWeek, wageredThisWeek, totalPlays, totalWagered, betaQualifiedMembers, betaTesterTarget, members]
 
     ClaimProfileInput:
       type: object

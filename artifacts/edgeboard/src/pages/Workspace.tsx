@@ -16,9 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatCurrency, formatOdds, formatDate } from "@/lib/format"
 import { Trophy, Flame, Snowflake, Swords, Users, Crown, X, Layers, Link2 } from "lucide-react"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
-import { UpgradeCard } from "@/components/UpgradeCard"
 import { TrophyCase } from "@/components/TrophyCase"
-import { useProStatus } from "@/hooks/use-pro"
 import { useCrews, getCrewActionsEnabled } from "@/hooks/use-crews"
 import { CrewSwitcher } from "@/components/CrewSwitcher"
 import { Button } from "@/components/ui/button"
@@ -91,19 +89,16 @@ function RankBadge({ rank }: { rank: number }) {
 export default function Workspace() {
   const { activeUser } = useUser()
   const [period, setPeriod] = useState<Period>("all")
-  const [rankBy, setRankBy] = useState<RankBy>("richest")
+  const [rankBy, setRankBy] = useState<RankBy>("sharpest")
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const { data: board = [], isLoading, isError, refetch, isRefetching } = useGetWorkspaceLeaderboard(
     { period },
     { query: { queryKey: getGetWorkspaceLeaderboardQueryKey({ period }) } },
   )
-  // Head-to-head is a Pro surface — the compare query stays off for free
-  // accounts so the 402 never hits the error machinery.
-  const { isPro, isProLoading, isProUnknown } = useProStatus()
   const { data: comparisons = [] } = useCompareWorkspaceMembers(
     { period },
-    { query: { enabled: isPro, queryKey: getCompareWorkspaceMembersQueryKey({ period }) } },
+    { query: { enabled: !!activeUser?.id, queryKey: getCompareWorkspaceMembersQueryKey({ period }) } },
   )
   const { data: friendBets = [], isLoading: isFriendBetsLoading } = useListBets(
     { userId: selectedId, limit: 5 },
@@ -411,10 +406,6 @@ export default function Workspace() {
         </Card>
       )}
 
-      {/* Head-to-head drill-in — velvet rope for free accounts */}
-      {selectedEntry && !isPro && !isProLoading && !isProUnknown && (
-        <UpgradeCard compact feature="Head-to-head compare" />
-      )}
       {selectedEntry && them && (
         <div className="space-y-4" data-testid="section-head-to-head">
           <div className="flex items-center justify-between">

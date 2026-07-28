@@ -33,7 +33,7 @@ const navItems = [
   { name: "Recap", shortName: "Recap", href: "/recap", icon: Newspaper },
   { name: "Lessons", shortName: "Lessons", href: "/lessons", icon: BookOpen },
   { name: "Edge Finder", shortName: "Edge", href: "/edge", icon: Crosshair },
-  { name: "Workspace", shortName: "Crew", href: "/workspace", icon: Users },
+  { name: "Crew", shortName: "Crew", href: "/workspace", icon: Users },
   { name: "Bankroll", shortName: "Bankroll", href: "/bankroll", icon: Wallet },
 ]
 
@@ -79,12 +79,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // marker the dashboard teaser uses, so they light up and clear together.
   const recapUnread = !!activeUser && isRecapUnseen(activeUser.recapSeenWeek)
 
-  // Founder-only page joins the sidebar nav; the mobile bottom bar keeps the
-  // core six (founders can reach the dash from the desktop nav or /founder).
-  // Account (Pro status + billing) rides the sidebar too — mobile reaches it
+  // Beta Ops joins the founder's sidebar; the mobile bottom bar keeps the
+  // core six (the founder can reach operations from the header or /founder).
+  // Account (multi-Crew status + billing) rides the sidebar too — mobile reaches it
   // from the header avatar.
   const sidebarNavItems = [
-    ...(activeUser?.isFounder ? [...navItems, { name: "Founder", href: "/founder", icon: Crown }] : navItems),
+    ...(activeUser?.isFounder ? [...navItems, { name: "Beta Ops", href: "/founder", icon: Crown }] : navItems),
     { name: "Account", href: "/account", icon: CircleUser },
   ]
 
@@ -193,7 +193,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               className={`h-8 w-8 rounded-md flex items-center justify-center ${
                 location === "/founder" ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground"
               }`}
-              aria-label="Founder dash"
+              aria-label="Beta operations"
               data-testid="link-founder-mobile"
             >
               <Crown className="h-4 w-4" />

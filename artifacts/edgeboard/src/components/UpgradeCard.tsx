@@ -6,7 +6,8 @@ import { useCreateBillingCheckout } from "@workspace/api-client-react"
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
 /**
- * The one upgrade surface, dropped wherever a Pro feature would render.
+ * The one upgrade surface, shown only when someone tries to join or create a
+ * second Crew.
  * Sends the bettor to Whop's hosted checkout; the return redirect lands on
  * /account?upgraded=1 where the server verifies the payment — nothing here
  * grants access.
@@ -35,9 +36,9 @@ export function UpgradeCard({ feature, compact = false }: { feature: string; com
             <Sparkles className="h-5 w-5 text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
           </div>
           <div className={compact ? "min-w-0" : "max-w-md"}>
-            <div className="font-semibold text-primary text-glow-primary">TiltCheck Pro</div>
+            <div className="font-semibold text-primary text-glow-primary">Multi-Crew access</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {feature} is part of the Pro insight layer. $9.99 a month — cheaper than the leak it finds.
+              {feature} needs Multi-Crew access. Your first Crew and the complete decision engine stay free.
             </p>
             {checkout.isError && (
               <p className="mt-1 text-sm text-chart-2" data-testid="text-upgrade-error">
@@ -52,7 +53,7 @@ export function UpgradeCard({ feature, compact = false }: { feature: string; com
           data-testid="button-upgrade-pro"
           className="shrink-0"
         >
-          {checkout.isPending ? "Opening checkout..." : "Unlock Pro"}
+          {checkout.isPending ? "Opening checkout..." : "Add Multi-Crew"}
         </Button>
       </CardContent>
     </Card>

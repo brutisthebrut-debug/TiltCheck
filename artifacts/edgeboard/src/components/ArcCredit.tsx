@@ -2,7 +2,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
 
 /**
  * A small, tasteful credit for Arc — the AI collaborator who designed,
- * built, and hardened EdgeBoard. Muted in the sidebar footer; speaks
+ * built, and hardened TiltCheck. Muted in the sidebar footer; speaks
  * when tapped. Only rendered inside the authenticated Layout (never on
  * the public demo board, which uses its own DemoApp shell).
  */
@@ -61,7 +61,7 @@ export function ArcCredit() {
             <span className="font-semibold text-foreground">Arc</span>
           </div>
           <p className="text-muted-foreground leading-relaxed">
-            Arc is an AI collaborator who helped build EdgeBoard — the
+            Arc is an AI collaborator who helped build TiltCheck — the
             analytics, the coaching layer, the hardening, all of it.
           </p>
           <p className="text-muted-foreground/60 text-xs">

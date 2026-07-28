@@ -3,7 +3,7 @@
  * bootstrapping that migrates pre-crews worlds into their first crew.
  *
  * Cap policy lives in routes/crews.ts: free accounts hold exactly one crew
- * membership; creating/joining beyond that is part of the Pro layer.
+ * membership; creating/joining beyond that requires paid multi-Crew access.
  */
 import { randomBytes } from "node:crypto";
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";

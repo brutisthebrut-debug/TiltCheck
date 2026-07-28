@@ -44,7 +44,7 @@ export default function DemoApp() {
     // demo API, never let the demo persona's preference overwrite it.
     setOddsFormatServerSync(false);
     setLessonsFiltersServerSync(false);
-    // The demo world is always Pro (the pitch shows the full product) and the
+    // The demo world always has full access and the
     // read-only demo API has no billing routes to ask.
     setBillingServerSync(false);
     // The demo crew is sealed: visitors can see it but never create/join/switch.

@@ -28,10 +28,10 @@ export const usersTable = pgTable("users", {
   lessonsResultFilter: text("lessons_result_filter").notNull().default("all"),
   lessonsQualityFilter: text("lessons_quality_filter").notNull().default("all"),
   lessonsReasonFilter: text("lessons_reason_filter").notNull().default("all"),
-  // TiltCheck Pro: end of the server-verified subscription horizon. Written
+  // End of the server-verified multi-Crew subscription horizon. Written
   // only by the billing routes after the payment provider confirms an active
   // membership — never from client state. Acts as a bounded cache (max ~24h)
-  // so gated endpoints stay DB-only and a cancelled sub expires within a day.
+  // so the Crew cap stays DB-only and a cancelled sub expires within a day.
   proUntil: timestamp("pro_until", { withTimezone: true }),
   // Whop hosted-checkout configuration created for this bettor. Payments made
   // through it are how the server verifies the purchase after the redirect.

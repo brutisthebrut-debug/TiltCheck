@@ -1,5 +1,5 @@
 /**
- * Shared week math for EdgeBoard (UTC, Monday-start weeks).
+ * Shared week math for TiltCheck (UTC, Monday-start weeks).
  *
  * The weekly recap on the server and the recap teaser in the web app must
  * agree on which week "last week" is — both import from here so the math

@@ -1,6 +1,13 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { eq, isNotNull, desc } from "drizzle-orm";
-import { db, usersTable, betsTable, parlaysTable, invitesTable } from "@workspace/db";
+import {
+  db,
+  usersTable,
+  betsTable,
+  parlaysTable,
+  invitesTable,
+  crewMembersTable,
+} from "@workspace/db";
 import { dayOf, mondayOf } from "@workspace/weeks";
 import {
   GetAdminOverviewResponse,
@@ -97,26 +104,76 @@ router.delete("/admin/invites/:id", async (req, res): Promise<void> => {
 router.get("/admin/overview", async (req, res): Promise<void> => {
   // Founder dash covers the real crew only — the fictional demo bettors and
   // their seeded plays are excluded from every count.
-  const [users, bets, parlays, invites] = await Promise.all([
+  const [users, bets, parlays, invites, crewMemberships] = await Promise.all([
     db.select().from(usersTable).where(eq(usersTable.isDemo, false)).orderBy(usersTable.id),
-    db.select({ userId: betsTable.userId, stake: betsTable.stake, createdAt: betsTable.createdAt }).from(betsTable),
-    db.select({ userId: parlaysTable.userId, stake: parlaysTable.stake, createdAt: parlaysTable.createdAt }).from(parlaysTable),
+    db
+      .select({
+        userId: betsTable.userId,
+        stake: betsTable.stake,
+        createdAt: betsTable.createdAt,
+        settledAt: betsTable.settledAt,
+        reasoningQuality: betsTable.reasoningQuality,
+      })
+      .from(betsTable),
+    db
+      .select({
+        userId: parlaysTable.userId,
+        stake: parlaysTable.stake,
+        createdAt: parlaysTable.createdAt,
+        settledAt: parlaysTable.settledAt,
+        reasoningQuality: parlaysTable.reasoningQuality,
+      })
+      .from(parlaysTable),
     db.select().from(invitesTable),
+    db.select({ userId: crewMembersTable.userId }).from(crewMembersTable),
   ]);
 
   const weekStart = new Date(`${mondayOf(dayOf(new Date()))}T00:00:00Z`);
   const realIds = new Set(users.map((u) => u.id));
   const plays = [...bets, ...parlays].filter((p) => realIds.has(p.userId));
 
-  type MemberAgg = { plays: number; playsThisWeek: number; wagered: number; lastPlayAt: Date | null };
+  type MemberAgg = {
+    plays: number;
+    playsThisWeek: number;
+    wagered: number;
+    firstPlayAt: Date | null;
+    secondPlayAt: Date | null;
+    lastPlayAt: Date | null;
+    reviewedPlays: number;
+    firstReviewAt: Date | null;
+  };
   const byUser = new Map<number, MemberAgg>();
-  for (const p of plays) {
-    const agg = byUser.get(p.userId) ?? { plays: 0, playsThisWeek: 0, wagered: 0, lastPlayAt: null };
+  for (const p of [...plays].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+    const agg = byUser.get(p.userId) ?? {
+      plays: 0,
+      playsThisWeek: 0,
+      wagered: 0,
+      firstPlayAt: null,
+      secondPlayAt: null,
+      lastPlayAt: null,
+      reviewedPlays: 0,
+      firstReviewAt: null,
+    };
     agg.plays += 1;
     agg.wagered += Number(p.stake);
     if (p.createdAt >= weekStart) agg.playsThisWeek += 1;
+    if (!agg.firstPlayAt) agg.firstPlayAt = p.createdAt;
+    else if (!agg.secondPlayAt) agg.secondPlayAt = p.createdAt;
     if (!agg.lastPlayAt || p.createdAt > agg.lastPlayAt) agg.lastPlayAt = p.createdAt;
+    if (p.settledAt && p.reasoningQuality) {
+      agg.reviewedPlays += 1;
+      if (!agg.firstReviewAt || p.settledAt < agg.firstReviewAt) {
+        agg.firstReviewAt = p.settledAt;
+      }
+    }
     byUser.set(p.userId, agg);
+  }
+  const membershipCountByUser = new Map<number, number>();
+  for (const membership of crewMemberships) {
+    membershipCountByUser.set(
+      membership.userId,
+      (membershipCountByUser.get(membership.userId) ?? 0) + 1,
+    );
   }
 
   const linkedEmails = new Set(
@@ -126,6 +183,12 @@ router.get("/admin/overview", async (req, res): Promise<void> => {
 
   const members = users.map((u) => {
     const agg = byUser.get(u.id);
+    const firstPlayAt = agg?.firstPlayAt ?? null;
+    const secondPlayAt = agg?.secondPlayAt ?? null;
+    const returnedWithin7Days =
+      firstPlayAt != null &&
+      secondPlayAt != null &&
+      secondPlayAt.getTime() - firstPlayAt.getTime() <= 7 * 24 * 60 * 60 * 1000;
     return {
       userId: u.id,
       displayName: u.displayName,
@@ -136,9 +199,25 @@ router.get("/admin/overview", async (req, res): Promise<void> => {
       playsLogged: agg?.plays ?? 0,
       playsThisWeek: agg?.playsThisWeek ?? 0,
       totalWagered: Math.round((agg?.wagered ?? 0) * 100) / 100,
+      reviewedPlays: agg?.reviewedPlays ?? 0,
+      crewMemberships: membershipCountByUser.get(u.id) ?? 0,
+      firstPlayAt: firstPlayAt?.toISOString() ?? null,
+      firstReviewAt: agg?.firstReviewAt?.toISOString() ?? null,
+      returnedWithin7Days,
       lastPlayAt: agg?.lastPlayAt?.toISOString() ?? null,
     };
   });
+
+  const betaTesterTarget = Math.max(1, Number.parseInt(process.env.BETA_TESTER_TARGET ?? "5", 10) || 5);
+  const betaQualifiedMembers = members.filter(
+    (member) =>
+      member.linked &&
+      !member.isFounder &&
+      member.firstPlayAt != null &&
+      member.firstReviewAt != null &&
+      member.returnedWithin7Days &&
+      member.crewMemberships > 0,
+  ).length;
 
   const overview = {
     betaLocked: envConfigured || invites.length > 0,
@@ -149,6 +228,8 @@ router.get("/admin/overview", async (req, res): Promise<void> => {
       Math.round(plays.filter((p) => p.createdAt >= weekStart).reduce((a, p) => a + Number(p.stake), 0) * 100) / 100,
     totalPlays: plays.length,
     totalWagered: Math.round(plays.reduce((a, p) => a + Number(p.stake), 0) * 100) / 100,
+    betaQualifiedMembers,
+    betaTesterTarget,
     members,
   };
   res.json(GetAdminOverviewResponse.parse(overview));

@@ -69,8 +69,8 @@ export default function Privacy() {
           <section className="space-y-2">
             <h2 className="text-base font-bold text-foreground">Sign-in and payments</h2>
             <p>
-              Sign-in is handled by Clerk; Pro subscriptions are processed by Whop. Each sees
-              only what it needs (your email) — your betting data never leaves TiltCheck.
+              Sign-in is handled by Clerk; paid multi-Crew access is processed by Whop. Each
+              sees only what it needs (your email) — your betting data never leaves TiltCheck.
             </p>
           </section>
         </div>

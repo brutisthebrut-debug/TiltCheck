@@ -66,7 +66,7 @@ router.use(badgesRouter);
 router.use(workspaceRouter);
 router.use(adminRouter);
 // Billing is deliberately NOT mounted on the demo router — the demo world
-// reports Pro via its own bypass in requirePro, never through checkout.
+// has no checkout flow and cannot create additional Crew memberships.
 router.use(billingRouter);
 router.use(crewsRouter);
 router.use(notificationsRouter);

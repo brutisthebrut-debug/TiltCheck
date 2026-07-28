@@ -35,7 +35,7 @@ function is402(error: unknown): boolean {
 /**
  * The crew picker: shows which crew's board you're looking at and lets you
  * switch, start a new crew, or join one with a code. Free accounts run one
- * crew — the create/join dialogs swap to the Pro pitch when the server says
+ * crew — the create/join dialogs swap to the multi-Crew pitch when the server says
  * the cap is hit (402), never deciding the cap client-side.
  */
 export function CrewSwitcher({ className = "" }: { className?: string }) {
@@ -166,7 +166,7 @@ export function CrewSwitcher({ className = "" }: { className?: string }) {
             </DialogDescription>
           </DialogHeader>
           {is402(create.error) ? (
-            <UpgradeCard feature="Running more than one crew" compact />
+            <UpgradeCard feature="Starting a second Crew" compact />
           ) : (
             <div className="space-y-3">
               <Input
@@ -205,7 +205,7 @@ export function CrewSwitcher({ className = "" }: { className?: string }) {
             </DialogDescription>
           </DialogHeader>
           {is402(join.error) ? (
-            <UpgradeCard feature="Running more than one crew" compact />
+            <UpgradeCard feature="Joining a second Crew" compact />
           ) : (
             <div className="space-y-3">
               <Input

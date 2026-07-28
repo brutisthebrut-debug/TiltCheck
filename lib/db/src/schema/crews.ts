@@ -4,8 +4,8 @@ import { usersTable } from "./users";
 /**
  * Crews: the social unit of TiltCheck. The leaderboard, head-to-head, and
  * weekly recap highlights only ever cover the members of the viewer's active
- * crew. Free accounts live in exactly one crew; creating or joining more is
- * part of the Pro layer (enforced server-side in the crews routes).
+ * crew. Standard accounts live in exactly one crew; creating or joining more
+ * requires paid multi-Crew access (enforced server-side in the crews routes).
  *
  * Demo isolation: the fictional demo board gets its own crew with
  * isDemo=true. Real joins only ever match isDemo=false crews, so the two

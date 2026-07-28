@@ -5,8 +5,8 @@
  *     with Whop and stamped back; provider failure → 503, never silent access
  *   - POST /billing/checkout: validates returnUrl, refuses when already Pro,
  *     creates a hosted checkout config and stores its id on the user
- *   - requirePro gate: free accounts get 402 on the insight-layer endpoints,
- *     a live horizon opens them (covered per-endpoint by their own suites)
+ *   - billing status controls only second and additional Crew memberships;
+ *     the personal decision engine remains available on free accounts
  */
 import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
 import request from "supertest";
@@ -47,6 +47,7 @@ vi.mock("../whopClient", () => ({
 process.env.BETA_SEAT_LIMIT = "0";
 process.env.WHOP_COMPANY_ID = "biz_test";
 process.env.WHOP_PLAN_ID = "plan_test";
+process.env.APP_ORIGIN = "https://app.example";
 
 import app from "../app";
 import { db, pool, usersTable } from "@workspace/db";
@@ -168,6 +169,17 @@ describe("POST /billing/checkout", () => {
     expect(mockCheckoutCreate).not.toHaveBeenCalled();
   });
 
+  it("rejects an absolute returnUrl on an unapproved origin", async () => {
+    const { clerkUserId } = await createLinkedUser();
+    currentClerkUserId = clerkUserId;
+    const res = await request(app)
+      .post("/api/billing/checkout")
+      .send({ returnUrl: "https://attacker.example/account?upgraded=1" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("approved app origin");
+    expect(mockCheckoutCreate).not.toHaveBeenCalled();
+  });
+
   it("refuses when already Pro (founder or live horizon)", async () => {
     const founder = await createLinkedUser({ isFounder: true });
     currentClerkUserId = founder.clerkUserId;
@@ -280,8 +292,8 @@ describe("POST /billing/checkout", () => {
   });
 });
 
-describe("requirePro gate", () => {
-  it("free accounts get a 402 on every insight-layer endpoint", async () => {
+describe("decision engine access", () => {
+  it("free accounts can use every personal insight endpoint", async () => {
     const { clerkUserId } = await createLinkedUser();
     currentClerkUserId = clerkUserId;
     for (const path of [
@@ -291,20 +303,12 @@ describe("requirePro gate", () => {
       "/api/workspace/compare",
     ]) {
       const res = await request(app).get(path);
-      expect(res.status, path).toBe(402);
-      expect(res.body.error, path).toBe("pro_required");
+      expect(res.status, path).toBe(200);
     }
   });
 
-  it("an expired horizon closes the gate again", async () => {
+  it("an expired multi-Crew horizon does not close personal insights", async () => {
     const { clerkUserId } = await createLinkedUser({ proUntil: PAST });
-    currentClerkUserId = clerkUserId;
-    const res = await request(app).get("/api/stats/leak-profile");
-    expect(res.status).toBe(402);
-  });
-
-  it("a live horizon opens the gate", async () => {
-    const { clerkUserId } = await createLinkedUser({ proUntil: FUTURE });
     currentClerkUserId = clerkUserId;
     const res = await request(app).get("/api/stats/leak-profile");
     expect(res.status).toBe(200);

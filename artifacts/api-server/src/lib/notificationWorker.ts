@@ -254,6 +254,8 @@ const CHECK_INTERVAL_MS = 15 * 60 * 1000;
 const OVERDUE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const TILT_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 const CREW_COOLDOWN_MS = 15 * 60 * 1000;
+let warmupTimer: NodeJS.Timeout | null = null;
+let checkTimer: NodeJS.Timeout | null = null;
 
 async function runNotificationCheck() {
   // #190: scheduled peer-benchmark refresh. getOrRefreshPercentiles is
@@ -342,6 +344,7 @@ async function runNotificationCheck() {
 }
 
 export function startNotificationWorker() {
+  if (warmupTimer || checkTimer) return;
   ensureVapid();
   // Even without VAPID keys the worker still runs: push sends are skipped
   // inside runNotificationCheck, but the scheduled benchmark refresh (#190)
@@ -353,14 +356,22 @@ export function startNotificationWorker() {
   );
 
   // First check after a short warm-up delay, then every 15 min
-  setTimeout(() => {
+  warmupTimer = setTimeout(() => {
+    warmupTimer = null;
     runNotificationCheck().catch((err) =>
       logger.error({ err }, "Notification worker: initial check failed")
     );
-    setInterval(() => {
+    checkTimer = setInterval(() => {
       runNotificationCheck().catch((err) =>
         logger.error({ err }, "Notification worker: check failed")
       );
     }, CHECK_INTERVAL_MS);
   }, 30_000); // 30s warm-up
+}
+
+export function stopNotificationWorker() {
+  if (warmupTimer) clearTimeout(warmupTimer);
+  if (checkTimer) clearInterval(checkTimer);
+  warmupTimer = null;
+  checkTimer = null;
 }

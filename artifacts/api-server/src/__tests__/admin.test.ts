@@ -30,10 +30,11 @@ vi.mock("@clerk/express", () => ({
 }));
 
 process.env.BETA_SEAT_LIMIT = "0";
+process.env.BETA_TESTER_TARGET = "5";
 delete process.env.BETA_ALLOWED_EMAILS;
 
 import app from "../app";
-import { db, pool, usersTable, betsTable, invitesTable } from "@workspace/db";
+import { db, pool, usersTable, betsTable, invitesTable, transactionsTable } from "@workspace/db";
 
 const createdUserIds: number[] = [];
 let counter = 0;
@@ -61,6 +62,7 @@ afterAll(async () => {
   await db.delete(invitesTable).where(like(invitesTable.email, "%admintest%"));
   await db.delete(invitesTable).where(like(invitesTable.email, "%gatetest%"));
   if (createdUserIds.length > 0) {
+    await db.delete(transactionsTable).where(inArray(transactionsTable.userId, createdUserIds));
     await db.delete(betsTable).where(inArray(betsTable.userId, createdUserIds));
     await db.delete(usersTable).where(inArray(usersTable.id, createdUserIds));
   }
@@ -174,7 +176,64 @@ describe("founder overview", () => {
     expect(me.playsLogged).toBe(1);
     expect(me.playsThisWeek).toBe(1);
     expect(me.totalWagered).toBe(25);
+    expect(me.reviewedPlays).toBe(0);
+    expect(me.crewMemberships).toBe(0);
+    expect(me.firstPlayAt).toBeTruthy();
+    expect(me.firstReviewAt).toBeNull();
+    expect(me.returnedWithin7Days).toBe(false);
     expect(me.lastPlayAt).toBeTruthy();
+    expect(res.body.betaTesterTarget).toBe(5);
+  });
+
+  it("tracks the beta loop without counting the founder as a tester", async () => {
+    const founder = await createLinkedUser({ isFounder: true });
+    const tester = await createLinkedUser();
+
+    currentClerkUserId = tester.clerkUserId;
+    const crew = await request(app).post("/api/crews").send({ name: "Evidence Crew" });
+    expect(crew.status).toBe(201);
+
+    const first = await request(app).post("/api/bets").send({
+      sport: "NBA",
+      event: "Evidence Game 1",
+      betType: "moneyline",
+      pick: "A ML",
+      odds: -110,
+      stake: 10,
+      gameDate: "2026-07-27",
+      confidenceScore: 6,
+    });
+    expect(first.status).toBe(201);
+    const settled = await request(app)
+      .patch(`/api/bets/${first.body.id}/settle`)
+      .send({ status: "lost", reasoningQuality: "flawed", missReason: "bad_read" });
+    expect(settled.status).toBe(200);
+
+    const second = await request(app).post("/api/bets").send({
+      sport: "NBA",
+      event: "Evidence Game 2",
+      betType: "spread",
+      pick: "B -3",
+      odds: -105,
+      stake: 10,
+      gameDate: "2026-07-28",
+      confidenceScore: 7,
+    });
+    expect(second.status).toBe(201);
+
+    currentClerkUserId = founder.clerkUserId;
+    const res = await request(app).get("/api/admin/overview");
+    expect(res.status).toBe(200);
+    const member = res.body.members.find((m: { userId: number }) => m.userId === tester.id);
+    expect(member).toMatchObject({
+      playsLogged: 2,
+      reviewedPlays: 1,
+      crewMemberships: 1,
+      returnedWithin7Days: true,
+    });
+    expect(member.firstPlayAt).toBeTruthy();
+    expect(member.firstReviewAt).toBeTruthy();
+    expect(res.body.betaQualifiedMembers).toBeGreaterThanOrEqual(1);
   });
 });
 

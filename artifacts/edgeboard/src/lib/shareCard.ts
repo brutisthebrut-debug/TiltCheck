@@ -67,7 +67,7 @@ export async function exportAndShare(
     await navigator.share({
       files: [file],
       title: "My TiltCheck stats",
-      text: "Check out my betting edge on EdgeBoard",
+      text: "Check out my decision record on TiltCheck",
     })
     return
   }
@@ -77,7 +77,7 @@ export async function exportAndShare(
     try {
       await navigator.share({
         title: "My TiltCheck stats",
-        text: "Check out my betting edge on EdgeBoard",
+        text: "Check out my decision record on TiltCheck",
       })
       return
     } catch {

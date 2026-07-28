@@ -6,8 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
-import { UpgradeCard } from "@/components/UpgradeCard"
-import { useProStatus } from "@/hooks/use-pro"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { Crosshair, TrendingUp, TrendingDown, Plus, ArrowRight, ShieldQuestion } from "lucide-react"
@@ -71,21 +69,17 @@ export default function EdgeFinder() {
   const [sport, setSport] = useState<string | null>(null)
   const hasFilters = period !== "all" || sport != null
 
-  // Edge Finder is the flagship Pro surface — queries stay off for free
-  // accounts so the 402 never reads as a connection problem.
-  const { isPro, isProLoading, isProUnknown, isProRefreshing, refreshPro } = useProStatus()
-
   const filterParams = { userId: activeUser?.id, period, sport: sport ?? undefined }
   const { data, isLoading, isError, refetch, isRefetching } = useGetEdgeFinder(
     filterParams,
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey(filterParams) } }
+    { query: { enabled: !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey(filterParams) } }
   )
 
   // Unfiltered slice just to know which sports exist — keeps the sport
   // dropdown stable while a sport filter is applied.
   const { data: allTime } = useGetEdgeFinder(
     { userId: activeUser?.id },
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey({ userId: activeUser?.id }) } }
+    { query: { enabled: !!activeUser?.id, queryKey: getGetEdgeFinderQueryKey({ userId: activeUser?.id }) } }
   )
   const sportOptions = (allTime?.sport ?? []).map((l) => l.key).sort()
 
@@ -100,76 +94,6 @@ export default function EdgeFinder() {
           isRetrying={isRefetching}
           testId="card-edge-finder-error"
         />
-      </div>
-    )
-  }
-
-  if (!isPro && !isProLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edge Finder</h1>
-          <p className="text-muted-foreground mt-1">
-            Your best lanes — by sport, bet type, odds band, and day — cut from your own graded record.
-          </p>
-        </div>
-        {isProUnknown ? (
-          // The plan check failed — never pitch an upgrade to someone who may
-          // already be paying. Neutral retry instead.
-          <QueryErrorCard
-            title="Couldn't verify your plan."
-            message="Connection hiccup on the billing check — your subscription hasn't gone anywhere."
-            onRetry={() => refreshPro()}
-            isRetrying={isProRefreshing}
-            testId="card-billing-error"
-          />
-        ) : (
-          <>
-            <UpgradeCard feature="Edge Finder" />
-            {/* Honest preview: clearly-labeled sample data showing exactly
-                what the report looks like — nobody's real numbers. */}
-            <Card className="relative overflow-hidden" data-testid="card-edge-sample-preview">
-              <div className="absolute right-3 top-3 z-10 rounded-full border border-[#ff9900]/50 bg-[#ff9900]/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#ff9900]">
-                Sample data
-              </div>
-              <CardHeader>
-                <CardTitle className="text-base">What you'd see here</CardTitle>
-                <CardDescription>A made-up bettor's report — yours gets cut from your own graded record.</CardDescription>
-              </CardHeader>
-              <CardContent className="opacity-60 pointer-events-none select-none">
-                <table className="w-full text-sm text-left">
-                  <caption className="sr-only">
-                    Sample Edge Finder report with fictional data — illustrates the lanes, records, and ROI you'd see for your own graded bets with Pro.
-                  </caption>
-                  <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Lane</th>
-                      <th className="px-4 py-3 font-medium text-right">Bets</th>
-                      <th className="px-4 py-3 font-medium text-right">Record</th>
-                      <th className="px-4 py-3 font-medium text-right">Net P/L</th>
-                      <th className="px-4 py-3 font-medium text-right">ROI</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {[
-                      { lane: "NBA underdogs", bets: 24, record: "15-9", pl: "+$412", roi: "+17.2%", up: true },
-                      { lane: "NFL favorites", bets: 18, record: "8-10", pl: "-$186", roi: "-10.3%", up: false },
-                      { lane: "Saturday plays", bets: 15, record: "10-5", pl: "+$240", roi: "+16.0%", up: true },
-                    ].map((r) => (
-                      <tr key={r.lane}>
-                        <td className="px-4 py-3 font-medium">{r.lane}</td>
-                        <td className="px-4 py-3 text-right font-mono">{r.bets}</td>
-                        <td className="px-4 py-3 text-right font-mono">{r.record}</td>
-                        <td className={`px-4 py-3 text-right font-mono font-bold ${r.up ? "text-chart-1" : "text-chart-2"}`}>{r.pl}</td>
-                        <td className={`px-4 py-3 text-right font-mono ${r.up ? "text-chart-1" : "text-chart-2"}`}>{r.roi}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          </>
-        )}
       </div>
     )
   }

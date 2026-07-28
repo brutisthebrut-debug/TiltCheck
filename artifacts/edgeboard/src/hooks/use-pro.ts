@@ -1,7 +1,7 @@
 import { useGetBillingStatus, getGetBillingStatusQueryKey } from "@workspace/api-client-react"
 
 // The public demo board never talks to /billing: the demo API doesn't mount
-// billing routes, and the demo world is always Pro — the demo IS the pitch.
+// billing routes, and the demo world always has multi-Crew access.
 // DemoApp flips this off the same way it does odds-format server sync.
 let billingServerSync = true
 export function setBillingServerSync(enabled: boolean) {
@@ -9,10 +9,8 @@ export function setBillingServerSync(enabled: boolean) {
 }
 
 /**
- * Server-verified Pro status for gating the insight layer. The server is the
- * only authority — this hook just reads GET /billing/status. While the status
- * is loading, callers should keep their skeletons up rather than flashing an
- * upgrade card at a paying user.
+ * Server-verified multi-Crew status. The server is the only authority — this
+ * hook only reads GET /billing/status.
  */
 export function useProStatus() {
   const query = useGetBillingStatus({

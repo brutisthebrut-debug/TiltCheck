@@ -22,7 +22,6 @@ import { computeWeeklyRecap, mondayOf, lastCompletedWeekStart, dayOf } from "../
 import { assembleRecapFacts, generateRecapNarrative, NARRATIVE_MODEL } from "../lib/narrative";
 import { logger } from "../lib/logger";
 import { requireProfile } from "../middlewares/auth";
-import { requirePro } from "../middlewares/billing";
 import { preBetCheckLimiter } from "../middlewares/rate-limit";
 import { userScopeCondition, userInSocialScope, getSocialUsers } from "../lib/scope";
 import { isDemoRequest } from "../middlewares/demo";
@@ -368,7 +367,7 @@ router.get("/stats/confidence-analysis", async (req, res): Promise<void> => {
 });
 
 // GET /stats/insights
-router.get("/stats/insights", requirePro, async (req, res): Promise<void> => {
+router.get("/stats/insights", requireProfile, async (req, res): Promise<void> => {
   const query = GetStatsInsightsQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
@@ -612,7 +611,7 @@ router.get("/stats/lessons", requireProfile, async (req, res): Promise<void> => 
 // aggregated across their whole settled history so the bet form can warn
 // before they repeat their most common mistake. Private: this is self-audit
 // data, so a userId param is only accepted when it matches the session user.
-router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): Promise<void> => {
+router.get("/stats/leak-profile", requireProfile, async (req, res): Promise<void> => {
   const query = GetLeakProfileQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
@@ -901,7 +900,7 @@ router.get("/stats/leak-profile", requireProfile, requirePro, async (req, res): 
 // greys them out rather than pretending small samples mean something.
 const EDGE_MIN_SAMPLE = 5;
 
-router.get("/stats/edge-finder", requireProfile, requirePro, async (req, res): Promise<void> => {
+router.get("/stats/edge-finder", requireProfile, async (req, res): Promise<void> => {
   const query = GetEdgeFinderQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: query.error.message });
@@ -1393,7 +1392,7 @@ router.get("/stats/recap/narrative", requireProfile, async (req, res): Promise<v
 
 // ── Pre-bet Arc coaching check ──────────────────────────────────────────────
 
-const PRE_BET_SYSTEM_PROMPT = `You are EdgeBoard's pre-bet coach. EdgeBoard is a private bet tracker a friend group uses to study their own decision-making — it never gives picks.
+const PRE_BET_SYSTEM_PROMPT = `You are TiltCheck's pre-bet coach. TiltCheck is a private decision journal a betting crew uses to study its own process — it never gives picks.
 
 Voice (non-negotiable): blunt like a trainer reviewing game tape, big-sibling energy, dry humor welcome. Never mean, never preachy, no clichés. Address the bettor as "you".
 
@@ -1429,7 +1428,6 @@ function demoPrebetNote(sport: string, odds: number): string {
 router.post(
   "/stats/pre-bet-check",
   requireProfile,
-  requirePro,
   preBetCheckLimiter,
   async (req, res): Promise<void> => {
     const parsed = PreBetCheckBody.safeParse(req.body);
@@ -1569,8 +1567,8 @@ router.post(
   }
 );
 
-// GET /stats/peer-benchmarks — anonymous platform-wide percentile comparison (Pro)
-router.get("/stats/peer-benchmarks", requireProfile, requirePro, async (req, res): Promise<void> => {
+// GET /stats/peer-benchmarks — anonymous platform-wide percentile comparison
+router.get("/stats/peer-benchmarks", requireProfile, async (req, res): Promise<void> => {
   const me = req.currentUser!;
 
   // Opted-out users get a clean response — they're not in the sample and

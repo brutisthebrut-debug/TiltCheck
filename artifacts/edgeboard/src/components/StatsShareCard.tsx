@@ -138,7 +138,7 @@ export const StatsShareCard = React.forwardRef<HTMLDivElement, { data: StatsCard
                 border: `1px solid ${C.primary}40`,
                 fontSize: 11, fontWeight: 600, color: C.primary,
                 letterSpacing: "0.3px",
-              }}>EdgeBoard</span>
+              }}>TiltCheck</span>
             </div>
 
             {/* Filter context */}
@@ -225,7 +225,7 @@ export const StatsShareCard = React.forwardRef<HTMLDivElement, { data: StatsCard
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <span style={{ fontSize: 13, color: C.mutedDark, letterSpacing: "0.2px" }}>
-              Track your edge at <span style={{ color: C.primary }}>EdgeBoard</span>
+              Track your decisions at <span style={{ color: C.primary }}>TiltCheck</span>
             </span>
             <span style={{ fontSize: 12, color: C.mutedDark, fontFamily: "'Space Mono', monospace" }}>
               tiltcheck.io
@@ -332,7 +332,7 @@ export const StatsShareCardPortrait = React.forwardRef<HTMLDivElement, { data: S
                 border: `2px solid ${C.primary}40`,
                 fontSize: 20, fontWeight: 600, color: C.primary,
                 letterSpacing: "0.4px",
-              }}>EdgeBoard</span>
+              }}>TiltCheck</span>
             </div>
 
             {/* Filter context */}
@@ -428,7 +428,7 @@ export const StatsShareCardPortrait = React.forwardRef<HTMLDivElement, { data: S
             display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
           }}>
             <span style={{ fontSize: 26, color: C.mutedDark, letterSpacing: "0.2px" }}>
-              Track your edge at <span style={{ color: C.primary }}>EdgeBoard</span>
+              Track your decisions at <span style={{ color: C.primary }}>TiltCheck</span>
             </span>
             <span style={{ fontSize: 22, color: C.mutedDark, fontFamily: "'Space Mono', monospace" }}>
               tiltcheck.io

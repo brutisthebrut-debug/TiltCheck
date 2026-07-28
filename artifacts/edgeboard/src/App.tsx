@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
-import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Layout } from './components/Layout';
 import { Toaster } from './components/ui/toaster';
@@ -13,25 +12,29 @@ import { getPendingInviteCode, setPendingInviteCode, clearPendingInviteCode } fr
 
 import Landing from './pages/Landing';
 import ClaimProfile from './pages/ClaimProfile';
-import Dashboard from './pages/Dashboard';
-import Bets from './pages/Bets';
-import NewBet from './pages/NewBet';
-import BetDetail from './pages/BetDetail';
-import Parlays from './pages/Parlays';
-import NewParlay from './pages/NewParlay';
-import ParlayDetail from './pages/ParlayDetail';
-import Stats from './pages/Stats';
-import Lessons from './pages/Lessons';
-import EdgeFinder from './pages/EdgeFinder';
-import Workspace from './pages/Workspace';
-import Bankroll from './pages/Bankroll';
-import Recap from './pages/Recap';
-import Account from './pages/Account';
-import Founder from './pages/Founder';
-import DemoApp from './pages/DemoApp';
-import Privacy from './pages/Privacy';
-import Terms from './pages/Terms';
 import { ResponsibleGamblingNote, TrustLinks } from './components/TrustFooter';
+
+// Keep the landing, authentication, and first-run flow immediate. Product
+// routes load on demand so a phone does not download every chart and founder
+// surface before the bettor can log a play.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Bets = lazy(() => import('./pages/Bets'));
+const NewBet = lazy(() => import('./pages/NewBet'));
+const BetDetail = lazy(() => import('./pages/BetDetail'));
+const Parlays = lazy(() => import('./pages/Parlays'));
+const NewParlay = lazy(() => import('./pages/NewParlay'));
+const ParlayDetail = lazy(() => import('./pages/ParlayDetail'));
+const Stats = lazy(() => import('./pages/Stats'));
+const Lessons = lazy(() => import('./pages/Lessons'));
+const EdgeFinder = lazy(() => import('./pages/EdgeFinder'));
+const Workspace = lazy(() => import('./pages/Workspace'));
+const Bankroll = lazy(() => import('./pages/Bankroll'));
+const Recap = lazy(() => import('./pages/Recap'));
+const Account = lazy(() => import('./pages/Account'));
+const Founder = lazy(() => import('./pages/Founder'));
+const DemoApp = lazy(() => import('./pages/DemoApp'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
 
 const queryClient = new QueryClient();
 
@@ -50,15 +53,9 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
-// same build serves multiple Clerk custom domains.
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
-
-// REQUIRED — empty in dev (Clerk hits dev FAPI directly), auto-set in prod.
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+// Clerk's publishable key is intentionally safe to embed in the browser build.
+// The secret key remains server-only.
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -270,7 +267,6 @@ function ClerkProviderWithRoutes() {
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
@@ -284,7 +280,7 @@ function ClerkProviderWithRoutes() {
         signUp: {
           start: {
             title: 'Get on the board',
-            subtitle: 'Your crew\u2019s private book — decision tracking for sharps',
+            subtitle: 'Track the decision. Review the process. Get better with your Crew.',
           },
         },
       }}
@@ -294,29 +290,31 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
         <Toaster />
-        <Switch>
-          {/* REQUIRED — "/sign-in/*?" and "/sign-up/*?" verbatim for OAuth sub-paths */}
-          <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
-          {/* Public demo board — works signed-out AND signed-in; it brings its
-              own QueryClient so it never touches the real session's cache. */}
-          <Route path="/demo" nest>
-            <DemoApp />
-          </Route>
-          {/* Crew invite deep link — pre-fills the join flow through sign-up. */}
-          <Route path="/join/:code">{(params) => <JoinRoute code={params.code} />}</Route>
-          {/* Trust pages — public, reachable signed-out from the sign-up screen. */}
-          <Route path="/privacy" component={Privacy} />
-          <Route path="/terms" component={Terms} />
-          <Route>
-            <Show when="signed-in">
-              <AuthedApp />
-            </Show>
-            <Show when="signed-out">
-              <Landing />
-            </Show>
-          </Route>
-        </Switch>
+        <Suspense fallback={<LoadingScreen />}>
+          <Switch>
+            {/* REQUIRED — "/sign-in/*?" and "/sign-up/*?" verbatim for OAuth sub-paths */}
+            <Route path="/sign-in/*?" component={SignInPage} />
+            <Route path="/sign-up/*?" component={SignUpPage} />
+            {/* Public demo board — works signed-out AND signed-in; it brings its
+                own QueryClient so it never touches the real session's cache. */}
+            <Route path="/demo" nest>
+              <DemoApp />
+            </Route>
+            {/* Crew invite deep link — pre-fills the join flow through sign-up. */}
+            <Route path="/join/:code">{(params) => <JoinRoute code={params.code} />}</Route>
+            {/* Trust pages — public, reachable signed-out from the sign-up screen. */}
+            <Route path="/privacy" component={Privacy} />
+            <Route path="/terms" component={Terms} />
+            <Route>
+              <Show when="signed-in">
+                <AuthedApp />
+              </Show>
+              <Show when="signed-out">
+                <Landing />
+              </Show>
+            </Route>
+          </Switch>
+        </Suspense>
       </QueryClientProvider>
     </ClerkProvider>
   );

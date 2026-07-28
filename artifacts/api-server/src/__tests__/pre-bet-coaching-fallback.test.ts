@@ -40,7 +40,7 @@ import { db, pool, usersTable } from "@workspace/db";
 const createdUserIds: number[] = [];
 let counter = 0;
 
-async function createProUser() {
+async function createUser() {
   const username = `arc_${Date.now()}_${counter++}`;
   const clerkUserId = `clerk_${username}`;
   const [row] = await db
@@ -49,8 +49,7 @@ async function createProUser() {
       username,
       displayName: username,
       clerkUserId,
-      // Founders pass requirePro without touching the billing provider.
-      isFounder: true,
+      isFounder: false,
     })
     .returning();
   createdUserIds.push(row.id);
@@ -74,7 +73,7 @@ const BODY = { sport: "NBA", odds: -110 };
 
 describe("POST /stats/pre-bet-check — provider failure fallback", () => {
   it("returns the note when the provider answers", async () => {
-    const { clerkUserId } = await createProUser();
+    const { clerkUserId } = await createUser();
     currentClerkUserId = clerkUserId;
     generateMock.mockResolvedValue({
       choices: [{ message: { content: "You're 2-9 on NBA dogs. Your call." } }],
@@ -86,7 +85,7 @@ describe("POST /stats/pre-bet-check — provider failure fallback", () => {
   });
 
   it("returns 503 coaching_unavailable when the provider throws", async () => {
-    const { clerkUserId } = await createProUser();
+    const { clerkUserId } = await createUser();
     currentClerkUserId = clerkUserId;
     generateMock.mockRejectedValue(new Error("provider down"));
 
@@ -97,7 +96,7 @@ describe("POST /stats/pre-bet-check — provider failure fallback", () => {
   });
 
   it("treats an empty provider response as a failure → 503", async () => {
-    const { clerkUserId } = await createProUser();
+    const { clerkUserId } = await createUser();
     currentClerkUserId = clerkUserId;
     generateMock.mockResolvedValue({ choices: [{ message: { content: "" } }] });
 
@@ -107,7 +106,7 @@ describe("POST /stats/pre-bet-check — provider failure fallback", () => {
   });
 
   it("cuts off a hanging provider at the deadline → 503, no hang", async () => {
-    const { clerkUserId } = await createProUser();
+    const { clerkUserId } = await createUser();
     currentClerkUserId = clerkUserId;
     process.env.PRE_BET_AI_TIMEOUT_MS = "150";
     // Never resolves — only the route's own deadline can end this request.

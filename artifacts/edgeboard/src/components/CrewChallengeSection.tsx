@@ -3,7 +3,7 @@
  *
  * Owners can start a 7-day challenge from a metric-picker modal. The active
  * banner shows live standings with days remaining. Past challenges show the
- * winner. Free crews get all challenge features; Pro unlocks historical detail.
+ * winner. Every Crew gets the full challenge history.
  */
 import { useState } from "react"
 import {

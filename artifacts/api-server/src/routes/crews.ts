@@ -26,9 +26,9 @@ async function lockCrew(tx: Tx, crewId: number): Promise<CrewRow | null> {
   return crew ?? null;
 }
 
-// The Pro lever: free accounts hold exactly one crew membership. Founders and
+// The paid lever: standard accounts hold exactly one crew membership. Founders and
 // the demo world ride free; a live server-verified subscription unlocks more.
-// Mirrors requirePro's bypass rules — but the FIRST membership is always free.
+// Founders and the demo bypass billing, but the FIRST membership is always free.
 function mayHoldAnotherCrew(user: {
   isDemo: boolean;
   isFounder: boolean;
@@ -38,8 +38,8 @@ function mayHoldAnotherCrew(user: {
   return user.proUntil != null && user.proUntil.getTime() > Date.now();
 }
 
-const PRO_CAP_MESSAGE =
-  "One crew's free. Running multiple books at once is a Pro move — literally.";
+const MULTI_CREW_CAP_MESSAGE =
+  "Your first Crew is included. Add multi-Crew access to join or create another.";
 
 type CrewRow = typeof crewsTable.$inferSelect;
 
@@ -84,7 +84,7 @@ router.get("/crews", requireProfile, async (req, res): Promise<void> => {
   );
 });
 
-// POST /crews — create a crew (and switch to it). First crew free, more is Pro.
+// POST /crews — create a crew (and switch to it). The first is included.
 router.post("/crews", requireProfile, async (req, res): Promise<void> => {
   const parsed = CreateCrewBody.safeParse(req.body);
   if (!parsed.success) {
@@ -132,7 +132,7 @@ router.post("/crews", requireProfile, async (req, res): Promise<void> => {
       return;
     }
     if (outcome.kind === "capped") {
-      res.status(402).json({ error: "pro_required", message: PRO_CAP_MESSAGE });
+      res.status(402).json({ error: "pro_required", message: MULTI_CREW_CAP_MESSAGE });
       return;
     }
     res.status(201).json(formatCrew(outcome.crew, "owner", 1, true));
@@ -197,7 +197,7 @@ router.post("/crews/join", requireProfile, async (req, res): Promise<void> => {
       return;
     }
     if (outcome.kind === "capped") {
-      res.status(402).json({ error: "pro_required", message: PRO_CAP_MESSAGE });
+      res.status(402).json({ error: "pro_required", message: MULTI_CREW_CAP_MESSAGE });
       return;
     }
     res.json(formatCrew(outcome.crew, "member", outcome.members, true));

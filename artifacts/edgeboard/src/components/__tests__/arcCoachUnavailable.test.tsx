@@ -26,10 +26,6 @@ vi.mock("@workspace/api-client-react", () => ({
   useCreateBillingCheckout: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
 }))
 
-vi.mock("@/hooks/use-pro", () => ({
-  useProStatus: () => ({ isPro: true, isLoading: false }),
-}))
-
 beforeEach(() => {
   cleanup()
   vi.clearAllMocks()

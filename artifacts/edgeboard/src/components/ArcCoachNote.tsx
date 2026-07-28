@@ -9,12 +9,9 @@
  * - Error: button resets and a one-line "Arc is unavailable" note appears
  *   (never blocks the form — the bet doesn't need Arc's permission)
  * - Note: persists until dismissed or the form resets
- * - Free tier: renders an UpgradeCard teaser in compact mode
  */
 import { useState } from "react"
 import { usePreBetCheck } from "@workspace/api-client-react"
-import { useProStatus } from "@/hooks/use-pro"
-import { UpgradeCard } from "@/components/UpgradeCard"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 
@@ -51,7 +48,6 @@ interface ArcCoachNoteProps {
 }
 
 export function ArcCoachNote({ enabled, sport, odds, betType, stake, pick }: ArcCoachNoteProps) {
-  const { isPro } = useProStatus()
   const [note, setNote] = useState<string | null>(null)
   const [dismissed, setDismissed] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
@@ -72,15 +68,6 @@ export function ArcCoachNote({ enabled, sport, odds, betType, stake, pick }: Arc
 
   // Don't render anything until the button is relevant
   if (!enabled) return null
-
-  // Free tier: compact teaser instead of the button
-  if (!isPro) {
-    return (
-      <div className="pt-1" data-testid="arc-coach-upgrade">
-        <UpgradeCard compact feature="Pre-bet coaching with Arc" />
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-2" data-testid="arc-coach-section">

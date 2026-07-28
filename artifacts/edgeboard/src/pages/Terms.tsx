@@ -72,7 +72,7 @@ export default function Terms() {
             <p>
               TiltCheck is a small product in active beta. It's provided as-is: stats can have
               bugs, features can change, and the service could shut down (with notice and time
-              to export your data). Pro subscriptions are billed through Whop and can be
+              to export your data). Multi-Crew access is billed through Whop and can be
               cancelled there anytime.
             </p>
           </section>
