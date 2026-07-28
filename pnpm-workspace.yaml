@@ -5,8 +5,8 @@ packages:
   - scripts
 
 allowBuilds:
-  '@clerk/shared': set this to true or false
-  esbuild: set this to true or false
+  '@clerk/shared': true
+  esbuild: true
 
 autoInstallPeers: false
 
@@ -32,13 +32,6 @@ catalog:
   zod: 3.25.76
 
 minimumReleaseAge: 1440
-
-onlyBuiltDependencies:
-  - '@clerk/shared'
-  - '@swc/core'
-  - esbuild
-  - msw
-  - unrs-resolver
 
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
