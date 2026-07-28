@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { useGetStatsInsights, getGetStatsInsightsQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
-import { useProStatus } from "@/hooks/use-pro"
 import { AlertTriangle, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -40,16 +39,15 @@ const rememberDismissed = (reason: string) => {
  * The Lessons feed's top signal, surfaced at the moment it matters: right
  * before the next bet gets logged. Shows only when the bettor's dominant
  * miss reason is a controllable one with a real sample behind it.
- * Never blocks the bet. Pro-only: free accounts get no warning, never an error.
+ * Never blocks the bet.
  */
 export function MistakeWarning() {
   const { activeUser } = useUser()
-  const { isPro } = useProStatus()
   const [dismissed, setDismissed] = useState<string | null>(null)
 
   const { data: insights } = useGetStatsInsights(
     { userId: activeUser?.id },
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
   )
 
   const top = insights?.missReasons?.[0]

@@ -1,5 +1,5 @@
 /**
- * Shared odds math for EdgeBoard.
+ * Shared odds math for TiltCheck.
  *
  * Storage canon: American odds as a whole number (int), magnitude >= 100.
  * Everything else (decimal 1.91, fractional 10/11) converts to/from that.

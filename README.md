@@ -49,7 +49,7 @@ database. They truncate and reseed test data.
 `railway.json` configures a Railway deployment with:
 
 - a PostgreSQL schema push before deployment
-- `/api/healthz` as the deployment health check
+- `/api/readyz` as the deployment health check (including PostgreSQL)
 - the platform-provided `PORT`
 
 The container is host-agnostic and can also run on Render, Fly.io, or another

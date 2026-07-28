@@ -152,7 +152,7 @@ export default function Landing() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
-            Your crew&apos;s private book
+            Your crew&apos;s decision room
           </div>
 
           <h1 className="max-w-3xl text-4xl md:text-6xl font-bold leading-tight tracking-tight">

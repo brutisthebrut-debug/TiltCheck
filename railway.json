@@ -7,7 +7,7 @@
   "deploy": {
     "preDeployCommand": "pnpm db:push",
     "startCommand": "node --enable-source-maps artifacts/api-server/dist/index.mjs",
-    "healthcheckPath": "/api/healthz",
+    "healthcheckPath": "/api/readyz",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5

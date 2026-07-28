@@ -170,9 +170,6 @@ describe("by-userId stats endpoints are crew-scoped", () => {
     const { row: stranger } = await createUser("Stranger");
     await putInOneCrew([me.id, mate.id]);
     await putInOneCrew([stranger.id]);
-    // /stats/insights sits behind the Pro gate (402 for free accounts before
-    // any data is touched); founders pass it, so the scope check is reachable.
-    await db.update(usersTable).set({ isFounder: true }).where(eq(usersTable.id, me.id));
     currentClerkUserId = clerkUserId;
 
     for (const path of ENDPOINTS) {

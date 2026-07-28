@@ -5,6 +5,7 @@ import { CreateBillingCheckoutBody } from "@workspace/api-zod";
 import { requireProfile } from "../middlewares/auth";
 import { getWhopClient } from "../whopClient";
 import { logger } from "../lib/logger";
+import { isAllowedAppUrl } from "../lib/origins";
 
 const router: IRouter = Router();
 
@@ -14,7 +15,7 @@ const CHECKOUT_LOCK_NS = 429_001;
 
 // How long a Whop verification is trusted before re-checking. Bounded so a
 // cancelled subscription loses access within a day without calling Whop on
-// every gated request (the requirePro gate reads users.proUntil only).
+// every second-Crew membership request (the Crew gate reads users.proUntil).
 const PRO_VERIFY_HORIZON_MS = 24 * 60 * 60 * 1000;
 
 const ACTIVE_MEMBERSHIP_STATUSES = new Set(["active", "trialing", "completed"]);
@@ -60,7 +61,7 @@ async function verifyProWithWhop(user: { whopCheckoutConfigId: string | null }):
   return null;
 }
 
-// GET /billing/status — server-verified Pro status. Re-checks Whop only when
+// GET /billing/status — server-verified multi-Crew status. Re-checks Whop only when
 // the cached horizon has lapsed; stamps the fresh horizon back on the profile.
 router.get("/billing/status", requireProfile, async (req, res): Promise<void> => {
   const user = req.currentUser!;
@@ -99,7 +100,7 @@ router.get("/billing/status", requireProfile, async (req, res): Promise<void> =>
   res.json({ isPro: true, proUntil: horizon.toISOString(), source: "subscription" });
 });
 
-// POST /billing/checkout — create a hosted checkout session for TiltCheck Pro.
+// POST /billing/checkout — create a hosted checkout session for Multi-Crew access.
 // The stored checkout configuration id is what later lets /billing/status
 // verify the purchase; the redirect back to the app never grants access.
 router.post("/billing/checkout", requireProfile, async (req, res): Promise<void> => {
@@ -109,13 +110,13 @@ router.post("/billing/checkout", requireProfile, async (req, res): Promise<void>
     return;
   }
   const { returnUrl } = body.data;
-  if (!/^https?:\/\//.test(returnUrl)) {
-    res.status(400).json({ error: "returnUrl must be an absolute http(s) URL" });
+  if (!isAllowedAppUrl(returnUrl)) {
+    res.status(400).json({ error: "returnUrl must use an approved app origin" });
     return;
   }
   const user = req.currentUser!;
   if (user.isFounder || (user.proUntil && user.proUntil.getTime() > Date.now())) {
-    res.status(409).json({ error: "already_pro", message: "You're already on Pro." });
+    res.status(409).json({ error: "already_pro", message: "You already have multi-Crew access." });
     return;
   }
   const planId = process.env.WHOP_PLAN_ID;
@@ -183,7 +184,7 @@ router.post("/billing/checkout", requireProfile, async (req, res): Promise<void>
       return;
     }
     if (outcome.kind === "already") {
-      res.status(409).json({ error: "already_pro", message: "You're already on Pro." });
+      res.status(409).json({ error: "already_pro", message: "You already have multi-Crew access." });
       return;
     }
     res.json({ checkoutUrl: outcome.url });

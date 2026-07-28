@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect, useRef } from "react"
 import { dayOf, addDays } from "@workspace/weeks"
 import { QueryErrorCard } from "@/components/QueryErrorCard"
-import { UpgradeCard } from "@/components/UpgradeCard"
-import { useProStatus } from "@/hooks/use-pro"
 import { formatCurrency } from "@/lib/format"
 import { Link } from "wouter"
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LineChart, Line } from "recharts"
@@ -299,10 +297,9 @@ export default function Stats() {
   // #195: clipboard copy state — idle / copying / copied / failed
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied" | "failed">("idle")
 
-  // Lessons + peer benchmarks are Pro surfaces — keep queries off for free accounts.
-  const { isPro, isProLoading, isProUnknown } = useProStatus()
+  // Lessons and peer benchmarks are part of the core decision engine.
   const { data: peerBenchmarks, isLoading: isPeerLoading } = useGetStatsPeerBenchmarks(
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsPeerBenchmarksQueryKey() } }
+    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsPeerBenchmarksQueryKey() } }
   )
   const insightsParams = {
     userId: activeUser?.id,
@@ -310,7 +307,7 @@ export default function Stats() {
   }
   const { data: insights, isLoading: isInsightsLoading } = useGetStatsInsights(
     insightsParams,
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey(insightsParams) } }
+    { query: { enabled: !!activeUser?.id, queryKey: getGetStatsInsightsQueryKey(insightsParams) } }
   )
   const isFiltered = filterSport !== "all" || filterRange !== "all"
 
@@ -833,13 +830,7 @@ export default function Stats() {
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        {!isPro ? (
-          isProLoading ? (
-            <Card className="animate-pulse bg-muted/50 h-32" />
-          ) : isProUnknown ? null : (
-            <UpgradeCard compact feature="The Lessons feed" />
-          )
-        ) : isInsightsLoading ? (
+        {isInsightsLoading ? (
           <Card className="animate-pulse bg-muted/50 h-32" />
         ) : !insights || insights.reviewedCount < 3 ? (
           <Card className="border-dashed border-2 border-muted" data-testid="card-lessons-empty">
@@ -992,20 +983,13 @@ export default function Stats() {
         )}
       </div>
 
-      {/* ── vs. The Field (Pro) ────────────────────────────────────────────── */}
+      {/* ── vs. The Field ──────────────────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold tracking-tight">vs. The Field</h2>
-          <Badge variant="outline" className="border-primary/50 bg-primary/15 text-primary text-[10px] px-1.5 py-0">Pro</Badge>
         </div>
-        {!isPro ? (
-          isProLoading ? (
-            <Card className="animate-pulse bg-muted/50 h-32" />
-          ) : isProUnknown ? null : (
-            <UpgradeCard compact feature="Anonymous peer benchmarking" />
-          )
-        ) : isPeerLoading ? (
+        {isPeerLoading ? (
           <Card className="animate-pulse bg-muted/50 h-44" />
         ) : !peerBenchmarks ? null : peerBenchmarks.optedOut ? (
           <Card className="border-dashed border-2 border-muted">

@@ -88,3 +88,7 @@ For each tester, record:
 - any attempted second-Crew conversion
 
 The beta decision is based on repeat behavior and Crew pull—not account count.
+
+The founder-only Beta Ops page automatically tracks the first play, first
+process review, seven-day return, and Crew membership. Record comprehension,
+invite behavior, and second-Crew intent during the observed session.

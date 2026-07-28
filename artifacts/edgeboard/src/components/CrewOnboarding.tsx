@@ -17,7 +17,7 @@ function errorStatus(error: unknown): number | null {
 /**
  * The first-run crew step: right after a bettor claims their profile (or
  * lands from a /join/CODE invite link), walk them onto a board — join with a
- * code or start their own crew. Always skippable; the Workspace card remains
+ * code or start their own Crew. Always skippable; the Crew card remains
  * as the fallback nudge.
  *
  * If the bettor already runs with a crew and didn't arrive via an invite
@@ -93,7 +93,7 @@ export function CrewOnboarding({
 
       <div className="w-full max-w-md space-y-4">
         {capHit ? (
-          <UpgradeCard feature="Running more than one crew" />
+          <UpgradeCard feature="Joining a second Crew" />
         ) : (
           <>
             <Card className={initialCode ? "border-primary/60 glow-primary" : "border-border/60"}>

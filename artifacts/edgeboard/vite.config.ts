@@ -39,6 +39,14 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'wouter', '@tanstack/react-query'],
+          auth: ['@clerk/react', '@clerk/themes'],
+        },
+      },
+    },
   },
   server: {
     port,

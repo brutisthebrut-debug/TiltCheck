@@ -4,7 +4,6 @@ import * as z from "zod"
 import { useLocation } from "wouter"
 import { useCreateBet, useGetLeakProfile, getGetLeakProfileQueryKey, getListBetsQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
-import { useProStatus } from "@/hooks/use-pro"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { 
@@ -94,12 +93,10 @@ export default function NewBet() {
   const watchBetType = form.watch("betType")
 
   // The bettor's own history, turned into one pointed heads-up before they
-  // repeat their most common mistake. Never blocks the bet. Pro-only: free
-  // accounts simply get no warning, never an error.
-  const { isPro } = useProStatus()
+  // repeat their most common mistake. Never blocks the bet.
   const { data: leakProfile } = useGetLeakProfile(
     { userId: activeUser?.id },
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
   )
 
   const leakWarning = (() => {
@@ -311,8 +308,7 @@ export default function NewBet() {
                 />
               </div>
 
-              {/* Arc pre-bet coaching — appears once sport + pick + odds are filled.
-                  Pro-only; free accounts see a compact upgrade teaser instead. */}
+              {/* Arc pre-bet coaching — appears once sport + pick + odds are filled. */}
               <ArcCoachNote
                 enabled={!!watchSport && !!watchPick && isValidAmericanOdds(watchOdds)}
                 sport={watchSport}
@@ -379,6 +375,37 @@ export default function NewBet() {
                 </div>
               </div>
 
+              {/* Confidence powers calibration and every later decision read.
+                  Keep it visible so 5/10 is an intentional answer, not a
+                  silent default hidden under optional metadata. */}
+              <FormField
+                control={form.control}
+                name="confidenceScore"
+                render={({ field }) => (
+                  <FormItem className="rounded-lg border border-primary/25 bg-primary/5 p-4">
+                    <div className="flex justify-between items-center gap-4">
+                      <FormLabel>How confident is this read?</FormLabel>
+                      <span className="font-mono text-lg font-bold text-primary">{field.value} / 10</span>
+                    </div>
+                    <FormControl>
+                      <Slider
+                        min={1}
+                        max={10}
+                        step={1}
+                        value={[field.value]}
+                        onValueChange={(vals) => field.onChange(vals[0])}
+                        className="py-4"
+                        data-testid="slider-confidence"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Set this deliberately. TiltCheck compares your confidence with what actually happens.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* The why — front and center, not buried in the extras. Optional,
                   but skipping it earns a nudge at submit time. */}
               <FormField
@@ -416,7 +443,7 @@ export default function NewBet() {
                   <span>
                     More details
                     <span className="ml-2 text-xs text-muted-foreground/70">
-                      {watchSportsbook ? watchSportsbook : "book"} · confidence {form.watch("confidenceScore")}/10
+                      {watchSportsbook ? watchSportsbook : "sportsbook"}
                       {form.watch("promoNote") ? " · promo" : ""}
                     </span>
                   </span>
@@ -470,30 +497,6 @@ export default function NewBet() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="confidenceScore"
-                      render={({ field }) => (
-                        <FormItem>
-                          <div className="flex justify-between items-center">
-                            <FormLabel>Confidence Score</FormLabel>
-                            <span className="font-mono font-bold">{field.value} / 10</span>
-                          </div>
-                          <FormControl>
-                            <Slider
-                              min={1}
-                              max={10}
-                              step={1}
-                              value={[field.value]}
-                              onValueChange={(vals) => field.onChange(vals[0])}
-                              className="py-4"
-                            />
-                          </FormControl>
-                          <FormDescription>How confident are you in this edge?</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
                 )}
               </div>

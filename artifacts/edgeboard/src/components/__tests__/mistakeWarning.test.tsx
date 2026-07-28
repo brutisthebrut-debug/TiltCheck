@@ -5,7 +5,7 @@
  *   - warns when the dominant miss reason is controllable with >=2 hits
  *   - stays silent for normal_variance / lineup_injury (not the bettor's fault)
  *   - stays silent when data is thin (count < 2) or missing
- *   - free accounts never fire the query at all
+ *   - the personal decision engine is available without multi-Crew access
  *   - dismiss hides it and remembers for the session (per reason)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
@@ -14,7 +14,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 
 let insightsResult: { data: unknown }
-let isPro = true
 let queryEnabled: boolean | undefined
 
 vi.mock("@workspace/api-client-react", () => ({
@@ -27,10 +26,6 @@ vi.mock("@workspace/api-client-react", () => ({
 
 vi.mock("@/contexts/UserContext", () => ({
   useUser: () => ({ activeUser: { id: 10, displayName: "Me" } }),
-}))
-
-vi.mock("@/hooks/use-pro", () => ({
-  useProStatus: () => ({ isPro }),
 }))
 
 import { MistakeWarning } from "../MistakeWarning"
@@ -51,7 +46,6 @@ function wrap(node: ReactNode) {
 
 beforeEach(() => {
   queryClient = new QueryClient()
-  isPro = true
   queryEnabled = undefined
   insightsResult = { data: undefined }
   sessionStorage.clear()
@@ -100,11 +94,10 @@ describe("MistakeWarning", () => {
     expect(screen.queryByTestId(/warning-mistake/)).toBeNull()
   })
 
-  it("free accounts keep the query disabled and show nothing", () => {
-    isPro = false
-    insightsResult = { data: undefined }
+  it("keeps the insight query enabled for a standard account", () => {
+    insightsResult = { data: insights([], 0) }
     wrap(<MistakeWarning />)
-    expect(queryEnabled).toBe(false)
+    expect(queryEnabled).toBe(true)
     expect(screen.queryByTestId(/warning-mistake/)).toBeNull()
   })
 

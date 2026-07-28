@@ -4,7 +4,6 @@ import * as z from "zod"
 import { useLocation } from "wouter"
 import { useCreateParlay, useGetLeakProfile, getGetLeakProfileQueryKey, getListParlaysQueryKey, getGetStatsSummaryQueryKey, getGetRecentActivityQueryKey, getGetBankrollQueryKey, getGetNeedsSettlingQueryKey, getGetUserBadgesQueryKey, getGetStreaksQueryKey } from "@workspace/api-client-react"
 import { useUser } from "@/contexts/UserContext"
-import { useProStatus } from "@/hooks/use-pro"
 import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { 
@@ -113,11 +112,9 @@ export default function NewParlay() {
 
   // Tilt check — a parlay slip mid-spiral is the classic "get it all back
   // in one ticket" move, so the session-level warning shows here too.
-  // Pro-only: free accounts simply get no warning, never an error.
-  const { isPro } = useProStatus()
   const { data: leakProfile } = useGetLeakProfile(
     { userId: activeUser?.id },
-    { query: { enabled: isPro && !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
+    { query: { enabled: !!activeUser?.id, queryKey: getGetLeakProfileQueryKey({ userId: activeUser?.id }), staleTime: 60_000 } }
   )
   const tiltSpiral = leakProfile?.tiltSpiral ?? null
 
@@ -244,6 +241,34 @@ export default function NewParlay() {
                 />
               </div>
 
+              <FormField
+                control={form.control}
+                name="confidenceScore"
+                render={({ field }) => (
+                  <FormItem className="rounded-lg border border-primary/25 bg-primary/5 p-4">
+                    <div className="flex justify-between items-center gap-4">
+                      <FormLabel>How confident is this whole ticket?</FormLabel>
+                      <span className="font-mono text-lg font-bold text-primary">{field.value} / 10</span>
+                    </div>
+                    <FormControl>
+                      <Slider
+                        min={1}
+                        max={10}
+                        step={1}
+                        value={[field.value]}
+                        onValueChange={(vals) => field.onChange(vals[0])}
+                        className="py-4"
+                        data-testid="slider-confidence"
+                      />
+                    </FormControl>
+                    <p className="text-sm text-muted-foreground">
+                      Rate the ticket—not its payout. TiltCheck will compare this read with the result later.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* The why — front and center, not buried in the extras. Optional,
                   but skipping it earns a nudge at submit time. */}
               <FormField
@@ -281,7 +306,7 @@ export default function NewParlay() {
                   <span>
                     More details
                     <span className="ml-2 text-xs text-muted-foreground/70">
-                      {watchSportsbook ? watchSportsbook : "book"} · confidence {form.watch("confidenceScore")}/10
+                      {watchSportsbook ? watchSportsbook : "sportsbook"}
                       {form.watch("promoNote") ? " · promo" : ""}
                     </span>
                   </span>
@@ -334,29 +359,6 @@ export default function NewParlay() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="confidenceScore"
-                      render={({ field }) => (
-                        <FormItem>
-                          <div className="flex justify-between items-center">
-                            <FormLabel>Confidence Score</FormLabel>
-                            <span className="font-mono font-bold">{field.value} / 10</span>
-                          </div>
-                          <FormControl>
-                            <Slider
-                              min={1}
-                              max={10}
-                              step={1}
-                              value={[field.value]}
-                              onValueChange={(vals) => field.onChange(vals[0])}
-                              className="py-4"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </div>
                 )}
               </div>

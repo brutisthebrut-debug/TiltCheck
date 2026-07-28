@@ -72,7 +72,7 @@ function BenchmarkPrivacySection() {
             <span className="text-sm font-medium">Include my data in anonymous benchmarks</span>
             <span className="text-xs text-muted-foreground font-normal">
               {activeUser.includedInBenchmarks
-                ? "Your data is included. You can see where you rank on the Stats page (Pro)."
+                ? "Your data is included. You can see where you rank on the Stats page."
                 : "Opted out. Your data is excluded and benchmarks won't show on Stats."}
             </span>
           </Label>
@@ -307,12 +307,11 @@ function DeleteAccountSection() {
   )
 }
 
-const PRO_FEATURES = [
-  "Your Leak — the recurring mistake costing you real money",
-  "Tilt Check — the session alarm before the spiral gets expensive",
-  "Edge Finder — your best lanes by sport, type, odds band, and day",
-  "Head-to-head — full crew compare behind the leaderboard",
-  "Lessons — patterns pulled from your post-game reviews",
+const MULTI_CREW_FEATURES = [
+  "Belong to more than one private Crew",
+  "Switch Crew leaderboards, challenges, and comparisons",
+  "Keep one personal decision history across every Crew",
+  "Bring separate betting circles into TiltCheck without mixing their records",
 ]
 
 export default function Account() {
@@ -362,14 +361,14 @@ export default function Account() {
               ) : (
                 <Sparkles className="h-5 w-5 text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
               )}
-              <CardTitle className="text-base">TiltCheck Pro</CardTitle>
+              <CardTitle className="text-base">Multi-Crew access</CardTitle>
               <Badge className="border-primary/50 bg-primary/15 text-primary" variant="outline" data-testid="badge-pro-active">
                 Active
               </Badge>
             </div>
             <CardDescription>
               {status?.source === "founder"
-                ? "Founder seat — Pro comes with the crown."
+                ? "Founder seat — no Crew membership limit."
                 : status?.proUntil
                   ? `Verified through ${new Date(status.proUntil).toLocaleDateString()} — re-checked automatically.`
                   : "Subscription active."}
@@ -377,7 +376,7 @@ export default function Account() {
           </CardHeader>
           <CardContent className="space-y-4">
             <ul className="space-y-1.5">
-              {PRO_FEATURES.map((f) => (
+              {MULTI_CREW_FEATURES.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   {f}
@@ -404,14 +403,17 @@ export default function Account() {
         </Card>
       ) : (
         <div className="space-y-4">
-          <UpgradeCard feature="The insight layer" />
+          <UpgradeCard feature="A second Crew" />
           <Card className="bg-card">
             <CardHeader>
-              <CardTitle className="text-base">What Pro unlocks</CardTitle>
+              <CardTitle className="text-base">What Multi-Crew adds</CardTitle>
+              <CardDescription>
+                The decision engine, Edge Finder, Lessons, Arc, and your first Crew are already included.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="space-y-1.5">
-                {PRO_FEATURES.map((f) => (
+                {MULTI_CREW_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     {f}
@@ -420,7 +422,7 @@ export default function Account() {
               </ul>
               <div className="flex items-center gap-3">
                 <p className="text-sm text-muted-foreground">
-                  Already paid and not seeing Pro? Payments are verified with Whop server-side.
+                  Already paid and still limited to one Crew? Payments are verified with Whop server-side.
                 </p>
                 <Button variant="outline" size="sm" onClick={() => refreshPro()} data-testid="button-recheck-billing">
                   Re-check

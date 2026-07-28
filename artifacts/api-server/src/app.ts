@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { logger, httpLogSerializers } from "./lib/logger";
+import { getAllowedOrigins } from "./lib/origins";
 
 const app: Express = express();
 
@@ -26,18 +27,7 @@ app.use(
   }),
 );
 
-const configuredOrigins = [
-  process.env.APP_ORIGIN,
-  ...(process.env.CORS_ALLOWED_ORIGINS ?? "").split(","),
-]
-  .map((origin) => origin?.trim().replace(/\/$/, ""))
-  .filter((origin): origin is string => Boolean(origin));
-
-if (process.env.NODE_ENV !== "production") {
-  configuredOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
-}
-
-const allowedOrigins = new Set(configuredOrigins);
+const allowedOrigins = getAllowedOrigins();
 
 app.use(
   cors({
