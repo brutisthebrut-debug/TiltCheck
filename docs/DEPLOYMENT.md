@@ -12,6 +12,20 @@ Use three managed pieces:
 
 The web and API can share one public domain through a reverse proxy, or live on separate origins. Same-origin is operationally simpler; split-origin is supported with `ALLOWED_ORIGINS`.
 
+## Security gate before first independent deploy
+
+A legacy host configuration committed earlier in the repository lifecycle contained a VAPID private key. That file has been removed from the current tree, but Git history must be treated as public and permanent.
+
+Before enabling push notifications on any new deployment:
+
+1. **Do not reuse any historical VAPID values.**
+2. Generate a brand-new VAPID public/private key pair.
+3. Store the new private key only in the hosting provider's secret store.
+4. Set the new public key in the production environment.
+5. Expect existing browser push subscriptions tied to the old key to need re-subscription.
+
+Push notifications should remain disabled until this rotation is complete. This does not block the core beta product.
+
 ## Runtime versions
 
 - Node.js 24
@@ -166,7 +180,7 @@ BETA_SEAT_LIMIT=0
 
 ### Push notifications
 
-Optional:
+Optional and disabled safely when keys are absent:
 
 ```text
 VAPID_PUBLIC_KEY
@@ -174,7 +188,7 @@ VAPID_PRIVATE_KEY
 VAPID_SUBJECT
 ```
 
-Without VAPID keys, push delivery stays disabled while the worker can still perform its non-push scheduled work.
+Use only a freshly generated key pair for the independent deployment. Without VAPID keys, push delivery stays disabled while the worker can still perform its non-push scheduled work.
 
 ## Database schema
 
@@ -240,6 +254,7 @@ Minimum smoke test:
 8. A test user can log a bet, settle it, and see the resulting stats update.
 9. Mobile bottom navigation exposes the core four destinations plus More.
 10. Server restart does not lose persisted data.
+11. No retired-host credentials or historical VAPID values are present in the new host environment.
 
 ## CI
 
