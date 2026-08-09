@@ -4,6 +4,7 @@ import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wo
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
 import { Layout } from './components/Layout';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { Toaster } from './components/ui/toaster';
 import { UserProvider, useUser } from './contexts/UserContext';
 import { useFirstRunSetupActive } from './hooks/use-first-run';
@@ -133,7 +134,6 @@ function SignUpPage() {
   );
 }
 
-// Keeps the webview up-to-date when the signed-in user changes.
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const qc = useQueryClient();
@@ -161,7 +161,6 @@ function LoadingScreen() {
   );
 }
 
-/** Signed-in shell: resolves the bettor profile, gates on the claim screen. */
 function AuthedApp() {
   return (
     <UserProvider>
@@ -215,10 +214,6 @@ function ProfileGate() {
   );
 }
 
-/**
- * Invite deep link: /join/CODE. Stashes the code so it survives the whole
- * Clerk sign-up round-trip, then routes by auth state.
- */
 function JoinRoute({ code }: { code: string }) {
   if (code) setPendingInviteCode(decodeURIComponent(code));
 
@@ -298,7 +293,9 @@ function ClerkProviderWithRoutes() {
 function App() {
   return (
     <WouterRouter base={basePath}>
-      <ClerkProviderWithRoutes />
+      <AppErrorBoundary>
+        <ClerkProviderWithRoutes />
+      </AppErrorBoundary>
     </WouterRouter>
   );
 }
