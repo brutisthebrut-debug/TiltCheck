@@ -4,8 +4,8 @@ services:
     runtime: node
     region: ohio
     plan: free
-    buildCommand: corepack enable && corepack prepare pnpm@10.34.5 --activate && pnpm install --frozen-lockfile && pnpm run build
-    startCommand: pnpm --filter @workspace/db run push && pnpm --filter @workspace/api-server run start
+    buildCommand: corepack enable && corepack prepare pnpm@10.34.5 --activate && pnpm install --frozen-lockfile && pnpm run build && pnpm --filter @workspace/db run push
+    startCommand: node --enable-source-maps ./artifacts/api-server/dist/index.mjs
     healthCheckPath: /healthz
     autoDeployTrigger: checksPass
     envVars:
