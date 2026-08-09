@@ -18,10 +18,11 @@ The core question for beta is simple:
 
 1. **Do not reopen the feature firehose.** The product already has enough surface area to test the thesis.
 2. **Hosting is infrastructure, not product scope.** Keep the app portable and avoid coupling core behavior to another vendor.
-3. **Integrations are not the milestone.** Missing external connections can stay parked unless a tester proves one blocks the core loop.
-4. **Polish before expansion.** Improve clarity, reliability, first-run comprehension, mobile usability, trust, and the public demo before adding new systems.
-5. **Evidence beats preference.** New product work after cutover should trace to observed tester behavior, repeated confusion, commitment, or willingness to pay.
-6. **GitHub is canonical.** Roadmap, product notes, CI, deployment contract, and code decisions live with the repository.
+3. **Do not pay for scale before evidence.** Reviewer infrastructure should stay at or near $0 until repeated use proves the product deserves paid hosting.
+4. **Integrations are not the milestone.** Missing external connections can stay parked unless a tester proves one blocks the core loop.
+5. **Polish before expansion.** Improve clarity, reliability, first-run comprehension, mobile usability, trust, and the public demo before adding new systems.
+6. **Evidence beats preference.** New product work after cutover should trace to observed tester behavior, repeated confusion, commitment, or willingness to pay.
+7. **GitHub is canonical.** Roadmap, product notes, CI, deployment contract, and code decisions live with the repository.
 
 ## Current product loop
 
@@ -87,7 +88,8 @@ This second pre-review pass exists because the project left Replit entirely. It 
 - Removed an exposed historical credential file from `main`; its VAPID key is treated as compromised and must not be reused.
 - Added a platform-neutral deployment and smoke-test contract.
 - Added `render.yaml` as a reproducible reference deployment: one Node service + private Postgres.
-- Merged the hardening work to `main` after a green clean-clone CI run.
+- Added an automated public-route smoke command for the final production URL.
+- Merged the hardening work to `main` after green clean-clone CI runs.
 
 ### Operational cutover still required
 
@@ -96,12 +98,20 @@ This second pre-review pass exists because the project left Replit entirely. It 
 - Apply the production DB schema.
 - Configure Clerk for the final domain.
 - Keep push disabled until brand-new VAPID keys are generated and stored outside Git.
-- Run the full deployment smoke test in `docs/DEPLOYMENT.md` on desktop and mobile.
+- Run the automated + manual deployment smoke tests in `docs/DEPLOYMENT.md`.
 - Replace `<production-origin>` with the verified review URL.
 
 ### Reference host decision
 
-Render is the current **reference** path because TiltCheck can run there as one always-on Node service plus managed Postgres without changing product code. The repository remains host-neutral; switching providers later should be infrastructure work, not a rewrite.
+Render is the current **reference** path because TiltCheck can run there without changing product code. For the Matt/first-reviewer round, `render.yaml` defaults to Render's **free web service + free Postgres** rather than paid infrastructure.
+
+This is intentionally a temporary evidence environment:
+
+- the free web service can sleep after inactivity and may take roughly a minute to wake,
+- the free Postgres database expires after 30 days,
+- the environment should be upgraded or moved only after reviewer behavior justifies ongoing infrastructure cost.
+
+The repository remains host-neutral; switching providers later should be infrastructure work, not a rewrite.
 
 ### Explicitly out of scope
 
@@ -111,6 +121,7 @@ Render is the current **reference** path because TiltCheck can run there as one 
 - Rewriting working domain logic merely to make the repo look cleaner.
 - Monetization expansion before real use evidence.
 - Cosmetic removal of unused legacy lockfile packages before the independent beta is proven.
+- Paying for always-on production infrastructure before the first evidence round.
 
 ## Milestone B2 — First five structured testers
 
@@ -191,7 +202,7 @@ For every structured session capture:
 
 The immediate decision is operational, not product scope:
 
-> Instantiate the independent beta environment, smoke-test it, and produce the verified URL Matt can review.
+> Instantiate the $0 independent beta environment, smoke-test it, and produce the verified URL Matt can review.
 
 After cutover, return to the evidence gate:
 
