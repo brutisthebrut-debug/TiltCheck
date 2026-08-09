@@ -2,22 +2,21 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
-import {
-  CLERK_PROXY_PATH,
-  clerkProxyMiddleware,
-  getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger, httpLogSerializers } from "./lib/logger";
 
 const app: Express = express();
 
-// The server always sits one hop behind the Replit proxy in both dev preview
-// and deployments. Trusting exactly that hop makes req.ip the real client
-// address (the entry the proxy appended), while a spoofed X-Forwarded-For
-// value sent by the client itself is ignored — rate limiting keys off req.ip.
-app.set("trust proxy", 1);
+/**
+ * Hosting platforms differ in how many reverse-proxy hops sit in front of the
+ * Node process. Do not hard-code a vendor topology: set TRUST_PROXY_HOPS to a
+ * positive integer on hosts that forward the client IP (commonly `1`).
+ */
+const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? "0");
+if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0) {
+  throw new Error("TRUST_PROXY_HOPS must be a non-negative integer");
+}
+app.set("trust proxy", trustProxyHops === 0 ? false : trustProxyHops);
 
 app.use(
   pinoHttp({
@@ -26,24 +25,38 @@ app.use(
   }),
 );
 
-// Clerk Frontend API proxy — must be mounted before body parsers (streams raw bytes)
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+/**
+ * Cross-origin access is opt-in in production. Same-origin deployments need
+ * no CORS headers; split frontend/API deployments can provide a comma-separated
+ * ALLOWED_ORIGINS list (for example https://app.example.com).
+ */
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ credentials: true, origin: true }));
+app.use(
+  cors({
+    credentials: true,
+    origin:
+      allowedOrigins.length > 0
+        ? allowedOrigins
+        : process.env.NODE_ENV === "production"
+          ? false
+          : true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Resolve the publishable key from the incoming request host so the same
-// server can serve multiple Clerk custom domains. Falls back to
-// CLERK_PUBLISHABLE_KEY when the host doesn't map to a custom domain.
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
-);
+// Standard Clerk configuration. @clerk/express reads CLERK_PUBLISHABLE_KEY and
+// CLERK_SECRET_KEY from the environment, which keeps auth portable across hosts.
+app.use(clerkMiddleware());
+
+// Unauthenticated liveness endpoint for load balancers and container hosts.
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok", service: "tiltcheck-api" });
+});
 
 app.use("/api", router);
 
