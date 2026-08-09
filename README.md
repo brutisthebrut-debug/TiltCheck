@@ -2,16 +2,24 @@
 
 TiltCheck is a private-beta sports betting **decision tracker**. It helps bettors record why they placed a wager, compare confidence with outcomes, grade the decision after settlement, and surface repeated leaks that a normal win/loss record hides.
 
-It is **not** a picks app, tout service, or outcome predictor.
+It is **not** a picks app, tout service, sportsbook, or outcome predictor.
+
+## Beta status
+
+**GitHub is the source of truth. The former Replit deployment is retired and is not the canonical build.**
+
+The current branch of work is preparing the repo for an independent beta host. The code no longer requires Replit-specific auth, AI, billing-credential, build, or proxy behavior.
+
+Before sharing a new review URL, deploy the current `main` build using [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md), then run the smoke-test checklist there.
 
 ## Review the product
 
-- **Live app:** https://betting-insights-danielleemarlin.replit.app
-- **No-login demo:** https://betting-insights-danielleemarlin.replit.app/demo
-- **Current roadmap:** [ROADMAP.md](./ROADMAP.md)
+- **Roadmap:** [ROADMAP.md](./ROADMAP.md)
 - **Structured beta review:** [docs/BETA_REVIEW.md](./docs/BETA_REVIEW.md)
+- **Deployment / cutover:** [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
+- **Environment template:** [.env.example](./.env.example)
 
-For a first look, use the no-login demo. The review path is intentionally centered on the core thesis rather than every available feature.
+The public `/demo` route is designed as the first-review experience. It uses fictional, read-only data and guides reviewers through the strongest product loop without requiring an account.
 
 ## Core loop
 
@@ -37,6 +45,11 @@ For a first look, use the no-login demo. The review path is intentionally center
 - CSV exports
 - Public read-only demo
 - Authenticated private-beta experience
+- App-level crash recovery screen
+- Mobile navigation consolidated around the core loop
+- Hosting-neutral Clerk, OpenAI, Whop, CORS, proxy, and server configuration
+- GitHub Actions typecheck/test/build gate
+- Health endpoint and graceful API shutdown
 
 ## Beta thesis
 
@@ -44,21 +57,23 @@ The beta is testing one question:
 
 > Does seeing your own betting-decision patterns change how you think before the next wager?
 
-Until real-user evidence answers that question, the project should favor **clarity, reliability, and testability over feature expansion**.
+The pre-review hardening pass is intentionally improving **clarity, reliability, trust, mobile usability, and portability** rather than expanding the feature count.
 
 ## Current milestone
 
-The current milestone is **Beta hardening + review clarity**.
+### Independent beta cutover + reviewer readiness
 
-This pass focuses on:
+Definition of done:
 
-- making the public demo easier to review without instruction,
-- clarifying the product thesis,
-- tightening first-impression UX,
-- creating a repeatable reviewer script,
-- and keeping product decisions documented in GitHub.
+- GitHub CI is green.
+- A non-Replit production environment is configured from `.env.example`.
+- `/healthz` returns 200.
+- `/demo` works signed out on desktop and mobile.
+- Clerk sign-in/sign-up works on the final domain.
+- The first structured reviewer can complete the guided path without founder coaching.
+- No canonical documentation points reviewers back to the retired host.
 
-See [ROADMAP.md](./ROADMAP.md) for the evidence gate and next milestones.
+After that, the roadmap returns to five structured reviews and evidence-gated product decisions.
 
 ## Repository structure
 
@@ -70,12 +85,14 @@ This is a pnpm workspace.
 - `lib/db` — Drizzle/Postgres schema
 - `lib/api-client-react` — generated React API client
 - `lib/api-zod` — generated validation types
+- `lib/integrations-openai-ai-server` — AI client wrapper
+- `docs/` — beta protocol and deployment operating docs
 
-The original Replit operating notes remain in [replit.md](./replit.md), but GitHub is the canonical code and roadmap source of truth.
+Some legacy workspace metadata and packages may remain in repository history or the lockfile until a dependency-refresh pass. They are not part of the runtime deployment contract.
 
 ## Stack
 
-- React
+- React 19
 - Vite
 - TypeScript
 - Wouter
@@ -87,11 +104,18 @@ The original Replit operating notes remain in [replit.md](./replit.md), but GitH
 - Zod
 - pnpm workspaces
 
-## Local commands
+## Local verification
 
 ```bash
+pnpm install --frozen-lockfile
 pnpm run typecheck
+pnpm --filter @workspace/edgeboard run test
 pnpm run build
+```
+
+API integration tests exist, but they intentionally use and mutate a PostgreSQL test database. Run them only against an isolated database:
+
+```bash
 pnpm --filter @workspace/api-server run test
 ```
 
@@ -104,11 +128,20 @@ pnpm --filter @workspace/api-spec run codegen
 ## Product guardrails
 
 - Do not add picks or predictive recommendations.
-- Do not expand integrations merely because they are available.
 - Do not confuse feature count with beta progress.
 - Keep decision quality distinct from wager outcome.
 - Preserve the append-only bankroll ledger model.
-- Treat real tester behavior as the next source of product scope.
+- Treat real tester behavior as the next source of product scope after cutover.
+- Do not couple core product code to a hosting vendor again.
+
+## Engineering guardrails
+
+- Pull requests should pass `.github/workflows/ci.yml`.
+- Secrets belong in host secret storage, never Git.
+- Production CORS is explicit rather than wildcard-by-default.
+- Proxy trust is explicit through `TRUST_PROXY_HOPS`.
+- Standard service credentials are read from environment variables.
+- The API exposes `/healthz` for deployment health checks.
 
 ## Beta review standard
 
@@ -126,4 +159,4 @@ Use [docs/BETA_REVIEW.md](./docs/BETA_REVIEW.md) for the exact session flow.
 
 ## Status
 
-**Private beta / market-validation build.** Major feature expansion remains evidence-gated.
+**Private beta / independent-host cutover.** Product expansion remains evidence-gated after the cutover is proven.
