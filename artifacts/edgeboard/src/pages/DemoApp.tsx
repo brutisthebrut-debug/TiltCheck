@@ -7,6 +7,7 @@ import { setLessonsFiltersServerSync } from '@/hooks/use-lessons-filters';
 import { setBillingServerSync } from '@/hooks/use-pro';
 import { setCrewActionsEnabled } from '@/hooks/use-crews';
 import { Layout } from '@/components/Layout';
+import { DemoReviewGuide } from '@/components/DemoReviewGuide';
 import { UserProvider } from '@/contexts/UserContext';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -82,6 +83,7 @@ export default function DemoApp() {
     <QueryClientProvider client={queryClient}>
       <div className="dark bg-background min-h-[100dvh] font-mono">
         <DemoBanner />
+        <DemoReviewGuide />
         <UserProvider>
           <Layout>
             <Switch>
@@ -117,10 +119,10 @@ function DemoBanner() {
     >
       <Sparkles className="h-4 w-4 shrink-0 text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.8)]" />
       <p className="text-[11px] text-foreground/90 sm:text-xs">
-        <span className="font-bold text-primary text-glow-primary">DEMO BOARD</span>
-        <span className="text-muted-foreground font-medium"> — a fictional crew, real product. </span>
+        <span className="font-bold text-primary text-glow-primary">LIVE BETA DEMO</span>
+        <span className="text-muted-foreground font-medium"> — fictional crew, real product. Follow the review path below. </span>
         <Link href="~/sign-up" className="font-bold text-primary underline underline-offset-4 hover:text-primary/80 transition-colors" data-testid="link-demo-signup">
-          Get on the board
+          Try your own tape
         </Link>
       </p>
     </div>
@@ -134,19 +136,20 @@ function DemoNudge() {
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
         <Lock className="h-6 w-6 text-primary" />
       </div>
-      <h1 className="text-2xl font-bold tracking-tight">This part's for the crew</h1>
-      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-        The demo board is read-only. Sign up to log your own bets, build parlays, and track
-        your bankroll with your crew.
+      <h1 className="text-2xl font-bold tracking-tight">This action changes the tape</h1>
+      <p className="mt-2 max-w-md text-sm text-muted-foreground">
+        The review build is intentionally read-only. You can inspect the full decision history,
+        stats, lessons, recap, and crew board without an account; logging your own plays starts
+        after sign-up.
       </p>
       <Button asChild size="lg" className="mt-6 gap-2">
         <Link href="~/sign-up">
-          Get on the board
+          Start my own board
           <ArrowRight className="h-4 w-4" />
         </Link>
       </Button>
       <Button asChild variant="ghost" className="mt-2 text-muted-foreground">
-        <Link href="/">Back to the demo dashboard</Link>
+        <Link href="/">Back to reviewer path</Link>
       </Button>
     </div>
   );
