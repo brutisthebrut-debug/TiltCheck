@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
-import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Layout } from './components/Layout';
 import { Toaster } from './components/ui/toaster';
@@ -39,8 +38,6 @@ const queryClient = new QueryClient();
 // Runs only when supported; failures are non-fatal (push works progressively).
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    // In Vite dev the public dir is served at root; in production the app is
-    // mounted under BASE_URL (e.g. /edgeboard/) and the SW lives there too.
     const swPath = import.meta.env.DEV
       ? "/sw.js"
       : `${import.meta.env.BASE_URL}sw.js`;
@@ -50,16 +47,9 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
-// same build serves multiple Clerk custom domains.
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
-
-// REQUIRED — empty in dev (Clerk hits dev FAPI directly), auto-set in prod.
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
-
+// Standard Clerk publishable key. Configure the deployed domain in Clerk rather
+// than deriving credentials from a hosting-provider hostname at runtime.
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // Clerk passes full paths to routerPush/routerReplace, but wouter's
@@ -71,7 +61,7 @@ function stripBase(path: string): string {
 }
 
 if (!clerkPubKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
 }
 
 const clerkAppearance = {
@@ -183,18 +173,11 @@ function AuthedApp() {
 function ProfileGate() {
   const { activeUser, isLoading, needsClaim } = useUser();
   const firstRunSetupActive = useFirstRunSetupActive();
-  // Bumped when a pending invite is consumed/skipped so the gate re-reads
-  // storage and lets the app through.
   const [, setInviteHandledAt] = useState(0);
 
-  // Keep the claim/setup screen up while first-run setup is in progress,
-  // even if a background refetch already resolved the linked profile.
   if (needsClaim || firstRunSetupActive) return <ClaimProfile />;
   if (isLoading || !activeUser) return <LoadingScreen />;
 
-  // An invite link (/join/CODE) followed by someone who already has a
-  // profile: hand them straight to the join step, pre-filled. (Fresh signups
-  // consume the code inside the claim flow instead.)
   const pendingCode = getPendingInviteCode();
   if (pendingCode) {
     return (
@@ -234,13 +217,9 @@ function ProfileGate() {
 
 /**
  * Invite deep link: /join/CODE. Stashes the code so it survives the whole
- * Clerk sign-up round-trip, then routes by auth state — signed-out visitors
- * go create an account (the claim flow's crew step picks the code up),
- * signed-in bettors land on the pre-filled join screen via ProfileGate.
+ * Clerk sign-up round-trip, then routes by auth state.
  */
 function JoinRoute({ code }: { code: string }) {
-  // Written synchronously during render (idempotent) so the code is stashed
-  // before the Redirect's effect fires.
   if (code) setPendingInviteCode(decodeURIComponent(code));
 
   return (
@@ -270,7 +249,6 @@ function ClerkProviderWithRoutes() {
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
@@ -284,7 +262,7 @@ function ClerkProviderWithRoutes() {
         signUp: {
           start: {
             title: 'Get on the board',
-            subtitle: 'Your crew\u2019s private book — decision tracking for sharps',
+            subtitle: 'Put your betting decisions on tape — no picks, just your process',
           },
         },
       }}
@@ -295,17 +273,12 @@ function ClerkProviderWithRoutes() {
         <ClerkQueryClientCacheInvalidator />
         <Toaster />
         <Switch>
-          {/* REQUIRED — "/sign-in/*?" and "/sign-up/*?" verbatim for OAuth sub-paths */}
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
-          {/* Public demo board — works signed-out AND signed-in; it brings its
-              own QueryClient so it never touches the real session's cache. */}
           <Route path="/demo" nest>
             <DemoApp />
           </Route>
-          {/* Crew invite deep link — pre-fills the join flow through sign-up. */}
           <Route path="/join/:code">{(params) => <JoinRoute code={params.code} />}</Route>
-          {/* Trust pages — public, reachable signed-out from the sign-up screen. */}
           <Route path="/privacy" component={Privacy} />
           <Route path="/terms" component={Terms} />
           <Route>
