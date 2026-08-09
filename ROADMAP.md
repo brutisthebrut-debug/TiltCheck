@@ -59,37 +59,49 @@ Delivered in the first hardening pass:
 
 ## Milestone B1.5 — Independent hosting + cofounder hardening
 
-**State:** In progress
+**State:** Engineering complete / operational cutover in progress
 
-This second pre-review pass exists because the project is leaving Replit entirely. It is not a feature sprint. It is a portability, reliability, trust, and polish sprint before the first important external review.
+This second pre-review pass exists because the project left Replit entirely. It was intentionally a portability, reliability, security, trust, and polish sprint rather than a feature sprint.
 
-### Implemented in this pass
+### Engineering completed
 
 - Removed runtime reliance on host-derived Clerk keys and Clerk proxy behavior.
 - Standardized API Clerk configuration through environment variables.
 - Removed host-connector credential lookup from Whop billing.
 - Standardized OpenAI environment variables while keeping migration fallbacks.
-- Made Vite build defaults host-neutral.
+- Made both product and mockup Vite builds host-neutral.
 - Made reverse-proxy trust explicit rather than platform-assumed.
 - Made production CORS explicit instead of wildcard credential access.
 - Added `/healthz` for load balancers and host health checks.
 - Added graceful API shutdown for rolling deploys.
+- Added same-origin production serving: Express serves the built React app and `/api/*` from one service.
 - Added `.env` secret protection and `.env.example`.
 - Added GitHub CI for frozen install, typecheck, web tests, and full build.
+- Fixed clean-clone TypeScript/build assumptions exposed by CI.
+- Verified 180 frontend tests passing in CI.
 - Consolidated the nine-item mobile bottom bar into four core destinations + More.
 - Added an app-level recovery screen instead of a blank-page failure.
 - Corrected privacy language around AI/service-provider processing.
 - Updated the responsible-gambling support resource.
+- Removed retired root and package-level Replit deployment metadata from the live tree.
+- Removed an exposed historical credential file from `main`; its VAPID key is treated as compromised and must not be reused.
 - Added a platform-neutral deployment and smoke-test contract.
+- Added `render.yaml` as a reproducible reference deployment: one Node service + private Postgres.
+- Merged the hardening work to `main` after a green clean-clone CI run.
 
-### Remaining definition of done
+### Operational cutover still required
 
-- CI passes on the hardening PR.
-- Choose and configure the independent beta host.
+- Instantiate the independent beta host from `render.yaml` or an equivalent host configuration.
+- Set `FOUNDER_EMAIL`, Clerk credentials, and OpenAI credentials in the host secret store.
 - Apply the production DB schema.
 - Configure Clerk for the final domain.
-- Run the deployment smoke test in `docs/DEPLOYMENT.md`.
+- Keep push disabled until brand-new VAPID keys are generated and stored outside Git.
+- Run the full deployment smoke test in `docs/DEPLOYMENT.md` on desktop and mobile.
 - Replace `<production-origin>` with the verified review URL.
+
+### Reference host decision
+
+Render is the current **reference** path because TiltCheck can run there as one always-on Node service plus managed Postgres without changing product code. The repository remains host-neutral; switching providers later should be infrastructure work, not a rewrite.
 
 ### Explicitly out of scope
 
@@ -98,10 +110,11 @@ This second pre-review pass exists because the project is leaving Replit entirel
 - Major social feature expansion.
 - Rewriting working domain logic merely to make the repo look cleaner.
 - Monetization expansion before real use evidence.
+- Cosmetic removal of unused legacy lockfile packages before the independent beta is proven.
 
 ## Milestone B2 — First five structured testers
 
-**State:** Blocked on B1.5 cutover
+**State:** Blocked only on B1.5 operational cutover
 
 Recruit five bettors who actually place wagers with enough frequency to have habits worth observing.
 
@@ -178,7 +191,7 @@ For every structured session capture:
 
 The immediate decision is operational, not product scope:
 
-> Which boring independent host gives us the cheapest reliable beta deployment without forcing product code to change?
+> Instantiate the independent beta environment, smoke-test it, and produce the verified URL Matt can review.
 
 After cutover, return to the evidence gate:
 
