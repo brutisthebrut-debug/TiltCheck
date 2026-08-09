@@ -271,14 +271,36 @@ Before sending the new hosted URL to testers:
 5. Let the pre-deploy schema step finish successfully.
 6. Confirm `/healthz` before testing the UI.
 7. Configure Clerk for the generated host domain.
-8. Run the smoke test below.
+8. Run the automated smoke check, then the manual product checks below.
 9. Only after smoke testing, put the verified origin into `README.md`, `ROADMAP.md`, and the reviewer handoff.
 
 ## Release smoke test
 
 A deployment candidate should not be promoted merely because the host says the deploy succeeded.
 
-Minimum smoke test:
+### Automated public-route check
+
+From repository root, run:
+
+```bash
+pnpm run smoke:deploy -- https://your-production-origin.example
+```
+
+Or:
+
+```bash
+TILTCHECK_ORIGIN=https://your-production-origin.example pnpm run smoke:deploy
+```
+
+The smoke checker fails the process unless all of these are true:
+
+- `/healthz` returns TiltCheck's expected JSON payload,
+- `/`, `/demo`, `/privacy`, and `/terms` return successful HTML,
+- each public UI route returns the TiltCheck app shell rather than a host error page.
+
+This catches bad health routing, missing static assets, and broken SPA fallbacks before a reviewer sees the link. It intentionally does **not** replace authenticated or visual QA.
+
+### Manual product checks
 
 1. `/healthz` returns 200.
 2. `/` loads the TiltCheck landing page from a clean browser.
