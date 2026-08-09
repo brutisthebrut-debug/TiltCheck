@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -26,9 +28,8 @@ app.use(
 );
 
 /**
- * Cross-origin access is opt-in in production. Same-origin deployments need
- * no CORS headers; split frontend/API deployments can provide a comma-separated
- * ALLOWED_ORIGINS list (for example https://app.example.com).
+ * Cross-origin access is opt-in in production. The preferred beta deployment
+ * is same-origin (Express serves the built React app), which needs no CORS.
  */
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
@@ -59,5 +60,43 @@ app.get("/healthz", (_req, res) => {
 });
 
 app.use("/api", router);
+
+/**
+ * Production is intentionally a single-origin app: one Node service serves
+ * both the API and the already-built React assets. That keeps Clerk callbacks,
+ * cookies, generated `/api/*` calls, custom domains, and beta deployment simple.
+ *
+ * `pnpm --filter @workspace/api-server run start` executes with the API package
+ * as cwd; direct root-level starts are also supported by checking both paths.
+ */
+if (process.env.NODE_ENV === "production") {
+  const webDist = [
+    path.resolve(process.cwd(), "../edgeboard/dist/public"),
+    path.resolve(process.cwd(), "artifacts/edgeboard/dist/public"),
+  ].find((candidate) => existsSync(path.join(candidate, "index.html")));
+
+  if (webDist) {
+    app.use(express.static(webDist, { index: false }));
+
+    // SPA fallback after API/static routes. Never turn an API 404 into HTML.
+    app.use((req, res, next) => {
+      if (
+        req.method !== "GET" ||
+        req.path === "/healthz" ||
+        req.path === "/api" ||
+        req.path.startsWith("/api/")
+      ) {
+        return next();
+      }
+      return res.sendFile(path.join(webDist, "index.html"));
+    });
+
+    logger.info({ webDist }, "Serving TiltCheck web build from API service");
+  } else {
+    logger.warn(
+      "Production web build not found; API will run without static frontend assets",
+    );
+  }
+}
 
 export default app;
