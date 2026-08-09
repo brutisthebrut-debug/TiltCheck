@@ -41,6 +41,9 @@ jobs:
       - name: Typecheck workspace
         run: pnpm run typecheck
 
+      - name: Check deployment smoke script
+        run: node --check ./scripts/src/deployment-smoke.mjs
+
       - name: Run web unit tests
         run: pnpm --filter @workspace/edgeboard run test
 
