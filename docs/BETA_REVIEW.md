@@ -2,10 +2,13 @@
 
 Use this for Matt and the first five structured reviewers.
 
-**Review URL:** https://betting-insights-danielleemarlin.replit.app/demo  
+**Review URL:** use the current independently hosted production URL plus `/demo`  
+**Do not use:** the retired Replit deployment  
 **Target time:** 7–10 minutes  
 **Account required:** No  
 **Goal:** Determine whether the product thesis is understandable and compelling before asking the reviewer to use it with real bets.
+
+Before sending the link, complete the smoke-test checklist in [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Before they open the link
 
@@ -60,6 +63,10 @@ Ask:
 - Would you invite anyone you actually bet with?
 - Does this feel like a private crew tool or a social feed?
 
+## Mobile check
+
+If the reviewer is on a phone, do not coach the navigation. Observe whether the four persistent destinations and **More** menu make sense naturally. Capture any place they expect a feature to live but cannot find it.
+
 ## Closing questions
 
 Ask these exactly enough that the answer can be compared across reviewers:
@@ -80,6 +87,7 @@ Copy this block for each tester:
 ```text
 Tester:
 Date:
+Device: desktop / mobile
 Betting frequency:
 
 First impression:
@@ -97,6 +105,7 @@ Observed behavior:
 - Where they hesitated:
 - What they returned to:
 - What they ignored:
+- Mobile navigation friction (if applicable):
 
 Top friction:
 Strongest value signal:

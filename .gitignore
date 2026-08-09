@@ -11,6 +11,11 @@ out-tsc
 # dependencies
 node_modules
 
+# environment / secrets
+.env
+.env.*
+!.env.example
+
 # IDEs and editors
 /.idea
 .project
@@ -44,6 +49,6 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# Replit
+# legacy local workspace caches
 .cache/
 .local/

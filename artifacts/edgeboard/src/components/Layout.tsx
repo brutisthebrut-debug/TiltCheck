@@ -16,6 +16,8 @@ import {
   Crosshair,
   CircleUser,
   Newspaper,
+  Menu,
+  X,
 } from "lucide-react"
 import { Button } from "./ui/button"
 import { BadgeWatcher } from "./BadgeWatcher"
@@ -36,6 +38,20 @@ const navItems = [
   { name: "Workspace", shortName: "Crew", href: "/workspace", icon: Users },
   { name: "Bankroll", shortName: "Bankroll", href: "/bankroll", icon: Wallet },
 ]
+
+// A phone bottom bar needs restraint. Keep the four highest-frequency surfaces
+// persistent and put the rest behind one explicit More sheet instead of
+// squeezing nine destinations into a single row.
+const mobilePrimaryItems = navItems.filter((item) =>
+  ["Dashboard", "Bets", "Stats", "Recap"].includes(item.name),
+)
+const mobileMoreItems = navItems.filter(
+  (item) => !mobilePrimaryItems.some((primary) => primary.href === item.href),
+)
+
+function routeIsActive(location: string, href: string) {
+  return location === href || (href !== "/" && location.startsWith(href))
+}
 
 /** Purple pulse on the Recap nav slot while this week's tape is unopened. */
 function RecapUnreadDot({ className = "" }: { className?: string }) {
@@ -65,9 +81,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const { activeUser } = useUser()
   const { signOut } = useClerk()
+  const [mobileMoreOpen, setMobileMoreOpen] = React.useState(false)
 
-  // "Needs settling" is judged against the bettor's own day, not UTC —
-  // otherwise the nag fires at UTC midnight, mid-evening for US bettors.
+  React.useEffect(() => {
+    setMobileMoreOpen(false)
+  }, [location])
+
+  // "Needs settling" is judged against the bettor's own day, not UTC.
   const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
   const { data: needsSettling } = useGetNeedsSettling(
     { tz: browserTz },
@@ -75,19 +95,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   )
   const settleCount = needsSettling?.count ?? 0
 
-  // New week's tape unopened → dot on the Recap nav slot. Same server-stored
-  // marker the dashboard teaser uses, so they light up and clear together.
+  // New week's tape unopened → dot on the Recap nav slot.
   const recapUnread = !!activeUser && isRecapUnseen(activeUser.recapSeenWeek)
 
-  // Founder-only page joins the sidebar nav; the mobile bottom bar keeps the
-  // core six (founders can reach the dash from the desktop nav or /founder).
-  // Account (Pro status + billing) rides the sidebar too — mobile reaches it
-  // from the header avatar.
   const sidebarNavItems = [
     ...(activeUser?.isFounder ? [...navItems, { name: "Founder", href: "/founder", icon: Crown }] : navItems),
     { name: "Account", href: "/account", icon: CircleUser },
   ]
 
+  const moreIsActive = mobileMoreItems.some((item) => routeIsActive(location, item.href))
   const handleSignOut = () => signOut({ redirectUrl: basePath || "/" })
 
   return (
@@ -102,7 +118,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-1 p-4">
-          {/* Which crew's board you're on — leaderboard, head-to-head, recap. */}
           <CrewSwitcher className="mb-4" />
           <div className="mb-6 space-y-2">
             <Button asChild className="w-full justify-start gap-2" variant="default">
@@ -121,8 +136,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           <div className="space-y-1">
             {sidebarNavItems.map((item) => {
-              const isActive = location === item.href || 
-                               (item.href !== '/' && location.startsWith(item.href));
+              const isActive = routeIsActive(location, item.href)
               return (
                 <Link
                   key={item.name}
@@ -133,7 +147,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       : "text-muted-foreground border border-transparent hover:bg-accent hover:text-foreground"
                   }`}
                 >
-                  <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : ''}`} />
+                  <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
                   <span className="flex-1">{item.name}</span>
                   {item.href === "/" && <NeedsSettlingBadge count={settleCount} />}
                   {item.href === "/recap" && recapUnread && <RecapUnreadDot />}
@@ -143,12 +157,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
 
-        {/* Arc credit */}
         <div className="px-4 pb-2">
           <ArcCredit />
         </div>
 
-        {/* Signed-in identity */}
         <div className="border-t border-border/50 p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -221,33 +233,84 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Main Content — extra bottom padding so content clears the bottom nav + safe area */}
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
-        <div className="mx-auto max-w-5xl p-4 md:p-8 md:pb-8" style={{ paddingBottom: undefined }}>
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: "calc(4.75rem + env(safe-area-inset-bottom))" }}>
+        <div className="mx-auto max-w-5xl p-4 md:p-8 md:pb-8">
           {children}
         </div>
       </main>
 
-      {/* Bottom Nav (Mobile) — sits at the very bottom with safe-area inset */}
-      <nav 
-        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border/50 bg-card/90 backdrop-blur-md md:hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      {/* Secondary mobile navigation sheet */}
+      {mobileMoreOpen && (
+        <div
+          className="fixed inset-x-3 z-[55] rounded-xl border border-border/80 bg-card/95 p-3 shadow-2xl backdrop-blur-xl md:hidden"
+          style={{ bottom: "calc(4.6rem + env(safe-area-inset-bottom))" }}
+          data-testid="mobile-more-menu"
+        >
+          <div className="mb-3 flex items-center justify-between px-1">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">More from your tape</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Deeper review, crew, and bankroll tools</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setMobileMoreOpen(false)}
+              aria-label="Close more navigation"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <Button asChild size="sm" className="justify-start gap-2">
+              <Link href="/bets/new"><span className="text-base leading-none">+</span> New Bet</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="justify-start gap-2 border-primary/20 text-primary">
+              <Link href="/parlays/new"><span className="text-base leading-none">+</span> New Parlay</Link>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {mobileMoreItems.map((item) => {
+              const isActive = routeIsActive(location, item.href)
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-3 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border/60 bg-background/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.name}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Five-slot mobile bottom navigation */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 grid grid-cols-5 border-t border-border/50 bg-card/95 backdrop-blur-md md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="Primary navigation"
       >
-        {navItems.map((item) => {
-          const isActive = location === item.href || 
-                           (item.href !== '/' && location.startsWith(item.href));
+        {mobilePrimaryItems.map((item) => {
+          const isActive = routeIsActive(location, item.href)
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-1 pt-2 pb-1 text-[9px] font-medium transition-all duration-200 min-w-0 ${
-                isActive
-                  ? "text-primary text-glow-primary"
-                  : "text-muted-foreground"
+              className={`flex min-w-0 flex-col items-center gap-0.5 px-1 pb-1 pt-2 text-[10px] font-medium transition-all duration-200 ${
+                isActive ? "text-primary text-glow-primary" : "text-muted-foreground"
               }`}
             >
               <span className="relative">
-                <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]' : ''}`} />
+                <item.icon className={`h-5 w-5 shrink-0 ${isActive ? "drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" : ""}`} />
                 {item.href === "/" && (
                   <NeedsSettlingBadge count={settleCount} className="absolute -top-1.5 -right-2.5" />
                 )}
@@ -259,9 +322,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           )
         })}
+
+        <button
+          type="button"
+          onClick={() => setMobileMoreOpen((open) => !open)}
+          className={`flex min-w-0 flex-col items-center gap-0.5 px-1 pb-1 pt-2 text-[10px] font-medium transition-all duration-200 ${
+            mobileMoreOpen || moreIsActive ? "text-primary text-glow-primary" : "text-muted-foreground"
+          }`}
+          aria-expanded={mobileMoreOpen}
+          aria-controls="mobile-more-menu"
+          data-testid="button-mobile-more"
+        >
+          <Menu className={`h-5 w-5 ${mobileMoreOpen || moreIsActive ? "drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" : ""}`} />
+          <span>More</span>
+        </button>
       </nav>
 
-      {/* Pops the reveal for newly earned badges anywhere in the app */}
       <BadgeWatcher />
     </div>
   )
