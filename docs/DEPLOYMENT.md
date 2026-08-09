@@ -1,16 +1,48 @@
 # TiltCheck Deployment Guide
 
-TiltCheck is now designed to deploy without relying on a specific app-building or hosting vendor.
+TiltCheck is designed to deploy without relying on a specific app-building or hosting vendor.
 
-## Recommended production shape
+## Recommended beta architecture
 
-Use three managed pieces:
+Keep beta boring:
 
-1. **Web** — static output from `artifacts/edgeboard/dist/public`
-2. **API** — Node service from `artifacts/api-server/dist/index.mjs`
-3. **Database** — managed PostgreSQL
+1. **One Node web service** — Express serves both `/api/*` and the built React app.
+2. **One managed PostgreSQL database** — private network access from the app service.
 
-The web and API can share one public domain through a reverse proxy, or live on separate origins. Same-origin is operationally simpler; split-origin is supported with `ALLOWED_ORIGINS`.
+The root build creates both production artifacts:
+
+- API: `artifacts/api-server/dist/index.mjs`
+- Web: `artifacts/edgeboard/dist/public`
+
+When `NODE_ENV=production`, the API service serves the built frontend itself and falls back to `index.html` for client-side routes. That gives TiltCheck one origin, one custom domain, one Clerk domain configuration, and no production CORS requirement for the normal beta deployment.
+
+Production routing is therefore:
+
+```text
+/          -> built React app / SPA fallback
+/api/*     -> Express API
+/healthz   -> Express liveness endpoint
+```
+
+A split frontend/API deployment remains possible later, but it is unnecessary complexity for the first independent beta.
+
+## Reference deployment: Render
+
+`render.yaml` is checked into the repository as a reproducible **reference implementation**, not as an application dependency.
+
+The blueprint describes:
+
+- one Starter Node web service,
+- one Basic PostgreSQL database,
+- frozen-lockfile build,
+- schema push as a pre-deploy step,
+- `/healthz` health checks,
+- deploys gated on GitHub checks,
+- trusted proxy configuration,
+- private database networking,
+- secrets entered in the Render dashboard rather than committed to Git.
+
+If another host becomes cheaper or more useful later, the product code should not need to change. The host only needs to satisfy the deployment contract in this document.
 
 ## Security gate before first independent deploy
 
@@ -28,46 +60,31 @@ Push notifications should remain disabled until this rotation is complete. This 
 
 ## Runtime versions
 
-- Node.js 24
+- Node.js 24 (`.node-version` pins the repository runtime)
 - pnpm 10
 - PostgreSQL
 
 GitHub CI uses the same Node/pnpm major versions so a green build is meaningful for deployment.
 
-## Build
+## Build and start
 
 From repository root:
 
 ```bash
+corepack enable
 pnpm install --frozen-lockfile
 pnpm run typecheck
+pnpm --filter @workspace/edgeboard run test
 pnpm run build
 ```
 
-The root build compiles workspace libraries, the API, and the web app.
-
-### Web-only
+Start production with:
 
 ```bash
-pnpm --filter @workspace/edgeboard run build
+NODE_ENV=production pnpm --filter @workspace/api-server run start
 ```
 
-Output:
-
-```text
-artifacts/edgeboard/dist/public
-```
-
-`BASE_PATH` is optional and defaults to `/`. Only set it when serving the app under a sub-path.
-
-### API-only
-
-```bash
-pnpm --filter @workspace/api-server run build
-pnpm --filter @workspace/api-server run start
-```
-
-The API defaults to port `8080` when `PORT` is not supplied. Most container platforms inject `PORT` automatically.
+The API defaults to port `8080` when `PORT` is not supplied. Managed hosts commonly inject `PORT` automatically.
 
 ## Health check
 
@@ -83,11 +100,11 @@ Expected response:
 {"status":"ok","service":"tiltcheck-api"}
 ```
 
-This endpoint does not require authentication.
+This endpoint does not require authentication or a bettor profile.
 
 ## Required environment
 
-Start from `.env.example`.
+Start from `.env.example`. Real secrets belong in the host secret store, never Git.
 
 ### Database
 
@@ -95,11 +112,19 @@ Start from `.env.example`.
 DATABASE_URL
 ```
 
-A standard PostgreSQL connection URL.
+Use a standard PostgreSQL connection URL. Prefer the host's private/internal connection string when the app and database share a private network.
+
+### Founder identity
+
+```text
+FOUNDER_EMAIL
+```
+
+**Set this in production.** Without it, the first account linked on a fresh database becomes the founder. That fallback is useful in development but is not an acceptable production ownership rule.
 
 ### Clerk
 
-API:
+API runtime:
 
 ```text
 CLERK_PUBLISHABLE_KEY
@@ -114,29 +139,45 @@ VITE_CLERK_PUBLISHABLE_KEY
 
 TiltCheck uses standard Clerk configuration. There is no application-level Clerk proxy. Configure the final production domain, OAuth redirect URLs, and allowed origins in Clerk itself.
 
+Because beta uses one public TiltCheck origin, sign-in, sign-up, `/join/:code`, the app, and the API all stay on the same domain.
+
 ### OpenAI
 
 ```text
 OPENAI_API_KEY
 ```
 
-Optional:
+Optional for OpenAI-compatible gateways:
 
 ```text
 OPENAI_BASE_URL
 ```
 
-Leave `OPENAI_BASE_URL` unset for the standard OpenAI API. The legacy integration variable names remain accepted temporarily by the client to make migration safer, but new environments should use the standard names.
+Leave `OPENAI_BASE_URL` unset for the standard OpenAI API. Legacy integration variable names remain accepted temporarily by the client to make migration safer, but new environments should use the standard names.
 
-### Whop
+### Whop billing
 
-Optional until billing is enabled:
+Billing can remain disabled for reviewer beta. To enable it later:
 
 ```text
 WHOP_API_KEY
+WHOP_COMPANY_ID
+WHOP_PLAN_ID
 ```
 
-Billing no longer obtains credentials through a host connector.
+The application no longer obtains Whop credentials through a hosting connector.
+
+### Beta access controls
+
+```text
+BETA_SEAT_LIMIT=0
+BETA_ALLOWED_EMAILS=
+```
+
+- `BETA_SEAT_LIMIT=0` means unlimited seats.
+- A positive seat limit reinstates a ceiling.
+- `BETA_ALLOWED_EMAILS` is an optional comma-separated allowlist.
+- Founder-managed database invites remain another supported gate.
 
 ### Reverse proxy
 
@@ -154,33 +195,27 @@ TRUST_PROXY_HOPS=1
 
 Do not blindly increase this value. Client-IP based rate limiting depends on the trusted proxy boundary being correct.
 
+The included Render blueprint sets this to `1`.
+
 ### CORS
 
-For a same-origin web/API deployment, leave this blank:
+The recommended single-origin beta deployment needs no cross-origin access, so leave this blank:
 
 ```text
 ALLOWED_ORIGINS=
 ```
 
-For a split-origin deployment, provide the exact web origins as a comma-separated list:
+Only if web and API are deliberately split later should you provide exact web origins:
 
 ```text
 ALLOWED_ORIGINS=https://app.example.com,https://preview.example.com
 ```
 
-Production does not permit arbitrary cross-origin credentials by default.
-
-### Beta seat ceiling
-
-```text
-BETA_SEAT_LIMIT=0
-```
-
-`0` means unlimited. A positive integer reinstates the seat ceiling.
+Production does not permit arbitrary credentialed cross-origin access by default.
 
 ### Push notifications
 
-Optional and disabled safely when keys are absent:
+Push is optional and should remain disabled until the historical key rotation is complete:
 
 ```text
 VAPID_PUBLIC_KEY
@@ -192,90 +227,84 @@ Use only a freshly generated key pair for the independent deployment. Without VA
 
 ## Database schema
 
-Before pointing production traffic at a fresh database:
+Before routing production traffic to a fresh database:
 
 ```bash
 DATABASE_URL=<production-url> pnpm --filter @workspace/db run push
 ```
 
-Treat this as an explicit deployment step. Do not run `push-force` against production without reviewing the schema diff and understanding destructive changes.
+The included Render blueprint runs this as its pre-deploy command.
 
-## Static-host routing
+Treat schema changes as an explicit deployment step. Do not run `push-force` against production without reviewing the schema diff and understanding destructive changes.
 
-The React app uses client-side routing. Configure the static host to rewrite unknown application routes to `index.html` so direct visits such as these do not 404 at the CDN:
+## GitHub CI gate
 
-```text
-/demo
-/sign-in
-/sign-up
-/bets/123
-/recap
-```
+`.github/workflows/ci.yml` runs on pull requests and `main` pushes:
 
-Do **not** rewrite `/api/*` to the web app when the API shares the same public origin.
+- frozen-lockfile install,
+- workspace typecheck,
+- web unit tests,
+- full workspace build.
 
-## API routing
+The API integration suite is intentionally not part of the default job yet because it mutates a PostgreSQL test database. Before enabling it in CI, provision an isolated ephemeral database and apply the schema inside that job.
 
-The frontend-generated API client calls `/api/*`. The cleanest deployment is therefore:
-
-```text
-/          -> static web
-/api/*     -> Node API
-/healthz   -> Node API
-```
-
-If web and API are deployed to separate origins, the API client base URL will need to be made explicit before cutover. Prefer same-origin for the first independent beta deployment unless there is a strong reason not to.
+The first clean-clone CI run already exposed a real repository configuration defect in the scripts package. That is the point of the gate: a migration is not complete merely because the old workspace could build it.
 
 ## Clerk cutover checklist
 
 Before sending the new hosted URL to testers:
 
-- Create/confirm the production Clerk application.
-- Add the final web domain.
+- Create or confirm the production Clerk application.
+- Add the final TiltCheck domain.
 - Configure Google/OAuth providers as needed.
-- Add sign-in/sign-up redirect URLs for the final domain.
-- Set `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` on the API service.
-- Set `VITE_CLERK_PUBLISHABLE_KEY` at web build time.
+- Add sign-in and sign-up redirect URLs for the final domain.
+- Set `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` on the Node service.
+- Set `VITE_CLERK_PUBLISHABLE_KEY` in the build environment.
 - Verify sign-in, sign-out, and `/join/:code` from a private browser window.
 
-## Release gate
+## First independent deployment checklist
+
+1. Merge only a green CI commit to `main`.
+2. Create the web service + Postgres database from `render.yaml` or an equivalent host configuration.
+3. Enter `FOUNDER_EMAIL`, Clerk keys, and `OPENAI_API_KEY` as host secrets.
+4. Leave Whop and VAPID unset for the first reviewer deploy unless intentionally enabling them.
+5. Let the pre-deploy schema step finish successfully.
+6. Confirm `/healthz` before testing the UI.
+7. Configure Clerk for the generated host domain.
+8. Run the smoke test below.
+9. Only after smoke testing, put the verified origin into `README.md`, `ROADMAP.md`, and the reviewer handoff.
+
+## Release smoke test
 
 A deployment candidate should not be promoted merely because the host says the deploy succeeded.
 
 Minimum smoke test:
 
 1. `/healthz` returns 200.
-2. Landing page loads from a clean browser.
-3. `/demo` works without sign-in.
+2. `/` loads the TiltCheck landing page from a clean browser.
+3. `/demo` loads directly without sign-in or a server-side 404.
 4. Demo Dashboard → Stats → Lessons → Recap → Crew path works.
-5. Privacy and Terms load directly by URL.
-6. Sign-up renders without console/auth origin errors.
-7. Existing user sign-in works.
-8. A test user can log a bet, settle it, and see the resulting stats update.
-9. Mobile bottom navigation exposes the core four destinations plus More.
-10. Server restart does not lose persisted data.
-11. No retired-host credentials or historical VAPID values are present in the new host environment.
+5. Refreshing a nested SPA route such as `/demo/stats` still loads the app.
+6. Privacy and Terms load directly by URL.
+7. Sign-up renders without console/auth-origin errors.
+8. Existing user sign-in works.
+9. A test user can log a bet, settle it, and see the resulting stats update.
+10. Mobile bottom navigation exposes Home, Bets, Stats, Recap, and More.
+11. More exposes Parlays, Lessons, Edge Finder, Crew, and Bankroll.
+12. Server restart does not lose persisted data.
+13. API 404s remain JSON/API responses rather than returning the SPA HTML.
+14. No retired-host credentials or historical VAPID values exist in the new host environment.
+15. Push remains disabled unless a fresh VAPID pair has been generated.
 
-## CI
+## Host selection rule
 
-`.github/workflows/ci.yml` runs on pull requests and `main` pushes:
+Do not change product architecture just to accommodate a hosting vendor. A suitable beta host needs to support:
 
-- frozen-lockfile install
-- workspace typecheck
-- web unit tests
-- full workspace build
+- a normal Node 24 web process,
+- environment secrets,
+- a health check,
+- managed PostgreSQL or private connectivity to one,
+- custom domains + TLS,
+- GitHub-triggered deployments.
 
-The current API integration suite is intentionally not in the default CI job because it is destructive by design and expects a dedicated PostgreSQL database. Before enabling it in CI, provision an isolated ephemeral database and apply the schema within that job.
-
-## Host selection
-
-Do not change product architecture just to accommodate a hosting vendor. A suitable host needs to support:
-
-- Node 24 or a standard Node container
-- environment secrets
-- a health check
-- managed PostgreSQL or connectivity to one
-- static web hosting or a reverse proxy to the built web output
-- custom domains + TLS
-
-Choose the cheapest boring option that satisfies those requirements for beta. The product should remain portable.
+For the current beta, prefer the cheapest **always-on, boring** option that satisfies those requirements. Free tiers that sleep or expire are useful for smoke tests, not for the link handed to an important reviewer.
