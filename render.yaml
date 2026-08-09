@@ -3,12 +3,10 @@ services:
     name: tiltcheck-beta
     runtime: node
     region: ohio
-    plan: starter
+    plan: free
     buildCommand: corepack enable && corepack prepare pnpm@10.34.5 --activate && pnpm install --frozen-lockfile && pnpm run build
-    startCommand: pnpm --filter @workspace/api-server run start
-    preDeployCommand: pnpm --filter @workspace/db run push
+    startCommand: pnpm --filter @workspace/db run push && pnpm --filter @workspace/api-server run start
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 15
     autoDeployTrigger: checksPass
     envVars:
       - key: DATABASE_URL
@@ -35,9 +33,7 @@ services:
 databases:
   - name: tiltcheck-db
     region: ohio
-    plan: basic-256mb
+    plan: free
     databaseName: tiltcheck
     user: tiltcheck
-    connectionPool: none
-    storageAutoscalingEnabled: false
     ipAllowList: []
