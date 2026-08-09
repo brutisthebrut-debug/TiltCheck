@@ -40,3 +40,4 @@ databases:
     user: tiltcheck
     connectionPool: none
     storageAutoscalingEnabled: false
+    ipAllowList: []
