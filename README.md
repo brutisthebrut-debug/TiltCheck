@@ -8,15 +8,16 @@ It is **not** a picks app, tout service, sportsbook, or outcome predictor.
 
 **GitHub is the source of truth. The former Replit deployment is retired and is not the canonical build.**
 
-The current branch of work is preparing the repo for an independent beta host. The code no longer requires Replit-specific auth, AI, billing-credential, build, or proxy behavior.
+The second pre-review hardening pass is now merged to `main`. TiltCheck no longer requires Replit-specific auth, AI, billing-credential, build, proxy, or deployment behavior. A clean GitHub runner can install from the frozen lockfile, typecheck the workspace, run the frontend test suite, and build the full repo successfully.
 
-Before sharing a new review URL, deploy the current `main` build using [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md), then run the smoke-test checklist there.
+The remaining blocker before sharing a review URL is operational: instantiate an independent production environment, configure its secrets/domain, and pass the smoke test in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 
 ## Review the product
 
 - **Roadmap:** [ROADMAP.md](./ROADMAP.md)
 - **Structured beta review:** [docs/BETA_REVIEW.md](./docs/BETA_REVIEW.md)
 - **Deployment / cutover:** [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
+- **Reference Render blueprint:** [render.yaml](./render.yaml)
 - **Environment template:** [.env.example](./.env.example)
 
 The public `/demo` route is designed as the first-review experience. It uses fictional, read-only data and guides reviewers through the strongest product loop without requiring an account.
@@ -48,8 +49,10 @@ The public `/demo` route is designed as the first-review experience. It uses fic
 - App-level crash recovery screen
 - Mobile navigation consolidated around the core loop
 - Hosting-neutral Clerk, OpenAI, Whop, CORS, proxy, and server configuration
+- Same-origin production serving: one Node service for React + `/api/*`
 - GitHub Actions typecheck/test/build gate
 - Health endpoint and graceful API shutdown
+- Reproducible independent-host reference deployment
 
 ## Beta thesis
 
@@ -57,21 +60,27 @@ The beta is testing one question:
 
 > Does seeing your own betting-decision patterns change how you think before the next wager?
 
-The pre-review hardening pass is intentionally improving **clarity, reliability, trust, mobile usability, and portability** rather than expanding the feature count.
+The pre-review hardening passes intentionally improved **clarity, reliability, trust, mobile usability, security, and portability** rather than expanding the feature count.
 
 ## Current milestone
 
 ### Independent beta cutover + reviewer readiness
 
+Engineering hardening is complete. Operational cutover remains.
+
 Definition of done:
 
-- GitHub CI is green.
-- A non-Replit production environment is configured from `.env.example`.
+- GitHub CI is green. ✅
+- Independent deployment blueprint exists. ✅
+- Retired host config is removed from the live tree. ✅
+- A non-Replit production environment is instantiated from `render.yaml` or an equivalent host configuration.
+- Production secrets and founder identity are configured.
+- Historical VAPID credentials are not reused; push stays disabled until fresh keys exist.
 - `/healthz` returns 200.
 - `/demo` works signed out on desktop and mobile.
 - Clerk sign-in/sign-up works on the final domain.
 - The first structured reviewer can complete the guided path without founder coaching.
-- No canonical documentation points reviewers back to the retired host.
+- The verified production origin is written back into the roadmap and reviewer handoff.
 
 After that, the roadmap returns to five structured reviews and evidence-gated product decisions.
 
@@ -80,15 +89,16 @@ After that, the roadmap returns to five structured reviews and evidence-gated pr
 This is a pnpm workspace.
 
 - `artifacts/edgeboard` — React + Vite web app
-- `artifacts/api-server` — Express API server
+- `artifacts/api-server` — Express API server and production static host
 - `lib/api-spec/openapi.yaml` — API contract source of truth
 - `lib/db` — Drizzle/Postgres schema
 - `lib/api-client-react` — generated React API client
 - `lib/api-zod` — generated validation types
 - `lib/integrations-openai-ai-server` — AI client wrapper
 - `docs/` — beta protocol and deployment operating docs
+- `render.yaml` — optional Render reference infrastructure
 
-Some legacy workspace metadata and packages may remain in repository history or the lockfile until a dependency-refresh pass. They are not part of the runtime deployment contract.
+Some unused legacy packages remain in the frozen lockfile until a dedicated dependency-refresh pass. They are not part of the runtime deployment contract and do not block the verified build.
 
 ## Stack
 
@@ -112,6 +122,8 @@ pnpm run typecheck
 pnpm --filter @workspace/edgeboard run test
 pnpm run build
 ```
+
+The current verified frontend suite contains 180 passing tests.
 
 API integration tests exist, but they intentionally use and mutate a PostgreSQL test database. Run them only against an isolated database:
 
@@ -142,6 +154,7 @@ pnpm --filter @workspace/api-spec run codegen
 - Proxy trust is explicit through `TRUST_PROXY_HOPS`.
 - Standard service credentials are read from environment variables.
 - The API exposes `/healthz` for deployment health checks.
+- The production beta should remain one public origin unless evidence justifies added infrastructure complexity.
 
 ## Beta review standard
 
