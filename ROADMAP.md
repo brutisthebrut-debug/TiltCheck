@@ -1,10 +1,10 @@
 # TiltCheck Roadmap
 
-**Status:** Private beta / market-validation build  
+**Status:** Private beta / independent-host cutover  
 **Updated:** August 8, 2026  
 **Code source of truth:** GitHub (`main`)  
-**Public review build:** https://betting-insights-danielleemarlin.replit.app  
-**No-login demo:** https://betting-insights-danielleemarlin.replit.app/demo
+**Public review build:** pending independent deployment  
+**No-login demo:** `<production-origin>/demo`
 
 ## Product north star
 
@@ -17,10 +17,11 @@ The core question for beta is simple:
 ## Operating guardrails
 
 1. **Do not reopen the feature firehose.** The product already has enough surface area to test the thesis.
-2. **Integrations are not the milestone.** Missing external connections can stay parked unless a tester proves one blocks the core loop.
-3. **Polish before expansion.** Improve clarity, reliability, first-run comprehension, and the public demo before adding new systems.
-4. **Evidence beats preference.** New work after this pass should trace to observed tester behavior, repeated confusion, commitment, or willingness to pay.
-5. **GitHub is canonical.** Roadmap, product notes, and code decisions should live with the repository.
+2. **Hosting is infrastructure, not product scope.** Keep the app portable and avoid coupling core behavior to another vendor.
+3. **Integrations are not the milestone.** Missing external connections can stay parked unless a tester proves one blocks the core loop.
+4. **Polish before expansion.** Improve clarity, reliability, first-run comprehension, mobile usability, trust, and the public demo before adding new systems.
+5. **Evidence beats preference.** New product work after cutover should trace to observed tester behavior, repeated confusion, commitment, or willingness to pay.
+6. **GitHub is canonical.** Roadmap, product notes, CI, deployment contract, and code decisions live with the repository.
 
 ## Current product loop
 
@@ -35,47 +36,78 @@ The core question for beta is simple:
 
 **State:** Complete
 
-- Full Replit project moved into GitHub.
-- Existing production architecture preserved.
-- Public demo route available without authentication.
-- Core betting, parlay, bankroll, stats, lessons, Edge Finder, recap, and crew surfaces already exist.
+- Full project source moved into GitHub.
+- Public demo route exists without authentication.
+- Core betting, parlay, bankroll, stats, lessons, Edge Finder, recap, and crew surfaces exist.
 
-**Definition of done:** GitHub contains the working source and the public demo remains the reference experience.
+**Definition of done:** GitHub contains the working source and complete product history.
 
 ## Milestone B1 — Beta hardening + review clarity
 
-**State:** In progress in `beta-hardening-2026-08-08`
+**State:** Complete
 
-This is the requested ~50% enhancement pass. “50%” means a material improvement in how understandable and testable the existing product feels, not 50% more features.
+Delivered in the first hardening pass:
 
-### Scope
+- Self-guided no-login demo.
+- Recommended reviewer sequence through the strongest product surfaces.
+- Clear “decision quality, not picks” product thesis.
+- Demo-first public landing page.
+- Structured tester script and evidence log.
+- Canonical README + roadmap.
 
-- Make the no-login demo self-guided for a first-time reviewer.
-- Give reviewers a recommended sequence through the most important product surfaces.
-- Make the product thesis explicit: decision quality over picks.
-- Tighten public-facing beta language and metadata.
-- Add a repeatable reviewer script and evidence log format.
-- Refresh repository documentation so future work does not drift from the thesis.
+**Definition of done:** A new person can understand the thesis and follow the intended review path without founder narration.
+
+## Milestone B1.5 — Independent hosting + cofounder hardening
+
+**State:** In progress
+
+This second pre-review pass exists because the project is leaving Replit entirely. It is not a feature sprint. It is a portability, reliability, trust, and polish sprint before the first important external review.
+
+### Implemented in this pass
+
+- Removed runtime reliance on host-derived Clerk keys and Clerk proxy behavior.
+- Standardized API Clerk configuration through environment variables.
+- Removed host-connector credential lookup from Whop billing.
+- Standardized OpenAI environment variables while keeping migration fallbacks.
+- Made Vite build defaults host-neutral.
+- Made reverse-proxy trust explicit rather than platform-assumed.
+- Made production CORS explicit instead of wildcard credential access.
+- Added `/healthz` for load balancers and host health checks.
+- Added graceful API shutdown for rolling deploys.
+- Added `.env` secret protection and `.env.example`.
+- Added GitHub CI for frozen install, typecheck, web tests, and full build.
+- Consolidated the nine-item mobile bottom bar into four core destinations + More.
+- Added an app-level recovery screen instead of a blank-page failure.
+- Corrected privacy language around AI/service-provider processing.
+- Updated the responsible-gambling support resource.
+- Added a platform-neutral deployment and smoke-test contract.
+
+### Remaining definition of done
+
+- CI passes on the hardening PR.
+- Choose and configure the independent beta host.
+- Apply the production DB schema.
+- Configure Clerk for the final domain.
+- Run the deployment smoke test in `docs/DEPLOYMENT.md`.
+- Replace `<production-origin>` with the verified review URL.
 
 ### Explicitly out of scope
 
 - New sportsbook/data integrations.
-- Replatforming or architecture rewrites.
-- Broad new social systems.
-- New predictive/picks functionality.
-- Monetization complexity before evidence.
-
-**Definition of done:** A new person can open `/demo`, understand the thesis in under a minute, follow the key product loop without an account, and give structured feedback.
+- Predictive picks or recommendations.
+- Major social feature expansion.
+- Rewriting working domain logic merely to make the repo look cleaner.
+- Monetization expansion before real use evidence.
 
 ## Milestone B2 — First five structured testers
 
-**State:** Next
+**State:** Blocked on B1.5 cutover
 
 Recruit five bettors who actually place wagers with enough frequency to have habits worth observing.
 
 Each tester should:
 
-- Open the no-login demo first.
+- Open the independently hosted no-login demo first.
 - Follow the review path in `docs/BETA_REVIEW.md`.
 - Explain the product back in their own words.
 - Identify the one screen they would return to most.
@@ -129,13 +161,14 @@ These are intentionally **not commitments**:
 
 For every structured session capture:
 
-- Tester / date
+- Tester / date / device
 - Betting frequency
 - First impression in one sentence
 - Product explanation in their own words
 - Most valuable screen
 - Most confusing screen
 - Trust concern
+- Mobile navigation friction (if applicable)
 - Would use for 7 days? Why/why not?
 - Commitment signal: none / account / real logging / invite / pay
 - Top observed friction
@@ -143,6 +176,10 @@ For every structured session capture:
 
 ## Next decision
 
-Do **not** ask “what should we build next?” until B2 has five completed reviews. Ask:
+The immediate decision is operational, not product scope:
+
+> Which boring independent host gives us the cheapest reliable beta deployment without forcing product code to change?
+
+After cutover, return to the evidence gate:
 
 > What repeated behavior or friction did the five testers actually show us?
