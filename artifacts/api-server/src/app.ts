@@ -50,14 +50,16 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Standard Clerk configuration. @clerk/express reads CLERK_PUBLISHABLE_KEY and
-// CLERK_SECRET_KEY from the environment, which keeps auth portable across hosts.
-app.use(clerkMiddleware());
-
 // Unauthenticated liveness endpoint for load balancers and container hosts.
+// Keep this before auth middleware so a missing/misconfigured auth provider
+// cannot make the process appear dead to the host.
 app.get("/healthz", (_req, res) => {
   res.status(200).json({ status: "ok", service: "tiltcheck-api" });
 });
+
+// Standard Clerk configuration. @clerk/express reads CLERK_PUBLISHABLE_KEY and
+// CLERK_SECRET_KEY from the environment, which keeps auth portable across hosts.
+app.use(clerkMiddleware());
 
 app.use("/api", router);
 
