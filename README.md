@@ -1,8 +1,16 @@
 # TiltCheck
 
-TiltCheck is a private-beta sports betting **decision tracker**. It helps bettors record why they placed a wager, compare confidence with outcomes, grade the decision after settlement, and surface repeated leaks that a normal win/loss record hides.
+> **What is TiltCheck, in 30 seconds?** TiltCheck is a sports-betting **decision tracker**, not a picks app. Before a game, you log a bet, write down *why* you made it, and rate your conviction from 1 to 10. After the game, you settle the bet and grade the **decision itself**, separately from whether it won or lost. Over time it shows you your repeated mistakes, how well calibrated your confidence is, and where your bankroll is actually leaking.
+>
+> **Why grade the decision, not just the outcome?** A good decision can lose and a bad decision can win. A plain win/loss record hides that. TiltCheck keeps decision quality distinct from wager outcome, so a bettor can see whether they are thinking well even when results are noisy — and fix the thinking, not just chase the next win.
+>
+> **Built by Daniel Marlin** using AI-assisted development with human review. Stack: React 19 + Vite + TypeScript, Express 5, PostgreSQL/Drizzle, Clerk auth, OpenAI. Billing (Whop) is wired but disabled for the private beta.
 
-It is **not** a picks app, tout service, sportsbook, or outcome predictor.
+## What is built vs. what is still in cutover
+
+**Built and verified:** straight-bet and parlay logging and settlement, rationale + conviction capture, decision-quality grading, bankroll ledger, ROI and confidence calibration, leak detection, lessons and Edge Finder, weekly recap, crew board and challenges, CSV exports, a public read-only demo (`/demo`, fictional data, no account needed), authenticated private-beta experience, and a green GitHub Actions typecheck/test/build gate (180 frontend tests passing).
+
+**Still in cutover (not deployed yet):** the app has no live production environment. The remaining work is operational, not feature work: stand up an independent host (Render services `tiltcheck-beta` and `tiltcheck-db` in `render.yaml`), configure secrets and the domain, and pass the smoke test in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). Push notifications stay disabled until fresh VAPID keys exist.
 
 ## Beta status
 
